@@ -51,7 +51,7 @@ export class POSCARParser implements StructureParser {
     const elements: string[] = [];
     for (const el of elementLine) {
       const parsed = parseElement(el);
-      if (parsed) elements.push(parsed);
+      if (parsed) {elements.push(parsed);}
     }
 
     // Line 7: number of atoms per type
@@ -86,16 +86,16 @@ export class POSCARParser implements StructureParser {
     let currentElementCount = 0;
 
     for (const line of atomLines) {
-      if (!line.trim()) continue;
+      if (!line.trim()) {continue;}
 
       const parts = line.trim().split(/\s+/);
-      if (parts.length < 3) continue;
+      if (parts.length < 3) {continue;}
 
       let x = parseFloat(parts[0]);
       let y = parseFloat(parts[1]);
       let z = parseFloat(parts[2]);
 
-      if (isNaN(x) || isNaN(y) || isNaN(z)) continue;
+      if (isNaN(x) || isNaN(y) || isNaN(z)) {continue;}
 
       // Convert to Cartesian if fractional
       if (coordType === 'D' || coordType === 'F') {

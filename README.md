@@ -87,4 +87,4 @@ src/
 
 ## License
 
-Specify your license here.
+MIT. See [LICENSE](LICENSE).

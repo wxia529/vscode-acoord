@@ -41,7 +41,7 @@ export function activate(context: vscode.ExtensionContext) {
           value: 'molecule',
         });
 
-        if (!name) return;
+        if (!name) {return;}
 
         const structure = new Structure(name, false);
         const content = FileManager.saveStructure(structure, 'xyz');
@@ -78,7 +78,7 @@ export function activate(context: vscode.ExtensionContext) {
           value: 'crystal',
         });
 
-        if (!name) return;
+        if (!name) {return;}
 
         const structure = new Structure(name, true);
         structure.unitCell = new UnitCell(5.0, 5.0, 5.0, 90, 90, 90);
@@ -132,7 +132,7 @@ export function activate(context: vscode.ExtensionContext) {
           placeHolder: 'Select export format',
         });
 
-        if (!selectedFormat) return;
+        if (!selectedFormat) {return;}
 
         const fileContent = await vscode.workspace.fs.readFile(fileUri);
         const content = new TextDecoder().decode(fileContent);

@@ -485,7 +485,7 @@ export class StructureEditorProvider implements vscode.CustomEditorProvider {
   private getWebviewContent(webview: vscode.Webview): string {
     const csp = `default-src 'none'; img-src ${webview.cspSource} data:; style-src ${webview.cspSource}; script-src ${webview.cspSource}`;
     const styleUri = webview.asWebviewUri(
-      vscode.Uri.joinPath(this.context.extensionUri, 'src', 'webview', 'styles.css')
+      vscode.Uri.joinPath(this.context.extensionUri, 'media', 'webview', 'styles.css')
     );
     const threeUri = webview.asWebviewUri(
       vscode.Uri.joinPath(
@@ -508,19 +508,19 @@ export class StructureEditorProvider implements vscode.CustomEditorProvider {
       )
     );
     const stateUri = webview.asWebviewUri(
-      vscode.Uri.joinPath(this.context.extensionUri, 'src', 'webview', 'state.js')
+      vscode.Uri.joinPath(this.context.extensionUri, 'media', 'webview', 'state.js')
     );
     const rendererUri = webview.asWebviewUri(
-      vscode.Uri.joinPath(this.context.extensionUri, 'src', 'webview', 'renderer.js')
+      vscode.Uri.joinPath(this.context.extensionUri, 'media', 'webview', 'renderer.js')
     );
     const interactionUri = webview.asWebviewUri(
-      vscode.Uri.joinPath(this.context.extensionUri, 'src', 'webview', 'interaction.js')
+      vscode.Uri.joinPath(this.context.extensionUri, 'media', 'webview', 'interaction.js')
     );
     const appUri = webview.asWebviewUri(
-      vscode.Uri.joinPath(this.context.extensionUri, 'src', 'webview', 'app.js')
+      vscode.Uri.joinPath(this.context.extensionUri, 'media', 'webview', 'app.js')
     );
 
-    const templatePath = path.join(this.context.extensionPath, 'src', 'webview', 'index.html');
+    const templatePath = path.join(this.context.extensionPath, 'media', 'webview', 'index.html');
     let html = fs.readFileSync(templatePath, 'utf8');
     html = html.replace(/\{\{csp\}\}/g, csp);
     html = html.replace(/\{\{stylesUri\}\}/g, styleUri.toString());

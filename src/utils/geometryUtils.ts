@@ -48,7 +48,7 @@ export function magnitude(v: Vector3): number {
  */
 export function normalize(v: Vector3): Vector3 {
   const mag = magnitude(v);
-  if (mag === 0) return { x: 0, y: 0, z: 0 };
+  if (mag === 0) {return { x: 0, y: 0, z: 0 };}
   return { x: v.x / mag, y: v.y / mag, z: v.z / mag };
 }
 
@@ -58,7 +58,7 @@ export function normalize(v: Vector3): Vector3 {
 export function angle(v1: Vector3, v2: Vector3): number {
   const n1 = magnitude(v1);
   const n2 = magnitude(v2);
-  if (n1 === 0 || n2 === 0) return 0;
+  if (n1 === 0 || n2 === 0) {return 0;}
   const dot = dotProduct(v1, v2);
   return Math.acos(dot / (n1 * n2));
 }
@@ -67,7 +67,7 @@ export function angle(v1: Vector3, v2: Vector3): number {
  * Calculate centroid of multiple points
  */
 export function centroid(points: Vector3[]): Vector3 {
-  if (points.length === 0) return { x: 0, y: 0, z: 0 };
+  if (points.length === 0) {return { x: 0, y: 0, z: 0 };}
   
   const sum = points.reduce(
     (acc, p) => ({ x: acc.x + p.x, y: acc.y + p.y, z: acc.z + p.z }),

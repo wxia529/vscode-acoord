@@ -61,16 +61,16 @@ export class CIFParser implements StructureParser {
         // Parse column headers
         while (i + 1 < lines.length) {
           const header = lines[i].trim();
-          if (!header.startsWith('_atom_site')) break;
+          if (!header.startsWith('_atom_site')) {break;}
 
-          if (header.includes('_atom_site_label')) labelIdx = colIdx;
-          else if (header.includes('_atom_site_type_symbol')) typeIdx = colIdx;
-          else if (header.includes('_atom_site_fract_x')) xIdx = colIdx;
-          else if (header.includes('_atom_site_fract_y')) yIdx = colIdx;
-          else if (header.includes('_atom_site_fract_z')) zIdx = colIdx;
-          else if (header.includes('_atom_site_cartn_x')) cartXIdx = colIdx;
-          else if (header.includes('_atom_site_cartn_y')) cartYIdx = colIdx;
-          else if (header.includes('_atom_site_cartn_z')) cartZIdx = colIdx;
+          if (header.includes('_atom_site_label')) {labelIdx = colIdx;}
+          else if (header.includes('_atom_site_type_symbol')) {typeIdx = colIdx;}
+          else if (header.includes('_atom_site_fract_x')) {xIdx = colIdx;}
+          else if (header.includes('_atom_site_fract_y')) {yIdx = colIdx;}
+          else if (header.includes('_atom_site_fract_z')) {zIdx = colIdx;}
+          else if (header.includes('_atom_site_cartn_x')) {cartXIdx = colIdx;}
+          else if (header.includes('_atom_site_cartn_y')) {cartYIdx = colIdx;}
+          else if (header.includes('_atom_site_cartn_z')) {cartZIdx = colIdx;}
           colIdx++;
           i++;
         }

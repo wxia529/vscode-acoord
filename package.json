@@ -2,7 +2,30 @@
   "name": "acoord",
   "displayName": "ACoord",
   "description": "Atomic Coordinate Toolkit",
+  "publisher": "wxia",
   "version": "0.1.0",
+  "license": "MIT",
+  "icon": "media/acoord-icon.svg",
+  "keywords": [
+    "chemistry",
+    "materials",
+    "crystal",
+    "molecule",
+    "structure",
+    "visualization",
+    "cif",
+    "xyz",
+    "vasp",
+    "poscar"
+  ],
+  "homepage": "https://github.com/wxia529/vscode-acoord",
+  "bugs": {
+    "url": "https://github.com/wxia529/vscode-acoord/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/wxia529/vscode-acoord"
+  },
   "engines": {
     "vscode": "^1.109.0"
   },
@@ -11,6 +34,16 @@
     "Other"
   ],
   "main": "./out/extension.js",
+  "activationEvents": [
+    "onCustomEditor:acoord.structureEditor",
+    "onCommand:acoord.openStructureEditor",
+    "onCommand:acoord.createNewMolecule",
+    "onCommand:acoord.createNewCrystal",
+    "onCommand:acoord.exportStructure",
+    "onCommand:acoord.addAtom",
+    "onCommand:acoord.deleteAtom",
+    "onCommand:acoord.toggleVisualization"
+  ],
   "contributes": {
     "customEditors": [
       {

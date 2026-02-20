@@ -31,7 +31,7 @@ export class STRUParser implements StructureParser {
       const upper = line.toUpperCase();
       if (upper === 'LATTICE_CONSTANT') {
         i++;
-        while (i < lines.length && !this.cleanLine(lines[i])) i++;
+        while (i < lines.length && !this.cleanLine(lines[i])) {i++;}
         if (i < lines.length) {
           const value = parseFloat(this.cleanLine(lines[i]));
           if (Number.isFinite(value)) {
@@ -68,7 +68,7 @@ export class STRUParser implements StructureParser {
 
       if (upper === 'ATOMIC_POSITIONS') {
         i++;
-        while (i < lines.length && !this.cleanLine(lines[i])) i++;
+        while (i < lines.length && !this.cleanLine(lines[i])) {i++;}
         if (i >= lines.length) {
           break;
         }
@@ -235,7 +235,7 @@ export class STRUParser implements StructureParser {
   }
 
   private cleanLine(line: string): string {
-    if (!line) return '';
+    if (!line) {return '';}
     const withoutComment = line.split('//')[0];
     return withoutComment.trim();
   }
@@ -294,7 +294,7 @@ export class STRUParser implements StructureParser {
   }
 
   private getCenterOffset(mode: string, vectors: number[][] | null): [number, number, number] | null {
-    if (!vectors) return null;
+    if (!vectors) {return null;}
     if (mode.includes('center_xyz')) {
       return this.fracToCart(0.5, 0.5, 0.5, vectors);
     }
