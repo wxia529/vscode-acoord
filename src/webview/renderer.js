@@ -1,0 +1,328 @@
+(function () {
+  const state = window.ACoordState;
+
+  const rendererState = {
+    scene: null,
+    camera: null,
+    renderer: null,
+    controls: null,
+    atomMeshes: new Map(),
+    bondLines: [],
+    unitCellGroup: null,
+    raycaster: null,
+    mouse: null,
+    dragPlane: null,
+    lastScale: 1,
+    lastSizeScale: 1,
+    setError: () => {},
+    setStatus: () => {},
+  };
+
+  function init(canvas, handlers) {
+    if (!window.THREE) {
+      handlers.setError('Three.js failed to load. Please run npm install and reload the editor.');
+      return;
+    }
+
+    rendererState.setError = handlers.setError;
+    rendererState.setStatus = handlers.setStatus;
+
+    const container = document.getElementById('container');
+    const rect = container.getBoundingClientRect();
+    const width = Math.max(1, rect.width - 250);
+    const height = Math.max(1, rect.height);
+    handlers.setStatus('Canvas size: ' + Math.round(width) + 'x' + Math.round(height));
+
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x0d1015);
+    rendererState.scene = scene;
+
+    const camera = new THREE.PerspectiveCamera(75, width / height, 0.1, 10000);
+    camera.position.z = 20;
+    rendererState.camera = camera;
+
+    try {
+      const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+      renderer.setSize(width, height);
+      renderer.setPixelRatio(window.devicePixelRatio);
+      renderer.setClearColor(0x222222, 1);
+      rendererState.renderer = renderer;
+    } catch (error) {
+      handlers.setError('WebGL renderer failed to initialize. Check GPU/WebGL support.');
+      return;
+    }
+
+    const gl = rendererState.renderer.getContext();
+    if (!gl) {
+      handlers.setError('WebGL context unavailable. Your system or VS Code may have WebGL disabled.');
+      return;
+    }
+
+    scene.add(new THREE.AmbientLight(0xffffff, 0.5));
+    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+    directionalLight.position.set(10, 10, 10);
+    scene.add(directionalLight);
+
+    scene.add(new THREE.AxesHelper(5));
+
+    if (THREE.OrbitControls) {
+      rendererState.controls = new THREE.OrbitControls(camera, rendererState.renderer.domElement);
+      rendererState.controls.enableDamping = true;
+      rendererState.controls.dampingFactor = 0.05;
+    } else {
+      rendererState.controls = { update: () => {} };
+      handlers.setError('OrbitControls not available. Rendering should still work.');
+    }
+
+    camera.lookAt(0, 0, 0);
+    rendererState.raycaster = new THREE.Raycaster();
+    rendererState.mouse = new THREE.Vector2();
+    rendererState.dragPlane = new THREE.Plane();
+
+    window.addEventListener('resize', onResize);
+    onResize();
+    requestAnimationFrame(() => onResize());
+    setTimeout(() => onResize(), 150);
+    animate();
+
+    setInterval(() => {
+      const calls = rendererState.renderer ? rendererState.renderer.info.render.calls : 0;
+      handlers.setStatus('Render OK. Draw calls: ' + calls + ' | Atoms: ' + rendererState.atomMeshes.size);
+    }, 1000);
+  }
+
+  function animate() {
+    requestAnimationFrame(animate);
+    if (!rendererState.renderer || !rendererState.controls) return;
+    rendererState.controls.update();
+    rendererState.renderer.render(rendererState.scene, rendererState.camera);
+  }
+
+  function onResize() {
+    if (!rendererState.renderer || !rendererState.camera) return;
+    const container = document.getElementById('container');
+    const rect = container.getBoundingClientRect();
+    const width = Math.max(1, rect.width - 250);
+    const height = Math.max(1, rect.height);
+    rendererState.camera.aspect = width / height;
+    rendererState.camera.updateProjectionMatrix();
+    rendererState.renderer.setSize(width, height);
+  }
+
+  function getAutoScales(atoms) {
+    if (!atoms || atoms.length === 0) return { scale: 1, sizeScale: 1 };
+    let minX = Infinity, minY = Infinity, minZ = Infinity;
+    let maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity;
+    for (const atom of atoms) {
+      const x = atom.position[0];
+      const y = atom.position[1];
+      const z = atom.position[2];
+      if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(z)) continue;
+      minX = Math.min(minX, x);
+      minY = Math.min(minY, y);
+      minZ = Math.min(minZ, z);
+      maxX = Math.max(maxX, x);
+      maxY = Math.max(maxY, y);
+      maxZ = Math.max(maxZ, z);
+    }
+    const sizeX = maxX - minX;
+    const sizeY = maxY - minY;
+    const sizeZ = maxZ - minZ;
+    const maxDim = Math.max(sizeX, sizeY, sizeZ);
+    if (!Number.isFinite(maxDim) || maxDim <= 0) return { scale: 1, sizeScale: 1 };
+
+    const target = 30;
+    const scale = Math.min(Math.max(target / maxDim, 0.05), 5);
+    const sizeScale = Math.min(Math.max(10 / Math.sqrt(maxDim), 1.5), 6);
+
+    return { scale, sizeScale };
+  }
+
+  function renderStructure(data, uiHooks, options) {
+    state.currentStructure = data;
+    let scale = state.manualScale;
+    let sizeScale = state.atomSizeScale;
+    if (state.autoScaleEnabled) {
+      const auto = getAutoScales(data.atoms || []);
+      scale = auto.scale;
+      sizeScale = auto.sizeScale;
+    }
+    rendererState.lastScale = scale;
+    rendererState.lastSizeScale = sizeScale;
+
+    for (const mesh of rendererState.atomMeshes.values()) {
+      rendererState.scene.remove(mesh);
+    }
+    rendererState.atomMeshes.clear();
+
+    for (const line of rendererState.bondLines) {
+      rendererState.scene.remove(line);
+    }
+    rendererState.bondLines = [];
+
+    if (rendererState.unitCellGroup) {
+      rendererState.scene.remove(rendererState.unitCellGroup);
+      rendererState.unitCellGroup = null;
+    }
+
+    const selectedSet = new Set(data.selectedAtomIds || []);
+
+    if (data.atoms) {
+      for (const atom of data.atoms) {
+        if (!Number.isFinite(atom.position[0]) || !Number.isFinite(atom.position[1]) || !Number.isFinite(atom.position[2])) {
+          continue;
+        }
+        const isSelected = !!atom.selected || selectedSet.has(atom.id);
+        const sphereRadius = Math.max(atom.radius * sizeScale, 0.12) * (isSelected ? 1.12 : 1);
+        const geometry = new THREE.SphereGeometry(sphereRadius, 32, 32);
+        const material = new THREE.MeshBasicMaterial({
+          color: new THREE.Color(isSelected ? '#f6d55c' : atom.color),
+          wireframe: !isSelected,
+        });
+        const mesh = new THREE.Mesh(geometry, material);
+        mesh.position.set(
+          atom.position[0] * scale,
+          atom.position[1] * scale,
+          atom.position[2] * scale
+        );
+        mesh.userData = { atomId: atom.id };
+        rendererState.scene.add(mesh);
+        rendererState.atomMeshes.set(atom.id, mesh);
+      }
+    }
+
+    if (data.bonds) {
+      for (const bond of data.bonds) {
+        const highlightBond =
+          bond.atomId1 &&
+          bond.atomId2 &&
+          selectedSet.has(bond.atomId1) &&
+          selectedSet.has(bond.atomId2);
+        const start = new THREE.Vector3(
+          bond.start[0] * scale,
+          bond.start[1] * scale,
+          bond.start[2] * scale
+        );
+        const end = new THREE.Vector3(
+          bond.end[0] * scale,
+          bond.end[1] * scale,
+          bond.end[2] * scale
+        );
+        const direction = end.clone().sub(start);
+        const length = direction.length();
+        const bondRadius = Math.max(bond.radius * sizeScale, 0.03) * (highlightBond ? 1.35 : 1);
+        const geometry = new THREE.CylinderGeometry(bondRadius, bondRadius, length, 8);
+        const material = new THREE.MeshBasicMaterial({
+          color: new THREE.Color(highlightBond ? '#f6d55c' : bond.color),
+        });
+        const cylinder = new THREE.Mesh(geometry, material);
+        const midpoint = start.clone().add(end).multiplyScalar(0.5);
+        cylinder.position.copy(midpoint);
+        if (direction.length() > 0.0001) {
+          const axis = new THREE.Vector3(0, 1, 0);
+          const rotationAxis = axis.clone().cross(direction.clone().normalize());
+          if (rotationAxis.length() > 0.0001) {
+            const angle = Math.acos(axis.dot(direction.normalize()) / direction.length());
+            cylinder.setRotationFromAxisAngle(rotationAxis.normalize(), angle);
+          }
+        }
+        rendererState.scene.add(cylinder);
+        rendererState.bondLines.push(cylinder);
+      }
+    }
+
+    if (data.unitCell && data.unitCell.edges && data.unitCell.edges.length > 0) {
+      const vertices = [];
+      for (const edge of data.unitCell.edges) {
+        vertices.push(
+          edge.start[0] * scale,
+          edge.start[1] * scale,
+          edge.start[2] * scale,
+          edge.end[0] * scale,
+          edge.end[1] * scale,
+          edge.end[2] * scale
+        );
+      }
+      const geometry = new THREE.BufferGeometry();
+      geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+      const color = data.unitCell.edges[0].color || '#FF6600';
+      const material = new THREE.LineBasicMaterial({ color: new THREE.Color(color) });
+      const lines = new THREE.LineSegments(geometry, material);
+      rendererState.scene.add(lines);
+      rendererState.unitCellGroup = lines;
+    }
+
+    if (uiHooks) {
+      uiHooks.updateCounts(data.atoms.length, data.bonds ? data.bonds.length : 0);
+      uiHooks.updateAtomList(data.atoms, data.selectedAtomIds || [], data.selectedAtomId);
+    }
+
+    if (options && options.fitCamera) {
+      fitCamera();
+    }
+  }
+
+  function fitCamera() {
+    if (rendererState.atomMeshes.size === 0) return;
+    const box = new THREE.Box3();
+    for (const mesh of rendererState.atomMeshes.values()) {
+      box.expandByObject(mesh);
+    }
+    const size = box.getSize(new THREE.Vector3());
+    const maxDim = Math.max(size.x, size.y, size.z);
+    const fov = rendererState.camera.fov * (Math.PI / 180);
+    const cameraDistance = Math.abs(maxDim / 2 / Math.tan(fov / 2)) * 0.6 / state.viewZoom;
+    const center = box.getCenter(new THREE.Vector3());
+    rendererState.camera.position.set(center.x, center.y, center.z + cameraDistance * 1.2);
+    rendererState.camera.near = Math.max(0.1, cameraDistance / 100);
+    rendererState.camera.far = Math.max(1000, cameraDistance * 10);
+    rendererState.camera.updateProjectionMatrix();
+    if (rendererState.controls && rendererState.controls.target) {
+      rendererState.controls.target.copy(center);
+    }
+    rendererState.controls.update();
+  }
+
+  function getRaycaster() {
+    return rendererState.raycaster;
+  }
+
+  function getMouse() {
+    return rendererState.mouse;
+  }
+
+  function getCamera() {
+    return rendererState.camera;
+  }
+
+  function getAtomMeshes() {
+    return rendererState.atomMeshes;
+  }
+
+  function getDragPlane() {
+    return rendererState.dragPlane;
+  }
+
+  function setControlsEnabled(enabled) {
+    if (rendererState.controls && rendererState.controls.enabled !== undefined) {
+      rendererState.controls.enabled = enabled;
+    }
+  }
+
+  function getScale() {
+    return rendererState.lastScale || 1;
+  }
+
+  window.ACoordRenderer = {
+    init,
+    renderStructure,
+    fitCamera,
+    getScale,
+    getRaycaster,
+    getMouse,
+    getCamera,
+    getAtomMeshes,
+    getDragPlane,
+    setControlsEnabled,
+  };
+})();

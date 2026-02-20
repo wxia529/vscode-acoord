@@ -1,0 +1,139 @@
+{
+  "name": "acoord",
+  "displayName": "ACoord",
+  "description": "Atomic Coordinate Toolkit",
+  "version": "0.1.0",
+  "engines": {
+    "vscode": "^1.109.0"
+  },
+  "categories": [
+    "Data Science",
+    "Other"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "customEditors": [
+      {
+        "viewType": "acoord.structureEditor",
+        "displayName": "ACoord Structure Editor",
+        "priority": "option",
+        "selector": [
+          {
+            "filenamePattern": "*.cif"
+          },
+          {
+            "filenamePattern": "*.xyz"
+          },
+          {
+            "filenamePattern": "*.poscar"
+          },
+          {
+            "filenamePattern": "*.vasp"
+          },
+          {
+            "filenamePattern": "*POSCAR"
+          },
+          {
+            "filenamePattern": "*CONTCAR"
+          },
+          {
+            "filenamePattern": "*.pdb"
+          },
+          {
+            "filenamePattern": "*.gjf"
+          },
+          {
+            "filenamePattern": "*.com"
+          },
+          {
+            "filenamePattern": "*.inp"
+          },
+          {
+            "filenamePattern": "*.stru"
+          }
+        ]
+      }
+    ],
+    "menus": {
+      "editor/title": [
+        {
+          "command": "acoord.openStructureEditor",
+          "when": "resourceExtname =~ /\\.(cif|xyz|poscar|vasp|pdb|gjf|com|inp|stru)$/i || resourceFilename =~ /^(POSCAR|CONTCAR|STRU)$/i",
+          "group": "navigation"
+        }
+      ]
+    },
+    "views": {
+      "explorer": [
+        {
+          "id": "acoordExplorer",
+          "name": "ACoord Explorer",
+          "when": "acoord.structureOpen",
+          "icon": "media/preview-light.svg"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "acoord.createNewMolecule",
+        "title": "ACoord: Create New Molecule",
+        "category": "ACoord"
+      },
+      {
+        "command": "acoord.createNewCrystal",
+        "title": "ACoord: Create New Crystal",
+        "category": "ACoord"
+      },
+      {
+        "command": "acoord.openStructureEditor",
+        "title": "ACoord: Open Structure Editor",
+        "icon": {
+          "light": "media/preview-light.svg",
+          "dark": "media/preview-dark.svg"
+        },
+        "category": "ACoord"
+      },
+      {
+        "command": "acoord.exportStructure",
+        "title": "ACoord: Export Structure",
+        "category": "ACoord"
+      },
+      {
+        "command": "acoord.addAtom",
+        "title": "ACoord: Add Atom",
+        "category": "ACoord"
+      },
+      {
+        "command": "acoord.deleteAtom",
+        "title": "ACoord: Delete Selected Atom",
+        "category": "ACoord"
+      },
+      {
+        "command": "acoord.toggleVisualization",
+        "title": "ACoord: Toggle Ball-and-Stick / Space-Filling",
+        "category": "ACoord"
+      }
+    ]
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "pretest": "npm run compile && npm run lint",
+    "lint": "eslint src",
+    "test": "vscode-test"
+  },
+  "dependencies": {
+    "three": "0.128.0"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.109.0",
+    "@types/mocha": "^10.0.10",
+    "@types/node": "22.x",
+    "typescript-eslint": "^8.54.0",
+    "eslint": "^9.39.2",
+    "typescript": "^5.9.3",
+    "@vscode/test-cli": "^0.0.12",
+    "@vscode/test-electron": "^2.5.2"
+  }
+}

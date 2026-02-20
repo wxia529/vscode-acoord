@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ACoord - Structure Editor</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: var(--vscode-font-family);
+            background-color: var(--vscode-editor-background);
+            color: var(--vscode-editor-foreground);
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        #toolbar {
+            background-color: var(--vscode-titleBar-activeBackground);
+            padding: 10px 15px;
+            display: flex;
+            gap: 10px;
+            border-bottom: 1px solid var(--vscode-titleBar-border);
+            flex-wrap: wrap;
+        }
+
+        button {
+            background-color: var(--vscode-button-background);
+            color: var(--vscode-button-foreground);
+            border: 1px solid var(--vscode-button-border);
+            padding: 6px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: background-color 0.2s;
+        }
+
+        button:hover {
+            background-color: var(--vscode-button-hoverBackground);
+        }
+
+        button:active {
+            background-color: var(--vscode-button-background);
+            opacity: 0.8;
+        }
+
+        #container {
+            flex: 1;
+            display: flex;
+            overflow: hidden;
+        }
+
+        #canvas {
+            flex: 1;
+            background: linear-gradient(135deg, #1e1e1e 0%, #2d2d2d 100%);
+        }
+
+        #sidebar {
+            width: 250px;
+            background-color: var(--vscode-sideBar-background);
+            border-left: 1px solid var(--vscode-sideBar-border);
+            padding: 10px;
+            overflow-y: auto;
+        }
+
+        .panel {
+            margin-bottom: 15px;
+        }
+
+        .panel-title {
+            font-weight: bold;
+            font-size: 12px;
+            text-transform: uppercase;
+            color: var(--vscode-textBlockQuote-border);
+            margin-bottom: 8px;
+            padding-bottom: 5px;
+            border-bottom: 1px solid var(--vscode-panel-border);
+        }
+
+        .input-group {
+            margin-bottom: 8px;
+            display: flex;
+            gap: 5px;
+            flex-direction: column;
+        }
+
+        .input-group label {
+            font-size: 11px;
+            color: var(--vscode-foreground);
+        }
+
+        .input-group input {
+            padding: 4px 6px;
+            background-color: var(--vscode-input-background);
+            color: var(--vscode-input-foreground);
+            border: 1px solid var(--vscode-input-border);
+            border-radius: 2px;
+            font-size: 11px;
+        }
+
+        .atom-list {
+            font-size: 11px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .atom-item {
+            padding: 4px;
+            margin: 2px 0;
+            background-color: var(--vscode-list-hoverBackground);
+            border-radius: 2px;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .atom-item.selected {
+            background-color: var(--vscode-list-activeSelectionBackground);
+            color: var(--vscode-list-activeSelectionForeground);
+        }
+
+        .atom-item:hover {
+            background-color: var(--vscode-list-hoverBackground);
+        }
+
+        #info {
+            font-size: 11px;
+            color: var(--vscode-descriptionForeground);
+            padding: 8px;
+            background-color: var(--vscode-infoBackground);
+            border-radius: 2px;
+            line-height: 1.5;
+        }
+
+        .spinner {
+            border: 2px solid var(--vscode-icon-foreground);
+            border-top: 2px solid var(--vscode-button-background);
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+            margin: auto;
+            margin-top: 100px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div id="toolbar">
+        <button id="btn-add-atom" title="Add atom (Ctrl+A)">+ Add Atom</button>
+        <button id="btn-delete-atom" title="Delete selected atom (Delete)">🗑 Delete</button>
+        <button id="btn-toggle-vis" title="Toggle ball-and-stick / space-filling (V)">👁 Toggle View</button>
+        <button id="btn-unit-cell" title="Toggle unit cell display (U)">📦 Unit Cell</button>
+        <button id="btn-center" title="Center structure (C)">⊕ Center</button>
+        <button id="btn-reset" title="Reset view (R)">↺ Reset View</button>
+    </div>
+
+    <div id="container">
+        <canvas id="canvas"></canvas>
+        <div id="sidebar">
+            <div class="panel">
+                <div class="panel-title">Structure Info</div>
+                <div id="info">
+                    <div>Atoms: <span id="atom-count">0</span></div>
+                    <div>Bonds: <span id="bond-count">0</span></div>
+                    <div id="cell-info" style="display:none;">
+                        <div>Cell: <span id="cell-params">-</span></div>
+                        <div>Volume: <span id="cell-volume">-</span> Ų</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="panel">
+                <div class="panel-title">Add Atom</div>
+                <div class="input-group">
+                    <label>Element</label>
+                    <input type="text" id="element-input" placeholder="e.g., C, N, O" maxlength="3">
+                </div>
+                <div class="input-group">
+                    <label>X (Å)</label>
+                    <input type="number" id="pos-x" placeholder="0.0" step="0.1">
+                </div>
+                <div class="input-group">
+                    <label>Y (Å)</label>
+                    <input type="number" id="pos-y" placeholder="0.0" step="0.1">
+                </div>
+                <div class="input-group">
+                    <label>Z (Å)</label>
+                    <input type="number" id="pos-z" placeholder="0.0" step="0.1">
+                </div>
+                <button id="btn-add-atom-form" style="width: 100%;">Add</button>
+            </div>
+
+            <div class="panel">
+                <div class="panel-title">Selected Atom</div>
+                <div id="selected-info" style="font-size: 11px; color: var(--vscode-descriptionForeground);">
+                    None selected
+                </div>
+            </div>
+
+            <div class="panel">
+                <div class="panel-title">Atoms</div>
+                <div class="atom-list" id="atom-list">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const vscode = acquireVsCodeApi();
+        let scene, camera, renderer, controls;
+        let atomMeshes = new Map();
+        let bondLines = [];
+        let unitCellLines = [];
+        let currentStructure = null;
+        let rendererMode = 'ballAndStick';
+
+        // Initialize Three.js
+        function initThreeJS() {
+            const canvas = document.getElementById('canvas');
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x1a1a1a);
+
+            camera = new THREE.PerspectiveCamera(
+                75,
+                canvas.clientWidth / canvas.clientHeight,
+                0.1,
+                10000
+            );
+            camera.position.z = 20;
+
+            renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+            renderer.setSize(canvas.clientWidth, canvas.clientHeight);
+            renderer.setPixelRatio(window.devicePixelRatio);
+
+            // Add lighting
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+            scene.add(ambientLight);
+
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+            directionalLight.position.set(10, 10, 10);
+            scene.add(directionalLight);
+
+            // Create orbit controls
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+            controls.autoRotate = false;
+
+            // Handle window resize
+            window.addEventListener('resize', onWindowResize);
+
+            // Start render loop
+            animate();
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+            renderer.render(scene, camera);
+        }
+
+        function onWindowResize() {
+            const container = document.getElementById('container');
+            const canvas = document.getElementById('canvas');
+            const width = container.clientWidth - 250;
+            const height = container.clientHeight;
+
+            camera.aspect = width / height;
+            camera.updateProjectionMatrix();
+            renderer.setSize(width, height);
+        }
+
+        // Render structure
+        function renderStructure(message) {
+            const data = message.data;
+            currentStructure = data;
+
+            // Clear scene
+            for (const mesh of atomMeshes.values()) {
+                scene.remove(mesh);
+            }
+            atomMeshes.clear();
+
+            for (const line of bondLines) {
+                scene.remove(line);
+            }
+            bondLines = [];
+
+            for (const line of unitCellLines) {
+                scene.remove(line);
+            }
+            unitCellLines = [];
+
+            // Add atoms
+            if (data.atoms) {
+                for (const atom of data.atoms) {
+                    const geometry = new THREE.SphereGeometry(atom.radius, 32, 32);
+                    const material = new THREE.MeshPhongMaterial({
+                        color: new THREE.Color(atom.color),
+                        emissive: atom.selected ? new THREE.Color(atom.color) : 0x000000,
+                        emissiveIntensity: atom.selected ? 0.5 : 0,
+                    });
+                    const mesh = new THREE.Mesh(geometry, material);
+                    mesh.position.set(atom.position[0], atom.position[1], atom.position[2]);
+                    mesh.userData = { atomId: atom.id, element: atom.element };
+                    scene.add(mesh);
+                    atomMeshes.set(atom.id, mesh);
+                }
+            }
+
+            // Add bonds
+            if (data.bonds) {
+                for (const bond of data.bonds) {
+                    const start = new THREE.Vector3(bond.start[0], bond.start[1], bond.start[2]);
+                    const end = new THREE.Vector3(bond.end[0], bond.end[1], bond.end[2]);
+                    const line = createCylinder(start, end, bond.radius, bond.color);
+                    scene.add(line);
+                    bondLines.push(line);
+                }
+            }
+
+            // Add unit cell
+            if (data.unitCell) {
+                for (const edge of data.unitCell.edges) {
+                    const start = new THREE.Vector3(edge.start[0], edge.start[1], edge.start[2]);
+                    const end = new THREE.Vector3(edge.end[0], edge.end[1], edge.end[2]);
+                    const line = createCylinder(start, end, edge.radius, edge.color);
+                    scene.add(line);
+                    unitCellLines.push(line);
+                }
+            }
+
+            // Update sidebar
+            updateSidebar();
+
+            // Auto-fit camera
+            fitCamera();
+        }
+
+        function createCylinder(start, end, radius, color) {
+            const direction = end.clone().sub(start);
+            const length = direction.length();
+            const geometry = new THREE.CylinderGeometry(radius, radius, length, 8);
+            const material = new THREE.MeshPhongMaterial({ color: new THREE.Color(color) });
+            const cylinder = new THREE.Mesh(geometry, material);
+
+            const midpoint = start.clone().add(end).multiplyScalar(0.5);
+            cylinder.position.copy(midpoint);
+
+            const axis = new THREE.Vector3(0, 1, 0);
+            const rotationAxis = axis.clone().cross(direction.clone().normalize());
+            if (rotationAxis.length() > 0.0001) {
+                const angle = Math.acos(axis.dot(direction.normalize()) / direction.length());
+                cylinder.setRotationFromAxisAngle(rotationAxis.normalize(), angle);
+            }
+
+            return cylinder;
+        }
+
+        function fitCamera() {
+            if (atomMeshes.size === 0) return;
+
+            const box = new THREE.Box3();
+            for (const mesh of atomMeshes.values()) {
+                box.expandByObject(mesh);
+            }
+
+            const size = box.getSize(new THREE.Vector3());
+            const maxDim = Math.max(size.x, size.y, size.z);
+            const fov = camera.fov * (Math.PI / 180);
+            let cameraDistance = Math.abs(maxDim / 2 / Math.tan(fov / 2));
+
+            camera.position.z = cameraDistance * 1.2;
+            controls.target.copy(box.getCenter(new THREE.Vector3()));
+            controls.update();
+        }
+
+        function updateSidebar() {
+            if (!currentStructure) return;
+
+            document.getElementById('atom-count').textContent = currentStructure.atoms.length;
+            document.getElementById('bond-count').textContent = currentStructure.bonds?.length || 0;
+
+            // Update atom list
+            const atomList = document.getElementById('atom-list');
+            atomList.innerHTML = '';
+            for (const atom of currentStructure.atoms) {
+                const item = document.createElement('div');
+                item.className = 'atom-item' + (atom.selected ? ' selected' : '');
+                item.innerHTML = `<span>${atom.element} (${atom.id.substring(0, 6)})</span> <span>${atom.position[0].toFixed(2)}</span>`;
+                item.onclick = () => selectAtom(atom.id);
+                atomList.appendChild(item);
+            }
+        }
+
+        // Event listeners
+        document.getElementById('btn-add-atom').onclick = () => {
+            document.getElementById('element-input').focus();
+        };
+
+        document.getElementById('btn-add-atom-form').onclick = () => {
+            const element = document.getElementById('element-input').value.trim();
+            const x = parseFloat(document.getElementById('pos-x').value) || 0;
+            const y = parseFloat(document.getElementById('pos-y').value) || 0;
+            const z = parseFloat(document.getElementById('pos-z').value) || 0;
+
+            if (element) {
+                vscode.postMessage({
+                    command: 'addAtom',
+                    element,
+                    x,
+                    y,
+                    z,
+                });
+                document.getElementById('element-input').value = '';
+                document.getElementById('pos-x').value = '';
+                document.getElementById('pos-y').value = '';
+                document.getElementById('pos-z').value = '';
+            }
+        };
+
+        document.getElementById('btn-delete-atom').onclick = () => {
+            if (currentStructure?.selectedAtomId) {
+                vscode.postMessage({
+                    command: 'deleteAtom',
+                    atomId: currentStructure.selectedAtomId,
+                });
+            }
+        };
+
+        document.getElementById('btn-toggle-vis').onclick = () => {
+            vscode.postMessage({ command: 'toggleVisualization' });
+        };
+
+        document.getElementById('btn-unit-cell').onclick = () => {
+            vscode.postMessage({ command: 'toggleUnitCell' });
+        };
+
+        document.getElementById('btn-center').onclick = () => {
+            vscode.postMessage({ command: 'centerStructure' });
+        };
+
+        document.getElementById('btn-reset').onclick = () => {
+            if (atomMeshes.size > 0) {
+                fitCamera();
+            }
+        };
+
+        function selectAtom(atomId) {
+            vscode.postMessage({ command: 'selectAtom', atomId });
+        }
+
+        // Listen for messages from extension
+        window.addEventListener('message', (event) => {
+            const message = event.data;
+            if (message.command === 'render') {
+                renderStructure(message);
+            }
+        });
+
+        // Initialize on load
+        window.addEventListener('load', () => {
+            initThreeJS();
+            vscode.postMessage({ command: 'getState' });
+        });
+    </script>
+
+    <!-- Three.js library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@r128/examples/js/controls/OrbitControls.js"></script>
+</body>
+</html>

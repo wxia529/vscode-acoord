@@ -1,0 +1,191 @@
+:root {
+  --acoord-bg: #0f1114;
+  --acoord-bg-2: #171a1f;
+  --acoord-panel: #1c2026;
+  --acoord-panel-2: #21262d;
+  --acoord-border: #2d333b;
+  --acoord-text: #e6edf3;
+  --acoord-muted: #9da7b3;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: "Palatino Linotype", "Book Antiqua", Palatino, serif;
+  background:
+    radial-gradient(1200px 600px at 10% 0%, rgba(52, 211, 153, 0.08), transparent 60%),
+    radial-gradient(900px 500px at 90% 10%, rgba(245, 158, 11, 0.08), transparent 60%),
+    var(--acoord-bg);
+  color: var(--acoord-text);
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+#toolbar {
+  background:
+    linear-gradient(135deg, rgba(52, 211, 153, 0.18), rgba(245, 158, 11, 0.12)),
+    var(--acoord-panel);
+  padding: 10px 14px;
+  display: flex;
+  gap: 10px;
+  border-bottom: 1px solid var(--acoord-border);
+  flex-wrap: wrap;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.35);
+}
+
+button {
+  background:
+    linear-gradient(135deg, rgba(52, 211, 153, 0.25), rgba(52, 211, 153, 0.05)),
+    #1b2026;
+  color: var(--acoord-text);
+  border: 1px solid rgba(52, 211, 153, 0.35);
+  padding: 6px 12px;
+  border-radius: 999px;
+  cursor: pointer;
+  font-size: 12px;
+  letter-spacing: 0.02em;
+  transition: transform 0.15s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+button:hover {
+  transform: translateY(-1px);
+  border-color: rgba(245, 158, 11, 0.6);
+  box-shadow: 0 6px 18px rgba(245, 158, 11, 0.2);
+}
+
+.axis-button.selected {
+  border-color: rgba(245, 158, 11, 0.8);
+  box-shadow: 0 6px 18px rgba(245, 158, 11, 0.35);
+  background:
+    linear-gradient(135deg, rgba(245, 158, 11, 0.35), rgba(245, 158, 11, 0.1)),
+    #1b2026;
+}
+
+#container {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+  background: var(--acoord-bg-2);
+}
+
+#canvas {
+  flex: 1;
+  background:
+    radial-gradient(800px 500px at 20% 20%, rgba(255, 255, 255, 0.06), transparent 60%),
+    radial-gradient(600px 400px at 80% 30%, rgba(52, 211, 153, 0.08), transparent 60%),
+    linear-gradient(160deg, #12151a 0%, #1f242b 60%, #101217 100%);
+  outline: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+#error-banner,
+#status-banner {
+  display: none;
+  padding: 6px 12px;
+  font-size: 11px;
+}
+
+#error-banner {
+  background: #6b1b1b;
+  color: #ffffff;
+}
+
+#status-banner {
+  background: #1f4f2a;
+  color: #ffffff;
+}
+
+#sidebar {
+  width: 260px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.02), transparent 50%),
+    var(--acoord-panel);
+  border-left: 1px solid var(--acoord-border);
+  padding: 12px;
+  overflow-y: auto;
+  box-shadow: inset 8px 0 16px rgba(0, 0, 0, 0.25);
+}
+
+.panel {
+  margin-bottom: 16px;
+  padding: 10px;
+  background: var(--acoord-panel-2);
+  border: 1px solid var(--acoord-border);
+  border-radius: 12px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+}
+
+.panel-title {
+  font-weight: 700;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--acoord-muted);
+  margin-bottom: 8px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.input-group {
+  margin-bottom: 8px;
+  display: flex;
+  gap: 5px;
+  flex-direction: column;
+}
+
+.input-group label {
+  font-size: 11px;
+  color: var(--acoord-muted);
+}
+
+.input-group input {
+  padding: 6px 8px;
+  background-color: #0e1116;
+  color: var(--acoord-text);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  font-size: 12px;
+}
+
+.checkbox-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.atom-list {
+  font-size: 11px;
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.atom-item {
+  padding: 6px 8px;
+  margin: 4px 0;
+  background-color: rgba(255, 255, 255, 0.04);
+  border-radius: 8px;
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  border: 1px solid transparent;
+}
+
+.atom-item.selected {
+  background-color: rgba(52, 211, 153, 0.18);
+  color: var(--acoord-text);
+  border-color: rgba(52, 211, 153, 0.6);
+}
+
+#info {
+  font-size: 11px;
+  color: var(--acoord-muted);
+  padding: 8px;
+  background-color: #0f1318;
+  border-radius: 10px;
+  line-height: 1.5;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}

@@ -1,0 +1,17 @@
+(function () {
+  window.ACoordState = {
+    currentStructure: null,
+    currentSelectedAtom: null,
+    selectedAtomIds: [],
+    adsorptionReferenceId: null,
+    adsorptionAdsorbateIds: [],
+    manualScale: 1,
+    autoScaleEnabled: false,
+    atomSizeScale: 1,
+    viewZoom: 1,
+    shouldFitCamera: true,
+    groupMoveActive: false,
+    lastDragWorld: null,
+    rotationAxis: 'z',
+  };
+})();

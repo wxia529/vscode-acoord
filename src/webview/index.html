@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta http-equiv="Content-Security-Policy" content="{{csp}}" />
+  <title>ACoord - Structure Editor</title>
+  <link rel="stylesheet" href="{{stylesUri}}" />
+</head>
+<body>
+  <div id="toolbar">
+    <button id="btn-add-atom">+ Add Atom</button>
+    <button id="btn-delete-atom">Delete</button>
+    <button id="btn-copy-atom">Copy</button>
+    <button id="btn-toggle-vis">Toggle View</button>
+    <button id="btn-unit-cell">Unit Cell</button>
+    <button id="btn-reset">Reset</button>
+    <button id="btn-undo">Undo</button>
+    <button id="btn-save">Save</button>
+    <button id="btn-save-as">Save As</button>
+    <button id="btn-open-source">Open Source</button>
+    <button id="btn-reload">Reload</button>
+  </div>
+  <div id="error-banner"></div>
+  <div id="status-banner"></div>
+
+  <div id="container">
+    <canvas id="canvas"></canvas>
+    <div id="sidebar">
+      <div class="panel">
+        <div class="panel-title">Structure Info</div>
+        <div id="info">
+          <div>Atoms: <span id="atom-count">0</span></div>
+          <div>Bonds: <span id="bond-count">0</span></div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-title">Add Atom</div>
+        <div class="input-group">
+          <label>Element</label>
+          <input type="text" id="element-input" placeholder="e.g., C, N, O" maxlength="3" />
+        </div>
+        <div class="input-group">
+          <label>X (A)</label>
+          <input type="number" id="pos-x" placeholder="0.0" step="0.1" />
+        </div>
+        <div class="input-group">
+          <label>Y (A)</label>
+          <input type="number" id="pos-y" placeholder="0.0" step="0.1" />
+        </div>
+        <div class="input-group">
+          <label>Z (A)</label>
+          <input type="number" id="pos-z" placeholder="0.0" step="0.1" />
+        </div>
+        <button id="btn-add-atom-form">Add</button>
+      </div>
+
+      <div class="panel">
+        <div class="panel-title">Selected Atom</div>
+        <div class="input-group">
+          <label>Element</label>
+          <input type="text" id="sel-element" placeholder="Select an atom" maxlength="3" />
+        </div>
+        <div class="input-group">
+          <label>X (A)</label>
+          <input type="number" id="sel-x" step="0.01" />
+        </div>
+        <div class="input-group">
+          <label>Y (A)</label>
+          <input type="number" id="sel-y" step="0.01" />
+        </div>
+        <div class="input-group">
+          <label>Z (A)</label>
+          <input type="number" id="sel-z" step="0.01" />
+        </div>
+        <button id="btn-apply-atom">Apply</button>
+      </div>
+
+      <div class="panel">
+        <div class="panel-title">Change Element</div>
+        <div class="input-group">
+          <label>Element</label>
+          <input type="text" id="change-element" placeholder="e.g., C, N, O" maxlength="3" />
+        </div>
+        <button id="btn-change-atom">Apply to Selected</button>
+      </div>
+
+      <div class="panel">
+        <div class="panel-title">Display Scale</div>
+        <div class="input-group">
+          <label class="checkbox-row">
+            <input type="checkbox" id="scale-auto" />
+            Auto scale
+          </label>
+        </div>
+        <div class="input-group">
+          <label>Manual scale: <span id="scale-value">1.0</span>x</label>
+          <input type="range" id="scale-slider" min="0.2" max="50" step="0.1" value="1" />
+        </div>
+        <div class="input-group">
+          <label>Atom size: <span id="size-value">1.0</span>x</label>
+          <input type="range" id="size-slider" min="0.5" max="20" step="0.1" value="1" />
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-title">Atoms</div>
+        <div class="atom-list" id="atom-list"></div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-title">Measurements</div>
+        <div id="measurements">
+          <div>Bond length: <span id="bond-length">--</span> A</div>
+          <div>Bond angle: <span id="bond-angle">--</span> deg</div>
+        </div>
+        <div class="input-group">
+          <label>Set bond length (A)</label>
+          <input type="number" id="bond-length-input" step="0.01" />
+        </div>
+        <button id="btn-apply-bond">Apply Bond Length</button>
+        <div class="input-group">
+          <label>Set bond angle (deg)</label>
+          <input type="number" id="bond-angle-input" step="0.1" />
+        </div>
+        <button id="btn-apply-angle">Apply Bond Angle</button>
+      </div>
+
+      <div class="panel">
+        <div class="panel-title">Rotate Selection</div>
+        <div class="input-group">
+          <label>Axis</label>
+          <div style="display:flex;gap:6px;">
+            <button id="btn-rot-x" class="axis-button" type="button">X</button>
+            <button id="btn-rot-y" class="axis-button" type="button">Y</button>
+            <button id="btn-rot-z" class="axis-button" type="button">Z</button>
+          </div>
+        </div>
+        <div class="input-group">
+          <label>Angle (deg)</label>
+          <input type="range" id="rotation-slider" min="-180" max="180" step="1" value="0" />
+        </div>
+        <div class="input-group">
+          <label>Set angle (deg)</label>
+          <input type="number" id="rotation-input" step="1" value="0" />
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-title">Adjust Distance</div>
+        <div id="adsorption-info">
+          <div>Reference: <span id="adsorption-ref">--</span></div>
+          <div>Distance: <span id="adsorption-distance">--</span> A</div>
+        </div>
+        <div class="input-group">
+          <label>Adjust distance (A)</label>
+          <input type="range" id="adsorption-slider" min="0" max="10" step="0.001" value="0" />
+        </div>
+        <div class="input-group">
+          <label>Set distance (A)</label>
+          <input type="number" id="adsorption-input" step="0.01" />
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="{{threeUri}}"></script>
+  <script src="{{orbitControlsUri}}"></script>
+  <script src="{{stateUri}}"></script>
+  <script src="{{rendererUri}}"></script>
+  <script src="{{interactionUri}}"></script>
+  <script src="{{appUri}}"></script>
+</body>
+</html>
