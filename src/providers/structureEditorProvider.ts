@@ -490,20 +490,16 @@ export class StructureEditorProvider implements vscode.CustomEditorProvider {
     const threeUri = webview.asWebviewUri(
       vscode.Uri.joinPath(
         this.context.extensionUri,
-        'node_modules',
+        'media',
         'three',
-        'build',
         'three.min.js'
       )
     );
     const orbitControlsUri = webview.asWebviewUri(
       vscode.Uri.joinPath(
         this.context.extensionUri,
-        'node_modules',
+        'media',
         'three',
-        'examples',
-        'js',
-        'controls',
         'OrbitControls.js'
       )
     );
