@@ -13,5 +13,6 @@
     groupMoveActive: false,
     lastDragWorld: null,
     rotationAxis: 'z',
+    rotationInProgress: false,
   };
 })();

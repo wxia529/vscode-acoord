@@ -14,11 +14,11 @@ Atomic Coordinate Toolkit for visualizing and editing atomic structures inside V
 
 Input and output:
 
-- XYZ / extxyz (reads Lattice and Properties when present).
+- XYZ
 - CIF
 - POSCAR / VASP (Selective dynamics preserved via fixed flags).
 - PDB (basic CRYST1 + ATOM/HETATM)
-- Gaussian input (.gjf / .com)
+- Gaussian input (.gjf)
 - ORCA input (.inp)
 - ABACUS STRU (.stru)
 
@@ -42,6 +42,18 @@ Input and output:
 2. Click the preview icon in the editor title (or run `ACoord: Open Structure Editor`).
 3. Edit atoms in the 3D view and side panel.
 4. Use **Save** or **Save As** from the toolbar.
+
+## Basic Operations
+
+- Select atoms: click an atom in the canvas or the atom list.
+- Multi-select: Ctrl or Cmd click to add/remove; Shift drag keeps selection.
+- Move atoms: Shift drag selected atoms in the canvas.
+- Rotate selection: pick axis (X/Y/Z) and move the angle slider (0-360).
+- Change element: use the Change Element panel and Apply to Selected.
+- Add or delete atoms: use the Add Atom panel or Delete button.
+- Measure: select 2 atoms for bond length, 3 atoms for bond angle.
+- Toggle display: use Toggle View or Unit Cell.
+- Scale: enable Auto scale or adjust Manual scale and Atom size.
 
 ## Development
 
@@ -87,4 +99,4 @@ src/
 
 ## License
 
-MIT. See [LICENSE](LICENSE).
+GPL-3.0-only. See [LICENSE](LICENSE).

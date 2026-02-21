@@ -394,6 +394,11 @@
     }
     if (!rotationBase) return;
 
+    if (preview && !state.rotationInProgress) {
+      state.rotationInProgress = true;
+      vscode.postMessage({ command: 'beginDrag', atomId: state.selectedAtomIds[0] });
+    }
+
     const angleRad = (angleDeg * Math.PI) / 180;
     const updated = [];
 
@@ -410,7 +415,18 @@
       preview: !!preview,
     });
 
+    if (preview && state.currentStructure) {
+      renderer.renderStructure(
+        state.currentStructure,
+        {
+          updateCounts,
+        },
+        { fitCamera: false }
+      );
+    }
+
     if (!preview) {
+      state.rotationInProgress = false;
       vscode.postMessage({ command: 'endDrag' });
     }
   }
@@ -530,6 +546,7 @@
       rotZ.classList.toggle('selected', axis === 'z');
       rotationBase = null;
       rotationBaseIds = [];
+      state.rotationInProgress = false;
     };
 
     rotX.onclick = () => setAxis('x');
@@ -553,8 +570,10 @@
     });
 
     rotInput.addEventListener('change', (event) => {
-      const value = parseFloat(event.target.value);
+      let value = parseFloat(event.target.value);
       if (!Number.isFinite(value)) return;
+      value = Math.max(0, Math.min(360, value));
+      rotInput.value = value.toFixed(0);
       rotSlider.value = value.toFixed(0);
       applyRotation(value, false);
       rotationBase = null;
