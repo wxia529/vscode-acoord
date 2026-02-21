@@ -6,6 +6,7 @@ import { UnitCell } from '../models/unitCell';
 import { FileManager } from '../io/fileManager';
 import { ThreeJSRenderer } from '../renderers/threejsRenderer';
 import { Atom } from '../models/atom';
+import { parseElement } from '../utils/elementData';
 
 /**
  * Custom editor provider for structure files
@@ -132,8 +133,13 @@ export class StructureEditorProvider implements vscode.CustomEditorProvider {
         break;
 
       case 'addAtom': {
+        const element = parseElement(String(message.element || ''));
+        if (!element) {
+          vscode.window.showErrorMessage(`Unknown element: ${message.element}`);
+          break;
+        }
         const atom = new Atom(
-          message.element.toUpperCase(),
+          element,
           message.x || 0,
           message.y || 0,
           message.z || 0
@@ -407,7 +413,11 @@ export class StructureEditorProvider implements vscode.CustomEditorProvider {
           break;
         }
         this.pushUndoSnapshot(key, structure);
-        const element = String(message.element).toUpperCase();
+        const element = parseElement(String(message.element));
+        if (!element) {
+          vscode.window.showErrorMessage(`Unknown element: ${message.element}`);
+          break;
+        }
         for (const id of ids) {
           const atom = structure.getAtom(id);
           if (atom) {
@@ -425,7 +435,12 @@ export class StructureEditorProvider implements vscode.CustomEditorProvider {
           if (atom) {
             this.pushUndoSnapshot(key, structure);
             if (message.element) {
-              atom.element = message.element;
+              const element = parseElement(String(message.element));
+              if (!element) {
+                vscode.window.showErrorMessage(`Unknown element: ${message.element}`);
+              } else {
+                atom.element = element;
+              }
             }
             if (
               typeof message.x === 'number' &&

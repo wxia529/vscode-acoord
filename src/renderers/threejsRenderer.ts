@@ -1,5 +1,5 @@
 import { Structure } from '../models/structure';
-import { ELEMENT_DATA } from '../utils/elementData';
+import { ELEMENT_DATA, parseElement } from '../utils/elementData';
 
 /**
  * Interface for webview messages
@@ -116,13 +116,14 @@ export class ThreeJSRenderer {
    */
   private getAtomGeometry(): any[] {
     return this.state.structure.atoms.map((atom) => {
-      const info = ELEMENT_DATA[atom.element];
+      const symbol = parseElement(atom.element) || atom.element;
+      const info = ELEMENT_DATA[symbol];
       const baseRadius = info?.covalentRadius || 0.3;
       const radius = Math.max(baseRadius * 0.35, 0.1);
 
       return {
         id: atom.id,
-        element: atom.element,
+        element: symbol,
         position: [atom.x, atom.y, atom.z],
         radius: radius,
         color: info?.color || '#C0C0C0',
@@ -188,11 +189,13 @@ export class ThreeJSRenderer {
 
     for (let i = 0; i < atoms.length; i++) {
       const atomA = atoms[i];
-      const radiusA = ELEMENT_DATA[atomA.element]?.covalentRadius || 1.5;
+      const symbolA = parseElement(atomA.element) || atomA.element;
+      const radiusA = ELEMENT_DATA[symbolA]?.covalentRadius || 1.5;
 
       for (let j = 0; j < atoms.length; j++) {
         const atomB = atoms[j];
-        const radiusB = ELEMENT_DATA[atomB.element]?.covalentRadius || 1.5;
+        const symbolB = parseElement(atomB.element) || atomB.element;
+        const radiusB = ELEMENT_DATA[symbolB]?.covalentRadius || 1.5;
         const bondLength = (radiusA + radiusB) * tolerance;
 
         for (const [ox, oy, oz] of offsets) {

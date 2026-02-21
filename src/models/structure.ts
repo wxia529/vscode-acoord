@@ -1,6 +1,6 @@
 import { Atom } from './atom';
 import { UnitCell } from './unitCell';
-import { ELEMENT_DATA } from '../utils/elementData';
+import { ELEMENT_DATA, parseElement } from '../utils/elementData';
 
 /**
  * Represents a molecular or crystal structure
@@ -56,8 +56,10 @@ export class Structure {
         const atom2 = this.atoms[j];
         const distance = atom1.distanceTo(atom2);
 
-        const radius1 = ELEMENT_DATA[atom1.element]?.covalentRadius || 1.5;
-        const radius2 = ELEMENT_DATA[atom2.element]?.covalentRadius || 1.5;
+        const symbol1 = parseElement(atom1.element) || atom1.element;
+        const symbol2 = parseElement(atom2.element) || atom2.element;
+        const radius1 = ELEMENT_DATA[symbol1]?.covalentRadius || 1.5;
+        const radius2 = ELEMENT_DATA[symbol2]?.covalentRadius || 1.5;
         const bondLength = (radius1 + radius2) * tolerance;
 
         if (distance < bondLength) {
@@ -87,7 +89,8 @@ export class Structure {
       cz = 0;
 
     for (const atom of this.atoms) {
-      const mass = ELEMENT_DATA[atom.element]?.atomicMass || 1;
+      const symbol = parseElement(atom.element) || atom.element;
+      const mass = ELEMENT_DATA[symbol]?.atomicMass || 1;
       cx += atom.x * mass;
       cy += atom.y * mass;
       cz += atom.z * mass;
