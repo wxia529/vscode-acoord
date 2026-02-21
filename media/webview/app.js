@@ -484,10 +484,6 @@
       });
     };
 
-    document.getElementById('btn-toggle-vis').onclick = () => {
-      vscode.postMessage({ command: 'toggleVisualization' });
-    };
-
     document.getElementById('btn-unit-cell').onclick = () => {
       vscode.postMessage({ command: 'toggleUnitCell' });
     };

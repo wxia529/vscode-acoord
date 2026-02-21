@@ -3,7 +3,7 @@
   "displayName": "ACoord",
   "description": "Atomic Coordinate Toolkit",
   "publisher": "wxia",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "license": "GPL-3.0-only",
   "icon": "media/acoord-icon.png",
   "keywords": [
@@ -41,8 +41,7 @@
     "onCommand:acoord.createNewCrystal",
     "onCommand:acoord.exportStructure",
     "onCommand:acoord.addAtom",
-    "onCommand:acoord.deleteAtom",
-    "onCommand:acoord.toggleVisualization"
+    "onCommand:acoord.deleteAtom"
   ],
   "contributes": {
     "customEditors": [
@@ -139,11 +138,6 @@
       {
         "command": "acoord.deleteAtom",
         "title": "ACoord: Delete Selected Atom",
-        "category": "ACoord"
-      },
-      {
-        "command": "acoord.toggleVisualization",
-        "title": "ACoord: Toggle Ball-and-Stick / Space-Filling",
         "category": "ACoord"
       }
     ]

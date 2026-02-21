@@ -52,7 +52,7 @@ Input and output:
 - Change element: use the Change Element panel and Apply to Selected.
 - Add or delete atoms: use the Add Atom panel or Delete button.
 - Measure: select 2 atoms for bond length, 3 atoms for bond angle.
-- Toggle display: use Toggle View or Unit Cell.
+- Adjust Distance: select at least two atoms; the last selected is the reference, and the rest move together along the reference-to-nearest-adsorbate direction to the target distance.
 - Scale: enable Auto scale or adjust Manual scale and Atom size.
 
 

@@ -172,12 +172,6 @@ export class StructureEditorProvider implements vscode.CustomEditorProvider {
         break;
       }
 
-      case 'toggleVisualization': {
-        renderer.toggleVisualization();
-        this.renderStructure(key, webviewPanel);
-        break;
-      }
-
       case 'toggleUnitCell': {
         renderer.setShowUnitCell(
           !renderer.getState().showUnitCell

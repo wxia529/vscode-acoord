@@ -14,7 +14,6 @@ export interface WebviewMessage {
  */
 export interface RendererState {
   structure: Structure;
-  visualizationMode: 'ballAndStick' | 'spaceFilling';
   showUnitCell: boolean;
   selectedAtomId?: string;
   selectedAtomIds: string[];
@@ -29,7 +28,6 @@ export class ThreeJSRenderer {
   constructor(structure: Structure) {
     this.state = {
       structure,
-      visualizationMode: 'ballAndStick',
       showUnitCell: !!structure.unitCell,
       selectedAtomIds: [],
     };
@@ -47,16 +45,6 @@ export class ThreeJSRenderer {
    */
   setStructure(structure: Structure): void {
     this.state.structure = structure;
-  }
-
-  /**
-   * Toggle visualization mode
-   */
-  toggleVisualization(): void {
-    this.state.visualizationMode =
-      this.state.visualizationMode === 'ballAndStick'
-        ? 'spaceFilling'
-        : 'ballAndStick';
   }
 
   /**
@@ -111,7 +99,6 @@ export class ThreeJSRenderer {
         unitCell: this.state.showUnitCell
           ? this.getUnitCellGeometry()
           : null,
-        mode: this.state.visualizationMode,
         selectedAtomId: this.state.selectedAtomId,
         selectedAtomIds: this.state.selectedAtomIds,
       },
@@ -124,10 +111,7 @@ export class ThreeJSRenderer {
   private getAtomGeometry(): any[] {
     return this.state.structure.atoms.map((atom) => {
       const info = ELEMENT_DATA[atom.element];
-      const baseRadius =
-        this.state.visualizationMode === 'spaceFilling'
-          ? info?.vdwRadius || 1.5
-          : info?.covalentRadius || 0.3;
+      const baseRadius = info?.covalentRadius || 0.3;
       const radius = Math.max(baseRadius * 0.35, 0.1);
 
       return {

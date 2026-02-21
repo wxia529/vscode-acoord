@@ -231,18 +231,6 @@ export function activate(context: vscode.ExtensionContext) {
     })
   );
 
-  // Command: Toggle visualization
-  context.subscriptions.push(
-    vscode.commands.registerCommand(
-      'acoord.toggleVisualization',
-      () => {
-        vscode.window.showInformationMessage(
-          'Use the ACoord editor to toggle visualization'
-        );
-      }
-    )
-  );
-
   console.log('ACoord commands registered successfully');
 }
 
