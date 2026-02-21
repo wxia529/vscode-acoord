@@ -55,47 +55,6 @@ Input and output:
 - Toggle display: use Toggle View or Unit Cell.
 - Scale: enable Auto scale or adjust Manual scale and Atom size.
 
-## Development
-
-### Prerequisites
-
-- Node.js (LTS recommended)
-- npm
-
-### Install
-
-```bash
-npm install
-```
-
-### Build
-
-```bash
-npm run compile
-```
-
-### Watch mode
-
-```bash
-npm run watch
-```
-
-### Run the extension
-
-- Press `F5` in VS Code to launch the Extension Development Host.
-- Open a structure file and use the ACoord preview.
-
-## Project Structure
-
-```
-src/
-  extension.ts            Extension entry
-  providers/              Custom editor provider
-  renderers/              Three.js renderer
-  io/                     Format parsers and file manager
-  models/                 Atom, Structure, UnitCell
-  webview/                UI (HTML/CSS/JS)
-```
 
 ## License
 
