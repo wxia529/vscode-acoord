@@ -25,7 +25,7 @@ export class XYZParser implements StructureParser {
     }
 
     const comment = lines[1] || '';
-    const structure = new Structure(comment || 'Imported XYZ');
+    const structure = new Structure(comment || '');
 
     const latticeVectors = this.parseLatticeFromComment(comment);
     if (latticeVectors) {

@@ -48,7 +48,7 @@ export class GJFParser implements StructureParser {
 
     idx = chargeMultiplicityIndex + 1;
 
-    const structure = new Structure(title || 'Imported GJF');
+    const structure = new Structure(title || '');
     const latticeVectors: number[][] = [];
 
     // Atom and TV lines until blank line or EOF

@@ -10,7 +10,7 @@ import { StructureParser } from './structureParser';
 export class PDBParser implements StructureParser {
   parse(content: string): Structure {
     const lines = content.split(/\r?\n/);
-    const structure = new Structure('Imported PDB');
+    const structure = new Structure('');
 
     for (const line of lines) {
       if (line.startsWith('CRYST1')) {

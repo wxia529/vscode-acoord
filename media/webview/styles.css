@@ -66,6 +66,14 @@ button:hover {
     #1b2026;
 }
 
+.toggle-button.selected {
+  border-color: rgba(245, 158, 11, 0.8);
+  box-shadow: 0 6px 18px rgba(245, 158, 11, 0.35);
+  background:
+    linear-gradient(135deg, rgba(245, 158, 11, 0.35), rgba(245, 158, 11, 0.1)),
+    #1b2026;
+}
+
 #container {
   flex: 1;
   display: flex;

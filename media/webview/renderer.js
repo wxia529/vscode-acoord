@@ -14,9 +14,58 @@
     dragPlane: null,
     lastScale: 1,
     lastSizeScale: 1,
+    extraMeshes: [],
+    projectionMode: 'perspective',
+    orthoSize: 30,
     setError: () => {},
     setStatus: () => {},
   };
+
+  function getOrthoFrustum(width, height) {
+    const aspect = width / height;
+    const viewSize = Math.max(1, rendererState.orthoSize || 30);
+    const halfHeight = viewSize / 2;
+    const halfWidth = halfHeight * aspect;
+    return {
+      left: -halfWidth,
+      right: halfWidth,
+      top: halfHeight,
+      bottom: -halfHeight,
+    };
+  }
+
+  function createCamera(mode, width, height) {
+    if (mode === 'orthographic') {
+      const frustum = getOrthoFrustum(width, height);
+      const camera = new THREE.OrthographicCamera(
+        frustum.left,
+        frustum.right,
+        frustum.top,
+        frustum.bottom,
+        0.1,
+        10000
+      );
+      camera.zoom = state.viewZoom || 1;
+      camera.updateProjectionMatrix();
+      return camera;
+    }
+
+    return new THREE.PerspectiveCamera(75, width / height, 0.1, 10000);
+  }
+
+  function applyControls(camera) {
+    if (rendererState.controls && rendererState.controls.dispose) {
+      rendererState.controls.dispose();
+    }
+    if (THREE.OrbitControls) {
+      rendererState.controls = new THREE.OrbitControls(camera, rendererState.renderer.domElement);
+      rendererState.controls.enableDamping = true;
+      rendererState.controls.dampingFactor = 0.05;
+    } else {
+      rendererState.controls = { update: () => {} };
+      rendererState.setError('OrbitControls not available. Rendering should still work.');
+    }
+  }
 
   function init(canvas, handlers) {
     if (!window.THREE) {
@@ -37,7 +86,8 @@
     scene.background = new THREE.Color(0x0d1015);
     rendererState.scene = scene;
 
-    const camera = new THREE.PerspectiveCamera(75, width / height, 0.1, 10000);
+    rendererState.projectionMode = state.projectionMode || 'perspective';
+    const camera = createCamera(rendererState.projectionMode, width, height);
     camera.position.z = 20;
     rendererState.camera = camera;
 
@@ -65,14 +115,7 @@
 
     scene.add(new THREE.AxesHelper(5));
 
-    if (THREE.OrbitControls) {
-      rendererState.controls = new THREE.OrbitControls(camera, rendererState.renderer.domElement);
-      rendererState.controls.enableDamping = true;
-      rendererState.controls.dampingFactor = 0.05;
-    } else {
-      rendererState.controls = { update: () => {} };
-      handlers.setError('OrbitControls not available. Rendering should still work.');
-    }
+    applyControls(camera);
 
     camera.lookAt(0, 0, 0);
     rendererState.raycaster = new THREE.Raycaster();
@@ -104,7 +147,16 @@
     const rect = container.getBoundingClientRect();
     const width = Math.max(1, rect.width - 250);
     const height = Math.max(1, rect.height);
-    rendererState.camera.aspect = width / height;
+    if (rendererState.camera.isOrthographicCamera) {
+      const frustum = getOrthoFrustum(width, height);
+      rendererState.camera.left = frustum.left;
+      rendererState.camera.right = frustum.right;
+      rendererState.camera.top = frustum.top;
+      rendererState.camera.bottom = frustum.bottom;
+      rendererState.camera.zoom = state.viewZoom || 1;
+    } else {
+      rendererState.camera.aspect = width / height;
+    }
     rendererState.camera.updateProjectionMatrix();
     rendererState.renderer.setSize(width, height);
   }
@@ -155,6 +207,11 @@
     }
     rendererState.atomMeshes.clear();
 
+    for (const mesh of rendererState.extraMeshes) {
+      rendererState.scene.remove(mesh);
+    }
+    rendererState.extraMeshes = [];
+
     for (const line of rendererState.bondLines) {
       rendererState.scene.remove(line);
     }
@@ -166,13 +223,16 @@
     }
 
     const selectedSet = new Set(data.selectedAtomIds || []);
+    const renderAtoms = data.renderAtoms || data.atoms;
+    const renderBonds = data.renderBonds || data.bonds;
 
-    if (data.atoms) {
-      for (const atom of data.atoms) {
+    if (renderAtoms) {
+      for (const atom of renderAtoms) {
         if (!Number.isFinite(atom.position[0]) || !Number.isFinite(atom.position[1]) || !Number.isFinite(atom.position[2])) {
           continue;
         }
-        const isSelected = !!atom.selected || selectedSet.has(atom.id);
+        const selectable = atom.selectable !== false;
+        const isSelected = selectable && (!!atom.selected || selectedSet.has(atom.id));
         const sphereRadius = Math.max(atom.radius * sizeScale, 0.12) * (isSelected ? 1.12 : 1);
         const geometry = new THREE.SphereGeometry(sphereRadius, 32, 32);
         const material = new THREE.MeshBasicMaterial({
@@ -185,14 +245,18 @@
           atom.position[1] * scale,
           atom.position[2] * scale
         );
-        mesh.userData = { atomId: atom.id };
         rendererState.scene.add(mesh);
-        rendererState.atomMeshes.set(atom.id, mesh);
+        if (selectable) {
+          mesh.userData = { atomId: atom.id };
+          rendererState.atomMeshes.set(atom.id, mesh);
+        } else {
+          rendererState.extraMeshes.push(mesh);
+        }
       }
     }
 
-    if (data.bonds) {
-      for (const bond of data.bonds) {
+    if (renderBonds) {
+      for (const bond of renderBonds) {
         const highlightBond =
           bond.atomId1 &&
           bond.atomId2 &&
@@ -270,17 +334,60 @@
     }
     const size = box.getSize(new THREE.Vector3());
     const maxDim = Math.max(size.x, size.y, size.z);
-    const fov = rendererState.camera.fov * (Math.PI / 180);
-    const cameraDistance = Math.abs(maxDim / 2 / Math.tan(fov / 2)) * 0.6 / state.viewZoom;
     const center = box.getCenter(new THREE.Vector3());
-    rendererState.camera.position.set(center.x, center.y, center.z + cameraDistance * 1.2);
-    rendererState.camera.near = Math.max(0.1, cameraDistance / 100);
-    rendererState.camera.far = Math.max(1000, cameraDistance * 10);
-    rendererState.camera.updateProjectionMatrix();
+
+    if (rendererState.camera.isOrthographicCamera) {
+      const targetSize = Math.max(maxDim * 1.2, 1);
+      rendererState.orthoSize = targetSize / (state.viewZoom || 1);
+      const cameraDistance = Math.max(targetSize * 2, 20);
+      rendererState.camera.position.set(center.x, center.y, center.z + cameraDistance);
+      rendererState.camera.near = Math.max(0.1, cameraDistance / 100);
+      rendererState.camera.far = Math.max(1000, cameraDistance * 10);
+      onResize();
+    } else {
+      const fov = rendererState.camera.fov * (Math.PI / 180);
+      const cameraDistance = Math.abs(maxDim / 2 / Math.tan(fov / 2)) * 0.6 / state.viewZoom;
+      rendererState.camera.position.set(center.x, center.y, center.z + cameraDistance * 1.2);
+      rendererState.camera.near = Math.max(0.1, cameraDistance / 100);
+      rendererState.camera.far = Math.max(1000, cameraDistance * 10);
+      rendererState.camera.updateProjectionMatrix();
+    }
     if (rendererState.controls && rendererState.controls.target) {
       rendererState.controls.target.copy(center);
     }
     rendererState.controls.update();
+  }
+
+  function setProjectionMode(mode) {
+    const nextMode = mode === 'orthographic' ? 'orthographic' : 'perspective';
+    if (rendererState.projectionMode === nextMode) return;
+    if (!rendererState.renderer || !rendererState.camera) return;
+
+    const container = document.getElementById('container');
+    const rect = container.getBoundingClientRect();
+    const width = Math.max(1, rect.width - 250);
+    const height = Math.max(1, rect.height);
+
+    const oldCamera = rendererState.camera;
+    const previousTarget =
+      rendererState.controls && rendererState.controls.target
+        ? rendererState.controls.target.clone()
+        : null;
+    const newCamera = createCamera(nextMode, width, height);
+    newCamera.position.copy(oldCamera.position);
+    newCamera.up.copy(oldCamera.up);
+    newCamera.quaternion.copy(oldCamera.quaternion);
+    newCamera.near = oldCamera.near;
+    newCamera.far = oldCamera.far;
+
+    rendererState.camera = newCamera;
+    rendererState.projectionMode = nextMode;
+    applyControls(newCamera);
+    if (rendererState.controls && rendererState.controls.target && previousTarget) {
+      rendererState.controls.target.copy(previousTarget);
+      newCamera.lookAt(previousTarget);
+    }
+    onResize();
   }
 
   function getRaycaster() {
@@ -317,6 +424,7 @@
     init,
     renderStructure,
     fitCamera,
+    setProjectionMode,
     getScale,
     getRaycaster,
     getMouse,

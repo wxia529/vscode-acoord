@@ -10,7 +10,7 @@ import { StructureParser } from './structureParser';
  */
 export class CIFParser implements StructureParser {
   parse(content: string): Structure {
-    const structure = new Structure('Imported CIF', true);
+    const structure = new Structure('', true);
 
     // Parse unit cell parameters
     const cellA = this.extractValue(content, '_cell_length_a');
@@ -171,21 +171,22 @@ export class CIFParser implements StructureParser {
   }
 
   serialize(structure: Structure): string {
+    if (!structure.unitCell) {
+      throw new Error('CIF export requires lattice parameters (a, b, c, alpha, beta, gamma).');
+    }
     const lines: string[] = [];
     lines.push('data_structure');
     lines.push('');
 
     // Write unit cell
-    if (structure.unitCell) {
-      const uc = structure.unitCell;
-      lines.push(`_cell_length_a    ${uc.a.toFixed(6)}`);
-      lines.push(`_cell_length_b    ${uc.b.toFixed(6)}`);
-      lines.push(`_cell_length_c    ${uc.c.toFixed(6)}`);
-      lines.push(`_cell_angle_alpha ${uc.alpha.toFixed(6)}`);
-      lines.push(`_cell_angle_beta  ${uc.beta.toFixed(6)}`);
-      lines.push(`_cell_angle_gamma ${uc.gamma.toFixed(6)}`);
-      lines.push('');
-    }
+    const uc = structure.unitCell;
+    lines.push(`_cell_length_a    ${uc.a.toFixed(6)}`);
+    lines.push(`_cell_length_b    ${uc.b.toFixed(6)}`);
+    lines.push(`_cell_length_c    ${uc.c.toFixed(6)}`);
+    lines.push(`_cell_angle_alpha ${uc.alpha.toFixed(6)}`);
+    lines.push(`_cell_angle_beta  ${uc.beta.toFixed(6)}`);
+    lines.push(`_cell_angle_gamma ${uc.gamma.toFixed(6)}`);
+    lines.push('');
 
     // Write atoms
     lines.push('loop_');

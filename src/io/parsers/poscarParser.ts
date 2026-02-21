@@ -134,7 +134,7 @@ export class POSCARParser implements StructureParser {
 
   serialize(structure: Structure): string {
     const lines: string[] = [];
-    lines.push('vasp format');
+    lines.push((structure.name || '').trim() || 'Created by ACoord');
     lines.push('1.0'); // scaling factor
 
     // Write lattice vectors

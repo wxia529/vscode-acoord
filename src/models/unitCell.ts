@@ -117,6 +117,17 @@ export class UnitCell {
   }
 
   /**
+   * Convert fractional coordinates to cartesian coordinates
+   */
+  fractionalToCartesian(fx: number, fy: number, fz: number): [number, number, number] {
+    const [aVec, bVec, cVec] = this.getLatticeVectors();
+    const x = fx * aVec[0] + fy * bVec[0] + fz * cVec[0];
+    const y = fx * aVec[1] + fy * bVec[1] + fz * cVec[1];
+    const z = fx * aVec[2] + fy * bVec[2] + fz * cVec[2];
+    return [x, y, z];
+  }
+
+  /**
    * Clone this unit cell
    */
   clone(): UnitCell {

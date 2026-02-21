@@ -19,7 +19,7 @@ export class ORCAParser implements StructureParser {
       throw new Error('Invalid ORCA input: missing "* xyz" block');
     }
 
-    const structure = new Structure('Imported ORCA');
+    const structure = new Structure('');
 
     for (let i = startIndex + 1; i < lines.length; i++) {
       const line = lines[i].trim();

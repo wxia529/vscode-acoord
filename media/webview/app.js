@@ -21,6 +21,52 @@
     document.getElementById('bond-count').textContent = bondCount;
   }
 
+  function updateLatticeUI(unitCellParams, supercell, hasUnitCell) {
+    const aInput = document.getElementById('lattice-a');
+    const bInput = document.getElementById('lattice-b');
+    const cInput = document.getElementById('lattice-c');
+    const alphaInput = document.getElementById('lattice-alpha');
+    const betaInput = document.getElementById('lattice-beta');
+    const gammaInput = document.getElementById('lattice-gamma');
+    const scaleToggle = document.getElementById('lattice-scale');
+    const removeBtn = document.getElementById('btn-lattice-remove');
+    const centerBtn = document.getElementById('btn-center-cell');
+    const superX = document.getElementById('supercell-x');
+    const superY = document.getElementById('supercell-y');
+    const superZ = document.getElementById('supercell-z');
+
+    if (unitCellParams) {
+      aInput.value = Number(unitCellParams.a).toFixed(4);
+      bInput.value = Number(unitCellParams.b).toFixed(4);
+      cInput.value = Number(unitCellParams.c).toFixed(4);
+      alphaInput.value = Number(unitCellParams.alpha).toFixed(2);
+      betaInput.value = Number(unitCellParams.beta).toFixed(2);
+      gammaInput.value = Number(unitCellParams.gamma).toFixed(2);
+    } else if (!state.unitCellEditing) {
+      aInput.value = '';
+      bInput.value = '';
+      cInput.value = '';
+      alphaInput.value = '';
+      betaInput.value = '';
+      gammaInput.value = '';
+    }
+
+    scaleToggle.checked = !!state.scaleAtomsWithLattice;
+    removeBtn.disabled = !hasUnitCell;
+    centerBtn.disabled = !hasUnitCell;
+
+    const sc = Array.isArray(supercell) ? supercell : [1, 1, 1];
+    const nx = Math.max(1, Math.floor(sc[0] || 1));
+    const ny = Math.max(1, Math.floor(sc[1] || 1));
+    const nz = Math.max(1, Math.floor(sc[2] || 1));
+    superX.value = String(nx);
+    superY.value = String(ny);
+    superZ.value = String(nz);
+    superX.disabled = !hasUnitCell;
+    superY.disabled = !hasUnitCell;
+    superZ.disabled = !hasUnitCell;
+  }
+
   function updateAtomList(atoms, selectedIds, selectedId) {
     const derivedSelectedIds = atoms.filter((atom) => atom.selected).map((atom) => atom.id);
     const fallbackIds = state.selectedAtomIds || [];
@@ -409,6 +455,25 @@
       updated.push({ id: entry.id, x: rotated[0], y: rotated[1], z: rotated[2] });
     }
 
+    if (preview && state.currentStructure && state.currentStructure.renderAtoms) {
+      const baseMap = new Map();
+      for (const atom of state.currentStructure.atoms || []) {
+        baseMap.set(atom.id, atom.position);
+      }
+      for (const renderAtom of state.currentStructure.renderAtoms) {
+        const baseId = String(renderAtom.id).split('::')[0];
+        const basePos = baseMap.get(baseId);
+        const offset = state.renderAtomOffsets[renderAtom.id];
+        if (basePos && offset) {
+          renderAtom.position = [
+            basePos[0] + offset[0],
+            basePos[1] + offset[1],
+            basePos[2] + offset[2],
+          ];
+        }
+      }
+    }
+
     vscode.postMessage({
       command: 'setAtomsPositions',
       atomPositions: updated,
@@ -637,6 +702,85 @@
         renderer.renderStructure(state.currentStructure, { updateCounts, updateAtomList });
       }
     });
+
+    const latticeApply = document.getElementById('btn-lattice-apply');
+    const latticeRemove = document.getElementById('btn-lattice-remove');
+    const latticeCenter = document.getElementById('btn-center-cell');
+    const latticeScale = document.getElementById('lattice-scale');
+    const latticeInputs = [
+      document.getElementById('lattice-a'),
+      document.getElementById('lattice-b'),
+      document.getElementById('lattice-c'),
+      document.getElementById('lattice-alpha'),
+      document.getElementById('lattice-beta'),
+      document.getElementById('lattice-gamma'),
+    ];
+
+    latticeScale.addEventListener('change', (event) => {
+      state.scaleAtomsWithLattice = event.target.checked;
+    });
+
+    latticeInputs.forEach((input) => {
+      input.addEventListener('input', () => {
+        state.unitCellEditing = true;
+      });
+      input.addEventListener('blur', () => {
+        state.unitCellEditing = false;
+      });
+    });
+
+    latticeApply.onclick = () => {
+      const a = parseFloat(document.getElementById('lattice-a').value);
+      const b = parseFloat(document.getElementById('lattice-b').value);
+      const c = parseFloat(document.getElementById('lattice-c').value);
+      const alpha = parseFloat(document.getElementById('lattice-alpha').value);
+      const beta = parseFloat(document.getElementById('lattice-beta').value);
+      const gamma = parseFloat(document.getElementById('lattice-gamma').value);
+      if (![a, b, c, alpha, beta, gamma].every((value) => Number.isFinite(value))) {
+        setError('Lattice parameters must be valid numbers.');
+        return;
+      }
+      vscode.postMessage({
+        command: 'setUnitCell',
+        params: { a, b, c, alpha, beta, gamma },
+        scaleAtoms: !!state.scaleAtomsWithLattice,
+      });
+      setError('');
+    };
+
+    latticeRemove.onclick = () => {
+      vscode.postMessage({ command: 'clearUnitCell' });
+    };
+    latticeCenter.onclick = () => {
+      vscode.postMessage({ command: 'centerToUnitCell' });
+    };
+
+    const supercellApply = document.getElementById('btn-supercell-apply');
+    supercellApply.onclick = () => {
+      const nx = parseInt(document.getElementById('supercell-x').value, 10);
+      const ny = parseInt(document.getElementById('supercell-y').value, 10);
+      const nz = parseInt(document.getElementById('supercell-z').value, 10);
+      if (![nx, ny, nz].every((value) => Number.isFinite(value) && value >= 1)) {
+        setError('Supercell values must be integers >= 1.');
+        return;
+      }
+      vscode.postMessage({ command: 'setSupercell', supercell: [nx, ny, nz] });
+      setError('');
+    };
+
+    const projPersp = document.getElementById('btn-proj-persp');
+    const projOrtho = document.getElementById('btn-proj-ortho');
+    const setProjection = (mode) => {
+      state.projectionMode = mode;
+      projPersp.classList.toggle('selected', mode === 'perspective');
+      projOrtho.classList.toggle('selected', mode === 'orthographic');
+      renderer.setProjectionMode(mode);
+      renderer.fitCamera();
+    };
+
+    projPersp.onclick = () => setProjection('perspective');
+    projOrtho.onclick = () => setProjection('orthographic');
+    setProjection(state.projectionMode || 'perspective');
   }
 
   function setupInteraction() {
@@ -712,6 +856,7 @@
     if (event.data.command === 'render') {
       state.currentStructure = event.data.data;
       state.selectedAtomIds = event.data.data.selectedAtomIds || [];
+      state.supercell = event.data.data.supercell || [1, 1, 1];
       if (state.selectedAtomIds.length >= 2) {
         state.adsorptionReferenceId = state.selectedAtomIds[state.selectedAtomIds.length - 1];
         state.adsorptionAdsorbateIds = state.selectedAtomIds.slice(0, -1);
@@ -729,6 +874,33 @@
         { fitCamera: state.shouldFitCamera }
       );
       state.shouldFitCamera = false;
+
+      if (event.data.data.renderAtoms && event.data.data.atoms) {
+        const baseMap = new Map();
+        for (const atom of event.data.data.atoms) {
+          baseMap.set(atom.id, atom.position);
+        }
+        state.renderAtomOffsets = {};
+        for (const renderAtom of event.data.data.renderAtoms) {
+          const baseId = String(renderAtom.id).split('::')[0];
+          const basePos = baseMap.get(baseId);
+          if (basePos) {
+            state.renderAtomOffsets[renderAtom.id] = [
+              renderAtom.position[0] - basePos[0],
+              renderAtom.position[1] - basePos[1],
+              renderAtom.position[2] - basePos[2],
+            ];
+          }
+        }
+      } else {
+        state.renderAtomOffsets = {};
+      }
+
+      updateLatticeUI(
+        event.data.data.unitCellParams || null,
+        event.data.data.supercell || [1, 1, 1],
+        !!event.data.data.unitCellParams
+      );
 
       const atoms = event.data.data.atoms || [];
       const selectedId =

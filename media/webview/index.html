@@ -35,6 +35,65 @@
       </div>
 
       <div class="panel">
+        <div class="panel-title">View</div>
+        <div class="input-group">
+          <label>Projection</label>
+          <div style="display:flex;gap:6px;">
+            <button id="btn-proj-persp" class="toggle-button" type="button">Perspective</button>
+            <button id="btn-proj-ortho" class="toggle-button" type="button">Orthographic</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-title">Lattice</div>
+        <div class="input-group">
+          <label>a (A)</label>
+          <input type="number" id="lattice-a" step="0.01" min="0" />
+        </div>
+        <div class="input-group">
+          <label>b (A)</label>
+          <input type="number" id="lattice-b" step="0.01" min="0" />
+        </div>
+        <div class="input-group">
+          <label>c (A)</label>
+          <input type="number" id="lattice-c" step="0.01" min="0" />
+        </div>
+        <div class="input-group">
+          <label>alpha (deg)</label>
+          <input type="number" id="lattice-alpha" step="0.1" min="0" max="180" />
+        </div>
+        <div class="input-group">
+          <label>beta (deg)</label>
+          <input type="number" id="lattice-beta" step="0.1" min="0" max="180" />
+        </div>
+        <div class="input-group">
+          <label>gamma (deg)</label>
+          <input type="number" id="lattice-gamma" step="0.1" min="0" max="180" />
+        </div>
+        <div class="input-group">
+          <label class="checkbox-row">
+            <input type="checkbox" id="lattice-scale" />
+            Scale atoms with lattice
+          </label>
+        </div>
+        <div class="input-group" style="display:flex;gap:6px;flex-direction:row;">
+          <button id="btn-lattice-apply" type="button">Apply Lattice</button>
+          <button id="btn-lattice-remove" type="button">Remove Lattice</button>
+        </div>
+        <button id="btn-center-cell" type="button">Center At Cell</button>
+        <div class="input-group">
+          <label>Supercell (Nx, Ny, Nz)</label>
+          <div style="display:flex;gap:6px;">
+            <input type="number" id="supercell-x" step="1" min="1" value="1" />
+            <input type="number" id="supercell-y" step="1" min="1" value="1" />
+            <input type="number" id="supercell-z" step="1" min="1" value="1" />
+          </div>
+        </div>
+        <button id="btn-supercell-apply" type="button">Apply Supercell</button>
+      </div>
+
+      <div class="panel">
         <div class="panel-title">Add Atom</div>
         <div class="input-group">
           <label>Element</label>

@@ -29,6 +29,8 @@ const PARSER_MAP: Record<string, StructureParser> = {
  * Manage structure file I/O
  */
 export class FileManager {
+  private static readonly DEFAULT_NAME = 'Created by ACoord';
+
   /**
    * Load structure from file content
    */
@@ -44,7 +46,9 @@ export class FileManager {
     }
 
     try {
-      return parser.parse(content);
+      const structure = parser.parse(content);
+      this.ensureStructureName(structure, filePath);
+      return structure;
     } catch (error) {
       throw new Error(`Failed to parse ${ext} file: ${error instanceof Error ? error.message : String(error)}`);
     }
@@ -65,6 +69,15 @@ export class FileManager {
     }
 
     return parser.serialize(structure);
+  }
+
+  static ensureStructureName(structure: Structure, filePath?: string) {
+    const current = (structure.name || '').trim();
+    if (current) {
+      return;
+    }
+
+    structure.name = this.DEFAULT_NAME;
   }
 
   /**

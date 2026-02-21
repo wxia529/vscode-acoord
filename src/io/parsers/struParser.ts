@@ -14,7 +14,7 @@ const ANGSTROM_TO_BOHR = 1 / BOHR_TO_ANGSTROM;
 export class STRUParser implements StructureParser {
   parse(content: string): Structure {
     const lines = content.split(/\r?\n/);
-    const structure = new Structure('Imported STRU');
+    const structure = new Structure('');
 
     let latticeConstantBohr: number | null = null;
     let latticeVectors: number[][] | null = null;

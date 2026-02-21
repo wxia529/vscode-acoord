@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
 import { Structure } from '../models/structure';
+import { UnitCell } from '../models/unitCell';
 import { FileManager } from '../io/fileManager';
 import { ThreeJSRenderer } from '../renderers/threejsRenderer';
 import { Atom } from '../models/atom';
@@ -176,6 +177,120 @@ export class StructureEditorProvider implements vscode.CustomEditorProvider {
         renderer.setShowUnitCell(
           !renderer.getState().showUnitCell
         );
+        this.renderStructure(key, webviewPanel);
+        break;
+      }
+
+      case 'setUnitCell': {
+        const params = message.params || {};
+        const a = Number(params.a);
+        const b = Number(params.b);
+        const c = Number(params.c);
+        const alpha = Number(params.alpha);
+        const beta = Number(params.beta);
+        const gamma = Number(params.gamma);
+        const isValid =
+          [a, b, c, alpha, beta, gamma].every((value) => Number.isFinite(value)) &&
+          a > 0 &&
+          b > 0 &&
+          c > 0 &&
+          alpha > 0 &&
+          beta > 0 &&
+          gamma > 0 &&
+          alpha < 180 &&
+          beta < 180 &&
+          gamma < 180;
+
+        if (!isValid) {
+          vscode.window.showErrorMessage('Invalid lattice parameters.');
+          break;
+        }
+
+        this.pushUndoSnapshot(key, structure);
+        const oldCell = structure.unitCell;
+        const nextCell = new UnitCell(a, b, c, alpha, beta, gamma);
+        if (message.scaleAtoms && oldCell) {
+          for (const atom of structure.atoms) {
+            const frac = oldCell.cartesianToFractional(atom.x, atom.y, atom.z);
+            const cart = nextCell.fractionalToCartesian(frac[0], frac[1], frac[2]);
+            atom.setPosition(cart[0], cart[1], cart[2]);
+          }
+        }
+        structure.unitCell = nextCell;
+        structure.isCrystal = true;
+        if (!structure.supercell) {
+          structure.supercell = [1, 1, 1];
+        }
+        renderer.setStructure(structure);
+        renderer.setShowUnitCell(true);
+        this.renderStructure(key, webviewPanel);
+        break;
+      }
+
+      case 'clearUnitCell': {
+        this.pushUndoSnapshot(key, structure);
+        structure.unitCell = undefined;
+        structure.isCrystal = false;
+        structure.supercell = [1, 1, 1];
+        renderer.setStructure(structure);
+        renderer.setShowUnitCell(false);
+        this.renderStructure(key, webviewPanel);
+        break;
+      }
+
+      case 'centerToUnitCell': {
+        if (!structure.unitCell) {
+          vscode.window.showErrorMessage('Centering requires a unit cell.');
+          break;
+        }
+        if (structure.atoms.length === 0) {
+          break;
+        }
+        const confirm = await vscode.window.showWarningMessage(
+          'Center all atoms in the unit cell? This will move every atom.',
+          { modal: true },
+          'Center'
+        );
+        if (confirm !== 'Center') {
+          break;
+        }
+        this.pushUndoSnapshot(key, structure);
+        let cx = 0;
+        let cy = 0;
+        let cz = 0;
+        for (const atom of structure.atoms) {
+          cx += atom.x;
+          cy += atom.y;
+          cz += atom.z;
+        }
+        const count = structure.atoms.length;
+        const geomCenter: [number, number, number] = [cx / count, cy / count, cz / count];
+        const vectors = structure.unitCell.getLatticeVectors();
+        const cellCenter: [number, number, number] = [
+          0.5 * (vectors[0][0] + vectors[1][0] + vectors[2][0]),
+          0.5 * (vectors[0][1] + vectors[1][1] + vectors[2][1]),
+          0.5 * (vectors[0][2] + vectors[1][2] + vectors[2][2]),
+        ];
+        const dx = cellCenter[0] - geomCenter[0];
+        const dy = cellCenter[1] - geomCenter[1];
+        const dz = cellCenter[2] - geomCenter[2];
+        structure.translate(dx, dy, dz);
+        renderer.setStructure(structure);
+        this.renderStructure(key, webviewPanel);
+        break;
+      }
+
+      case 'setSupercell': {
+        const sc = Array.isArray(message.supercell) ? message.supercell : [1, 1, 1];
+        const nx = Math.max(1, Math.floor(Number(sc[0]) || 1));
+        const ny = Math.max(1, Math.floor(Number(sc[1]) || 1));
+        const nz = Math.max(1, Math.floor(Number(sc[2]) || 1));
+        if (!structure.unitCell) {
+          structure.supercell = [1, 1, 1];
+        } else {
+          structure.supercell = [nx, ny, nz];
+        }
+        renderer.setStructure(structure);
         this.renderStructure(key, webviewPanel);
         break;
       }
@@ -380,8 +495,15 @@ export class StructureEditorProvider implements vscode.CustomEditorProvider {
         if (!uri) {
           break;
         }
-        const content = FileManager.saveStructure(structureToSave, selectedFormat);
-        await vscode.workspace.fs.writeFile(uri, new TextEncoder().encode(content));
+        try {
+          FileManager.ensureStructureName(structureToSave, uri.fsPath);
+          const content = FileManager.saveStructure(structureToSave, selectedFormat);
+          await vscode.workspace.fs.writeFile(uri, new TextEncoder().encode(content));
+        } catch (error) {
+          vscode.window.showErrorMessage(
+            `Failed to export structure: ${error instanceof Error ? error.message : String(error)}`
+          );
+        }
         break;
       }
 
@@ -405,6 +527,7 @@ export class StructureEditorProvider implements vscode.CustomEditorProvider {
           this.structures.set(key, updated);
           this.undoStacks.set(key, []);
           renderer.setStructure(updated);
+          renderer.setShowUnitCell(!!updated.unitCell);
           renderer.deselectAtom();
           this.renderStructure(key, webviewPanel);
         } catch (error) {
@@ -440,6 +563,7 @@ export class StructureEditorProvider implements vscode.CustomEditorProvider {
     }
     this.structures.set(key, previous);
     renderer.setStructure(previous);
+    renderer.setShowUnitCell(!!previous.unitCell);
     renderer.deselectAtom();
     this.renderStructure(key, webviewPanel);
   }
@@ -463,6 +587,7 @@ export class StructureEditorProvider implements vscode.CustomEditorProvider {
 
     try {
       const format = FileManager.resolveFormat(key, 'xyz');
+      FileManager.ensureStructureName(structure, key);
       const content = FileManager.saveStructure(structure, format);
       const uri = vscode.Uri.file(key);
       await vscode.workspace.fs.writeFile(
@@ -540,8 +665,16 @@ export class StructureEditorProvider implements vscode.CustomEditorProvider {
       return Promise.resolve();
     }
     const format = FileManager.resolveFormat(destination.fsPath, 'xyz');
-    const content = FileManager.saveStructure(structure, format);
-    return vscode.workspace.fs.writeFile(destination, new TextEncoder().encode(content));
+    try {
+      FileManager.ensureStructureName(structure, destination.fsPath);
+      const content = FileManager.saveStructure(structure, format);
+      return vscode.workspace.fs.writeFile(destination, new TextEncoder().encode(content));
+    } catch (error) {
+      vscode.window.showErrorMessage(
+        `Failed to export structure: ${error instanceof Error ? error.message : String(error)}`
+      );
+      return Promise.resolve();
+    }
   }
 
   revertCustomDocument(

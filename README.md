@@ -5,7 +5,10 @@ Atomic Coordinate Toolkit for visualizing and editing atomic structures inside V
 ## Features
 
 - 3D viewer (Three.js) with selection, measurement, and basic editing.
-- Unit cell visualization for crystal structures.
+- Projection toggle (orthographic/perspective).
+- Lattice editor (a/b/c + alpha/beta/gamma) with optional atom scaling.
+- Supercell display with periodic bonds.
+- Center atoms to unit cell (with confirmation).
 - Manual and auto scaling for atom size and scene scale.
 - Save and Save As from the preview panel.
 - Format conversion through Save As.

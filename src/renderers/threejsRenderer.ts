@@ -91,14 +91,20 @@ export class ThreeJSRenderer {
    * Get message for webview to render
    */
   getRenderMessage(): WebviewMessage {
+    const baseAtoms = this.getAtomGeometry();
+    const baseBonds = this.getBondGeometry();
     return {
       command: 'render',
       data: {
-        atoms: this.getAtomGeometry(),
-        bonds: this.getBondGeometry(),
+        atoms: baseAtoms,
+        bonds: baseBonds,
+        renderAtoms: this.getRenderAtomGeometry(baseAtoms),
+        renderBonds: this.getRenderBondGeometry(baseBonds),
         unitCell: this.state.showUnitCell
           ? this.getUnitCellGeometry()
           : null,
+        unitCellParams: this.getUnitCellParams(),
+        supercell: this.getEffectiveSupercell(),
         selectedAtomId: this.state.selectedAtomId,
         selectedAtomIds: this.state.selectedAtomIds,
       },
@@ -129,24 +135,193 @@ export class ThreeJSRenderer {
    * Generate bond geometry data for webview
    */
   private getBondGeometry(): any[] {
+    if (this.state.structure.unitCell) {
+      return this.getPeriodicBondGeometry();
+    }
+
     const bonds = this.state.structure.getBonds();
-    return bonds.map((bond) => {
-      const atom1 = this.state.structure.getAtom(bond.atomId1);
-      const atom2 = this.state.structure.getAtom(bond.atomId2);
+    return bonds
+      .map((bond) => {
+        const atom1 = this.state.structure.getAtom(bond.atomId1);
+        const atom2 = this.state.structure.getAtom(bond.atomId2);
 
-      if (!atom1 || !atom2) {
-        return null;
+        if (!atom1 || !atom2) {
+          return null;
+        }
+
+        return {
+          atomId1: atom1.id,
+          atomId2: atom2.id,
+          start: [atom1.x, atom1.y, atom1.z],
+          end: [atom2.x, atom2.y, atom2.z],
+          radius: 0.04,
+          color: '#C0C0C0',
+        };
+      })
+      .filter((b) => b !== null);
+  }
+
+  private getPeriodicBondGeometry(): any[] {
+    const structure = this.state.structure;
+    const unitCell = structure.unitCell;
+    if (!unitCell) {
+      return [];
+    }
+
+    const atoms = structure.atoms;
+    const vectors = unitCell.getLatticeVectors();
+    const offsets: Array<[number, number, number]> = [];
+
+    for (let ox = -1; ox <= 1; ox++) {
+      for (let oy = -1; oy <= 1; oy++) {
+        for (let oz = -1; oz <= 1; oz++) {
+          offsets.push([ox, oy, oz]);
+        }
       }
+    }
 
-      return {
-        atomId1: atom1.id,
-        atomId2: atom2.id,
-        start: [atom1.x, atom1.y, atom1.z],
-        end: [atom2.x, atom2.y, atom2.z],
-        radius: 0.04,
-        color: '#C0C0C0',
-      };
-    }).filter((b) => b !== null);
+    const isHalfSpace = (ox: number, oy: number, oz: number) =>
+      ox > 0 || (ox === 0 && oy > 0) || (ox === 0 && oy === 0 && oz > 0);
+
+    const bonds: any[] = [];
+    const tolerance = 1.1;
+
+    for (let i = 0; i < atoms.length; i++) {
+      const atomA = atoms[i];
+      const radiusA = ELEMENT_DATA[atomA.element]?.covalentRadius || 1.5;
+
+      for (let j = 0; j < atoms.length; j++) {
+        const atomB = atoms[j];
+        const radiusB = ELEMENT_DATA[atomB.element]?.covalentRadius || 1.5;
+        const bondLength = (radiusA + radiusB) * tolerance;
+
+        for (const [ox, oy, oz] of offsets) {
+          if (ox === 0 && oy === 0 && oz === 0) {
+            if (j <= i) {
+              continue;
+            }
+          } else if (!isHalfSpace(ox, oy, oz)) {
+            continue;
+          }
+
+          const dx =
+            atomB.x + ox * vectors[0][0] + oy * vectors[1][0] + oz * vectors[2][0] - atomA.x;
+          const dy =
+            atomB.y + ox * vectors[0][1] + oy * vectors[1][1] + oz * vectors[2][1] - atomA.y;
+          const dz =
+            atomB.z + ox * vectors[0][2] + oy * vectors[1][2] + oz * vectors[2][2] - atomA.z;
+
+          const distance = Math.sqrt(dx * dx + dy * dy + dz * dz);
+          if (distance < bondLength) {
+            bonds.push({
+              atomId1: atomA.id,
+              atomId2: atomB.id,
+              start: [atomA.x, atomA.y, atomA.z],
+              end: [atomA.x + dx, atomA.y + dy, atomA.z + dz],
+              radius: 0.04,
+              color: '#C0C0C0',
+            });
+          }
+        }
+      }
+    }
+
+    return bonds;
+  }
+
+  private getEffectiveSupercell(): [number, number, number] {
+    if (!this.state.structure.unitCell) {
+      return [1, 1, 1];
+    }
+    const raw = this.state.structure.supercell || [1, 1, 1];
+    const nx = Math.max(1, Math.floor(raw[0] || 1));
+    const ny = Math.max(1, Math.floor(raw[1] || 1));
+    const nz = Math.max(1, Math.floor(raw[2] || 1));
+    return [nx, ny, nz];
+  }
+
+  private getUnitCellParams(): any | null {
+    if (!this.state.structure.unitCell) {
+      return null;
+    }
+    const uc = this.state.structure.unitCell;
+    return {
+      a: uc.a,
+      b: uc.b,
+      c: uc.c,
+      alpha: uc.alpha,
+      beta: uc.beta,
+      gamma: uc.gamma,
+    };
+  }
+
+  private getRenderAtomGeometry(baseAtoms: any[]): any[] {
+    const unitCell = this.state.structure.unitCell;
+    const [nx, ny, nz] = this.getEffectiveSupercell();
+    if (!unitCell || (nx === 1 && ny === 1 && nz === 1)) {
+      return baseAtoms;
+    }
+
+    const vectors = unitCell.getLatticeVectors();
+    const result: any[] = [];
+
+    for (let i = 0; i < nx; i++) {
+      for (let j = 0; j < ny; j++) {
+        for (let k = 0; k < nz; k++) {
+          const dx = i * vectors[0][0] + j * vectors[1][0] + k * vectors[2][0];
+          const dy = i * vectors[0][1] + j * vectors[1][1] + k * vectors[2][1];
+          const dz = i * vectors[0][2] + j * vectors[1][2] + k * vectors[2][2];
+          const isBaseCell = i === 0 && j === 0 && k === 0;
+
+          for (const atom of baseAtoms) {
+            result.push({
+              ...atom,
+              id: isBaseCell ? atom.id : `${atom.id}::${i}-${j}-${k}`,
+              position: [
+                atom.position[0] + dx,
+                atom.position[1] + dy,
+                atom.position[2] + dz,
+              ],
+              selectable: isBaseCell,
+              selected: isBaseCell ? atom.selected : false,
+            });
+          }
+        }
+      }
+    }
+
+    return result;
+  }
+
+  private getRenderBondGeometry(baseBonds: any[]): any[] {
+    const unitCell = this.state.structure.unitCell;
+    const [nx, ny, nz] = this.getEffectiveSupercell();
+    if (!unitCell || (nx === 1 && ny === 1 && nz === 1)) {
+      return baseBonds;
+    }
+
+    const vectors = unitCell.getLatticeVectors();
+    const result: any[] = [];
+
+    for (let i = 0; i < nx; i++) {
+      for (let j = 0; j < ny; j++) {
+        for (let k = 0; k < nz; k++) {
+          const dx = i * vectors[0][0] + j * vectors[1][0] + k * vectors[2][0];
+          const dy = i * vectors[0][1] + j * vectors[1][1] + k * vectors[2][1];
+          const dz = i * vectors[0][2] + j * vectors[1][2] + k * vectors[2][2];
+
+          for (const bond of baseBonds) {
+            result.push({
+              ...bond,
+              start: [bond.start[0] + dx, bond.start[1] + dy, bond.start[2] + dz],
+              end: [bond.end[0] + dx, bond.end[1] + dy, bond.end[2] + dz],
+            });
+          }
+        }
+      }
+    }
+
+    return result;
   }
 
   /**
@@ -157,7 +332,12 @@ export class ThreeJSRenderer {
       return null;
     }
 
-    const vectors = this.state.structure.unitCell.getLatticeVectors();
+    const unitCell = this.state.structure.unitCell;
+    const [nx, ny, nz] = this.getEffectiveSupercell();
+    const vectors = unitCell.getLatticeVectors().map((vec, idx) => {
+      const scale = idx === 0 ? nx : idx === 1 ? ny : nz;
+      return [vec[0] * scale, vec[1] * scale, vec[2] * scale];
+    });
 
     // 8 corners of the unit cell
     const corners = [
