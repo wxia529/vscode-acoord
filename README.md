@@ -48,8 +48,9 @@ Input and output:
 ## Basic Operations
 
 - Select atoms: click an atom in the canvas or the atom list.
-- Multi-select: Ctrl or Cmd click to add/remove; Shift drag keeps selection.
+- Multi-select: Ctrl or Cmd click to add/remove.
 - Move atoms: Shift drag selected atoms in the canvas.
+- Box select: Shift drag in empty space to select multiple atoms in screen space.
 - Rotate selection: pick axis (X/Y/Z) and move the angle slider (0-360).
 - Change element: use the Change Element panel and Apply to Selected.
 - Add or delete atoms: use the Add Atom panel or Delete button.

@@ -79,15 +79,34 @@ button:hover {
   display: flex;
   overflow: hidden;
   background: var(--acoord-bg-2);
+  position: relative;
+}
+
+#canvas-wrap {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
 }
 
 #canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
   flex: 1;
   background:
     radial-gradient(800px 500px at 20% 20%, rgba(255, 255, 255, 0.06), transparent 60%),
     radial-gradient(600px 400px at 80% 30%, rgba(52, 211, 153, 0.08), transparent 60%),
     linear-gradient(160deg, #12151a 0%, #1f242b 60%, #101217 100%);
   outline: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+#selection-box {
+  position: absolute;
+  border: 1px dashed rgba(246, 213, 92, 0.9);
+  background: rgba(246, 213, 92, 0.15);
+  pointer-events: none;
+  display: none;
+  z-index: 2;
 }
 
 #error-banner,
@@ -107,6 +126,30 @@ button:hover {
   color: #ffffff;
 }
 
+.toolbar-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 6px;
+  background: rgba(0, 0, 0, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 999px;
+}
+
+.toolbar-field label {
+  font-size: 11px;
+  color: var(--acoord-muted);
+}
+
+.toolbar-field select {
+  background: #11161c;
+  color: var(--acoord-text);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 11px;
+}
+
 #sidebar {
   width: 260px;
   background:
@@ -116,6 +159,19 @@ button:hover {
   padding: 12px;
   overflow-y: auto;
   box-shadow: inset 8px 0 16px rgba(0, 0, 0, 0.25);
+}
+
+#status-bar {
+  display: flex;
+  align-items: center;
+  padding: 6px 12px;
+  font-size: 11px;
+  color: var(--acoord-muted);
+  background: rgba(10, 12, 16, 0.9);
+  border-top: 1px solid var(--acoord-border);
+  min-height: 26px;
+  letter-spacing: 0.02em;
+  user-select: text;
 }
 
 .panel {

@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## 0.1.4
+
+- Refined multi-select dragging to keep movement in the view plane.
+- Added box selection for atoms (Shift-drag to select in screen space).
+- Added a bottom status bar showing render status and selected atom coordinates.
+
 ## 0.1.3
 
 - Added lattice editing panel with apply/remove and center-to-cell actions.

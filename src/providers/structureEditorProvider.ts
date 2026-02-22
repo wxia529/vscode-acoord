@@ -179,6 +179,13 @@ export class StructureEditorProvider implements vscode.CustomEditorProvider {
         break;
       }
 
+      case 'setSelection': {
+        const ids: string[] = Array.isArray(message.atomIds) ? message.atomIds : [];
+        renderer.setSelection(ids);
+        this.renderStructure(key, webviewPanel);
+        break;
+      }
+
       case 'toggleUnitCell': {
         renderer.setShowUnitCell(
           !renderer.getState().showUnitCell

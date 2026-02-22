@@ -3,6 +3,8 @@
     currentStructure: null,
     currentSelectedAtom: null,
     selectedAtomIds: [],
+    isDragging: false,
+    dragAtomId: null,
     adsorptionReferenceId: null,
     adsorptionAdsorbateIds: [],
     manualScale: 1,
@@ -17,6 +19,7 @@
     shouldFitCamera: true,
     groupMoveActive: false,
     lastDragWorld: null,
+    dragPlaneNormal: null,
     rotationAxis: 'z',
     rotationInProgress: false,
   };

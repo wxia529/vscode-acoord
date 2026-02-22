@@ -3,6 +3,9 @@
   const state = window.ACoordState;
   const renderer = window.ACoordRenderer;
   const interaction = window.ACoordInteraction;
+  let renderStatus = 'Ready.';
+  let statusSelectionLock = false;
+  let lastStatusSelectedId = null;
 
   function setError(message) {
     const banner = document.getElementById('error-banner');
@@ -11,9 +14,98 @@
   }
 
   function setStatus(message) {
-    const banner = document.getElementById('status-banner');
-    banner.textContent = message || '';
-    banner.style.display = message ? 'block' : 'none';
+    renderStatus = message || 'Ready.';
+    updateStatusBar();
+  }
+
+  function updateStatusBar(force) {
+    const statusEl = document.getElementById('status-text');
+    if (!statusEl) return;
+    const selected = state.currentSelectedAtom;
+    const selectedId = selected ? selected.id : null;
+    if (!force && statusSelectionLock && selectedId === lastStatusSelectedId) {
+      return;
+    }
+    if (!selected) {
+      statusEl.textContent = renderStatus;
+      lastStatusSelectedId = null;
+      return;
+    }
+
+    const cart = selected.position || [0, 0, 0];
+    const cartText = `Cart: ${cart[0].toFixed(4)}, ${cart[1].toFixed(4)}, ${cart[2].toFixed(4)}`;
+    const frac = getFractionalCoords(cart, state.currentStructure && state.currentStructure.unitCellParams);
+    const fracText = frac
+      ? ` | Frac: ${frac[0].toFixed(4)}, ${frac[1].toFixed(4)}, ${frac[2].toFixed(4)}`
+      : '';
+    statusEl.textContent = `${renderStatus} | Selected: ${selected.element} | ${cartText}${fracText}`;
+    lastStatusSelectedId = selectedId;
+  }
+
+  function syncStatusSelectionLock() {
+    const selection = document.getSelection();
+    const statusBar = document.getElementById('status-bar');
+    if (!selection || !statusBar || selection.isCollapsed) {
+      statusSelectionLock = false;
+      return;
+    }
+    const anchor = selection.anchorNode;
+    const focus = selection.focusNode;
+    statusSelectionLock =
+      (!!anchor && statusBar.contains(anchor)) ||
+      (!!focus && statusBar.contains(focus));
+  }
+
+  function getFractionalCoords(cart, cell) {
+    if (!cell) return null;
+    const a = Number(cell.a);
+    const b = Number(cell.b);
+    const c = Number(cell.c);
+    const alpha = Number(cell.alpha) * Math.PI / 180;
+    const beta = Number(cell.beta) * Math.PI / 180;
+    const gamma = Number(cell.gamma) * Math.PI / 180;
+    if (![a, b, c, alpha, beta, gamma].every((value) => Number.isFinite(value))) return null;
+    const sinGamma = Math.sin(gamma);
+    if (Math.abs(sinGamma) < 1e-8) return null;
+
+    const cosAlpha = Math.cos(alpha);
+    const cosBeta = Math.cos(beta);
+    const cosGamma = Math.cos(gamma);
+
+    const ax = a, ay = 0, az = 0;
+    const bx = b * cosGamma, by = b * sinGamma, bz = 0;
+    const cx = c * cosBeta;
+    const cy = c * (cosAlpha - cosBeta * cosGamma) / sinGamma;
+    const czSquared =
+      c * c - cx * cx - cy * cy;
+    if (czSquared <= 0) return null;
+    const cz = Math.sqrt(czSquared);
+
+    const matrix = [
+      [ax, bx, cx],
+      [ay, by, cy],
+      [az, bz, cz],
+    ];
+    const inverse = invert3x3(matrix);
+    if (!inverse) return null;
+    const fx = inverse[0][0] * cart[0] + inverse[0][1] * cart[1] + inverse[0][2] * cart[2];
+    const fy = inverse[1][0] * cart[0] + inverse[1][1] * cart[1] + inverse[1][2] * cart[2];
+    const fz = inverse[2][0] * cart[0] + inverse[2][1] * cart[1] + inverse[2][2] * cart[2];
+    return [fx, fy, fz];
+  }
+
+  function invert3x3(m) {
+    const a = m[0][0], b = m[0][1], c = m[0][2];
+    const d = m[1][0], e = m[1][1], f = m[1][2];
+    const g = m[2][0], h = m[2][1], i = m[2][2];
+    const det = a * (e * i - f * h) - b * (d * i - f * g) + c * (d * h - e * g);
+    if (Math.abs(det) < 1e-12) return null;
+    const invDet = 1 / det;
+    return [
+      [(e * i - f * h) * invDet, (c * h - b * i) * invDet, (b * f - c * e) * invDet],
+      [(f * g - d * i) * invDet, (a * i - c * g) * invDet, (c * d - a * f) * invDet],
+      [(d * h - e * g) * invDet, (b * g - a * h) * invDet, (a * e - b * d) * invDet],
+    ];
   }
 
   function updateCounts(atomCount, bondCount) {
@@ -112,6 +204,7 @@
     updateSelectedInputs(selected);
     updateMeasurements();
     updateAdsorptionUI();
+    updateStatusBar();
   }
 
   function handleSelect(atomId, add, preserve) {
@@ -139,6 +232,46 @@
     }
   }
 
+  function applySelectionFromIds(atomIds, mode) {
+    if (!state.currentStructure || !state.currentStructure.atoms) {
+      return;
+    }
+    const currentIds = state.selectedAtomIds || [];
+    const nextSet = new Set();
+    if (mode === 'add') {
+      for (const id of currentIds) {
+        nextSet.add(id);
+      }
+      for (const id of atomIds) {
+        nextSet.add(id);
+      }
+    } else if (mode === 'subtract') {
+      for (const id of currentIds) {
+        nextSet.add(id);
+      }
+      for (const id of atomIds) {
+        nextSet.delete(id);
+      }
+    } else {
+      for (const id of atomIds) {
+        nextSet.add(id);
+      }
+    }
+
+    const atoms = state.currentStructure.atoms;
+    const next = [];
+    for (const atom of atoms) {
+      const selected = nextSet.has(atom.id);
+      atom.selected = selected;
+      if (selected) {
+        next.push(atom.id);
+      }
+    }
+    const selectedId = next.length > 0 ? next[next.length - 1] : null;
+    updateAtomList(atoms, next, selectedId);
+    vscode.postMessage({ command: 'setSelection', atomIds: next });
+  }
+
   function getAtomById(atomId) {
     if (!state.currentStructure || !state.currentStructure.atoms) return null;
     return state.currentStructure.atoms.find((atom) => atom.id === atomId) || null;
@@ -150,6 +283,9 @@
     atom.position[0] = x;
     atom.position[1] = y;
     atom.position[2] = z;
+    if (state.currentSelectedAtom && state.currentSelectedAtom.id === atomId) {
+      updateStatusBar();
+    }
   }
 
   function updateMeasurements() {
@@ -768,18 +904,23 @@
       setError('');
     };
 
-    const projPersp = document.getElementById('btn-proj-persp');
-    const projOrtho = document.getElementById('btn-proj-ortho');
+    const projSelect = document.getElementById('proj-select');
     const setProjection = (mode) => {
-      state.projectionMode = mode;
-      projPersp.classList.toggle('selected', mode === 'perspective');
-      projOrtho.classList.toggle('selected', mode === 'orthographic');
-      renderer.setProjectionMode(mode);
+      const next = mode === 'orthographic' ? 'orthographic' : 'perspective';
+      state.projectionMode = next;
+      if (projSelect) {
+        projSelect.value = next;
+      }
+      renderer.setProjectionMode(next);
       renderer.fitCamera();
     };
 
-    projPersp.onclick = () => setProjection('perspective');
-    projOrtho.onclick = () => setProjection('orthographic');
+    if (projSelect) {
+      projSelect.onchange = (event) => {
+        const target = event.target;
+        setProjection(target.value);
+      };
+    }
     setProjection(state.projectionMode || 'perspective');
   }
 
@@ -787,6 +928,7 @@
     const canvas = document.getElementById('canvas');
     interaction.init(canvas, {
       onSelectAtom: (atomId, add, preserve) => handleSelect(atomId, add, preserve),
+      onBoxSelect: (atomIds, mode) => applySelectionFromIds(atomIds, mode),
       onBeginDrag: (atomId) => vscode.postMessage({ command: 'beginDrag', atomId }),
       onDragAtom: (atomId, intersection) => {
         const scale = renderer.getScale();
@@ -850,6 +992,12 @@
     setupUI();
     setupInteraction();
     vscode.postMessage({ command: 'getState' });
+    document.addEventListener('selectionchange', () => {
+      syncStatusSelectionLock();
+      if (!statusSelectionLock) {
+        updateStatusBar(true);
+      }
+    });
   }
 
   window.addEventListener('message', (event) => {
@@ -874,6 +1022,7 @@
         { fitCamera: state.shouldFitCamera }
       );
       state.shouldFitCamera = false;
+      updateStatusBar();
 
       if (event.data.data.renderAtoms && event.data.data.atoms) {
         const baseMap = new Map();
