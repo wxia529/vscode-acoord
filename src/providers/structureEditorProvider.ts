@@ -157,6 +157,7 @@ export class StructureEditorProvider implements vscode.CustomEditorProvider {
           structure.removeAtom(message.atomId);
           renderer.setStructure(structure);
           renderer.deselectAtom();
+          renderer.deselectBond();
           this.renderStructure(key, webviewPanel);
         }
         break;
@@ -174,6 +175,7 @@ export class StructureEditorProvider implements vscode.CustomEditorProvider {
           } else {
             renderer.selectAtom(message.atomId);
           }
+          renderer.deselectBond();
           this.renderStructure(key, webviewPanel);
         }
         break;
@@ -182,6 +184,16 @@ export class StructureEditorProvider implements vscode.CustomEditorProvider {
       case 'setSelection': {
         const ids: string[] = Array.isArray(message.atomIds) ? message.atomIds : [];
         renderer.setSelection(ids);
+        renderer.deselectBond();
+        this.renderStructure(key, webviewPanel);
+        break;
+      }
+
+      case 'selectBond': {
+        const bondKey = typeof message.bondKey === 'string' && message.bondKey.trim()
+          ? message.bondKey.trim()
+          : undefined;
+        renderer.selectBond(bondKey);
         this.renderStructure(key, webviewPanel);
         break;
       }
@@ -436,6 +448,74 @@ export class StructureEditorProvider implements vscode.CustomEditorProvider {
         break;
       }
 
+      case 'setAtomColor': {
+        const ids: string[] = Array.isArray(message.atomIds) ? message.atomIds : [];
+        const color = typeof message.color === 'string' ? message.color.trim() : '';
+        if (ids.length === 0 || !/^#[0-9a-fA-F]{6}$/.test(color)) {
+          break;
+        }
+        this.pushUndoSnapshot(key, structure);
+        for (const id of ids) {
+          const atom = structure.getAtom(id);
+          if (atom) {
+            atom.color = color;
+          }
+        }
+        renderer.setStructure(structure);
+        this.renderStructure(key, webviewPanel);
+        break;
+      }
+
+      case 'createBond': {
+        const ids: string[] = Array.isArray(message.atomIds) ? message.atomIds : [];
+        if (ids.length < 2) {
+          break;
+        }
+        const atomId1 = ids[0];
+        const atomId2 = ids[1];
+        if (!structure.getAtom(atomId1) || !structure.getAtom(atomId2) || atomId1 === atomId2) {
+          break;
+        }
+        this.pushUndoSnapshot(key, structure);
+        structure.addManualBond(atomId1, atomId2);
+        renderer.setStructure(structure);
+        renderer.selectBond(Structure.bondKey(atomId1, atomId2));
+        this.renderStructure(key, webviewPanel);
+        break;
+      }
+
+      case 'deleteBond': {
+        let pair: [string, string] | null = null;
+        if (typeof message.bondKey === 'string') {
+          pair = Structure.bondKeyToPair(message.bondKey);
+        }
+        if (!pair) {
+          const ids: string[] = Array.isArray(message.atomIds) ? message.atomIds : [];
+          if (ids.length >= 2) {
+            pair = Structure.normalizeBondPair(ids[0], ids[1]);
+          }
+        }
+        if (!pair) {
+          break;
+        }
+        this.pushUndoSnapshot(key, structure);
+        structure.removeBond(pair[0], pair[1]);
+        renderer.setStructure(structure);
+        renderer.deselectBond();
+        this.renderStructure(key, webviewPanel);
+        break;
+      }
+
+      case 'recalculateBonds': {
+        this.pushUndoSnapshot(key, structure);
+        structure.manualBonds = [];
+        structure.suppressedAutoBonds = [];
+        renderer.setStructure(structure);
+        renderer.deselectBond();
+        this.renderStructure(key, webviewPanel);
+        break;
+      }
+
       case 'updateAtom': {
         if (message.atomId) {
           const atom = structure.getAtom(message.atomId);
@@ -587,6 +667,7 @@ export class StructureEditorProvider implements vscode.CustomEditorProvider {
     renderer.setStructure(previous);
     renderer.setShowUnitCell(!!previous.unitCell);
     renderer.deselectAtom();
+    renderer.deselectBond();
     this.renderStructure(key, webviewPanel);
   }
 

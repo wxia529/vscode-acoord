@@ -9,6 +9,8 @@ export class Structure {
   id: string;
   name: string;
   atoms: Atom[] = [];
+  manualBonds: Array<[string, string]> = [];
+  suppressedAutoBonds: Array<[string, string]> = [];
   unitCell?: UnitCell;
   isCrystal: boolean = false;
   supercell: [number, number, number] = [1, 1, 1];
@@ -34,6 +36,54 @@ export class Structure {
    */
   removeAtom(atomId: string): void {
     this.atoms = this.atoms.filter((a) => a.id !== atomId);
+    this.manualBonds = this.manualBonds.filter(([a, b]) => a !== atomId && b !== atomId);
+    this.suppressedAutoBonds = this.suppressedAutoBonds.filter(([a, b]) => a !== atomId && b !== atomId);
+  }
+
+  static normalizeBondPair(atomId1: string, atomId2: string): [string, string] {
+    return atomId1 < atomId2 ? [atomId1, atomId2] : [atomId2, atomId1];
+  }
+
+  static bondKey(atomId1: string, atomId2: string): string {
+    const [a, b] = Structure.normalizeBondPair(atomId1, atomId2);
+    return `${a}|${b}`;
+  }
+
+  static bondKeyToPair(key: string): [string, string] | null {
+    if (!key || typeof key !== 'string') {
+      return null;
+    }
+    const parts = key.split('|');
+    if (parts.length !== 2 || !parts[0] || !parts[1]) {
+      return null;
+    }
+    return Structure.normalizeBondPair(parts[0], parts[1]);
+  }
+
+  addManualBond(atomId1: string, atomId2: string): void {
+    if (!this.getAtom(atomId1) || !this.getAtom(atomId2) || atomId1 === atomId2) {
+      return;
+    }
+    const [a, b] = Structure.normalizeBondPair(atomId1, atomId2);
+    this.suppressedAutoBonds = this.suppressedAutoBonds.filter(([x, y]) => !(x === a && y === b));
+    const exists = this.manualBonds.some(([x, y]) => x === a && y === b);
+    if (!exists) {
+      this.manualBonds.push([a, b]);
+    }
+  }
+
+  removeBond(atomId1: string, atomId2: string): void {
+    const [a, b] = Structure.normalizeBondPair(atomId1, atomId2);
+    this.manualBonds = this.manualBonds.filter(([x, y]) => !(x === a && y === b));
+    const suppressed = this.suppressedAutoBonds.some(([x, y]) => x === a && y === b);
+    if (!suppressed) {
+      this.suppressedAutoBonds.push([a, b]);
+    }
+  }
+
+  hasManualBond(atomId1: string, atomId2: string): boolean {
+    const [a, b] = Structure.normalizeBondPair(atomId1, atomId2);
+    return this.manualBonds.some(([x, y]) => x === a && y === b);
   }
 
   /**
@@ -46,9 +96,11 @@ export class Structure {
   /**
    * Get list of bonds based on covalent radii
    */
-  getBonds(): Array<{ atomId1: string; atomId2: string; distance: number }> {
-    const bonds = [];
+  getBonds(): Array<{ atomId1: string; atomId2: string; distance: number; manual: boolean }> {
+    const bonds: Array<{ atomId1: string; atomId2: string; distance: number; manual: boolean }> = [];
     const tolerance = 1.1; // 10% tolerance
+    const suppressed = new Set(this.suppressedAutoBonds.map(([a, b]) => Structure.bondKey(a, b)));
+    const seen = new Set<string>();
 
     for (let i = 0; i < this.atoms.length; i++) {
       for (let j = i + 1; j < this.atoms.length; j++) {
@@ -63,13 +115,38 @@ export class Structure {
         const bondLength = (radius1 + radius2) * tolerance;
 
         if (distance < bondLength) {
+          const key = Structure.bondKey(atom1.id, atom2.id);
+          if (suppressed.has(key) || seen.has(key)) {
+            continue;
+          }
           bonds.push({
             atomId1: atom1.id,
             atomId2: atom2.id,
             distance: distance,
+            manual: false,
           });
+          seen.add(key);
         }
       }
+    }
+
+    for (const [a, b] of this.manualBonds) {
+      const atom1 = this.getAtom(a);
+      const atom2 = this.getAtom(b);
+      if (!atom1 || !atom2) {
+        continue;
+      }
+      const key = Structure.bondKey(atom1.id, atom2.id);
+      if (seen.has(key)) {
+        continue;
+      }
+      bonds.push({
+        atomId1: atom1.id,
+        atomId2: atom2.id,
+        distance: atom1.distanceTo(atom2),
+        manual: true,
+      });
+      seen.add(key);
     }
 
     return bonds;
@@ -155,7 +232,7 @@ export class Structure {
           ];
 
           for (const atom of this.atoms) {
-            const newAtom = atom.clone();
+            const newAtom = new Atom(atom.element, atom.x, atom.y, atom.z, undefined, atom.color);
             newAtom.x += displacement[0];
             newAtom.y += displacement[1];
             newAtom.z += displacement[2];
@@ -176,6 +253,8 @@ export class Structure {
     for (const atom of this.atoms) {
       cloned.addAtom(atom.clone());
     }
+    cloned.manualBonds = this.manualBonds.map(([a, b]) => [a, b]);
+    cloned.suppressedAutoBonds = this.suppressedAutoBonds.map(([a, b]) => [a, b]);
     if (this.unitCell) {
       cloned.unitCell = this.unitCell.clone();
     }
@@ -191,6 +270,8 @@ export class Structure {
       id: this.id,
       name: this.name,
       atoms: this.atoms.map((a) => a.toJSON()),
+      manualBonds: this.manualBonds,
+      suppressedAutoBonds: this.suppressedAutoBonds,
       unitCell: this.unitCell?.toJSON(),
       isCrystal: this.isCrystal,
       supercell: this.supercell,

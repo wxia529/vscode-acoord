@@ -7,6 +7,7 @@ export class Atom {
   x: number;
   y: number;
   z: number;
+  color?: string;
   selected: boolean = false;
   fixed: boolean = false;
 
@@ -15,13 +16,15 @@ export class Atom {
     x: number,
     y: number,
     z: number,
-    id?: string
+    id?: string,
+    color?: string
   ) {
     this.element = element;
     this.x = x;
     this.y = y;
     this.z = z;
     this.id = id || `atom_${Math.random().toString(36).substr(2, 9)}`;
+    this.color = color;
   }
 
   /**
@@ -54,7 +57,7 @@ export class Atom {
    * Clone this atom
    */
   clone(): Atom {
-    const cloned = new Atom(this.element, this.x, this.y, this.z);
+    const cloned = new Atom(this.element, this.x, this.y, this.z, this.id, this.color);
     cloned.selected = this.selected;
     cloned.fixed = this.fixed;
     return cloned;
@@ -70,6 +73,7 @@ export class Atom {
       x: this.x,
       y: this.y,
       z: this.z,
+      color: this.color,
       fixed: this.fixed,
     };
   }

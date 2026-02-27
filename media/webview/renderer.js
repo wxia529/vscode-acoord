@@ -7,6 +7,7 @@
     renderer: null,
     controls: null,
     atomMeshes: new Map(),
+    bondMeshes: [],
     bondLines: [],
     unitCellGroup: null,
     raycaster: null,
@@ -19,6 +20,11 @@
     orthoSize: 30,
     setError: () => {},
     setStatus: () => {},
+    // Lights
+    ambientLight: null,
+    keyLight: null,
+    fillLight: null,
+    rimLight: null,
   };
 
   function getOrthoFrustum(width, height) {
@@ -83,7 +89,7 @@
     handlers.setStatus('Canvas size: ' + Math.round(width) + 'x' + Math.round(height));
 
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x0d1015);
+    scene.background = new THREE.Color(state.backgroundColor || '#0d1015');
     rendererState.scene = scene;
 
     rendererState.projectionMode = state.projectionMode || 'perspective';
@@ -108,10 +114,24 @@
       return;
     }
 
-    scene.add(new THREE.AmbientLight(0xffffff, 0.5));
-    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
-    directionalLight.position.set(10, 10, 10);
-    scene.add(directionalLight);
+    // Three-point lighting setup
+    rendererState.ambientLight = new THREE.AmbientLight(0xffffff, state.ambientIntensity || 0.5);
+    scene.add(rendererState.ambientLight);
+
+    // Key light (main light source)
+    rendererState.keyLight = new THREE.DirectionalLight(0xffffff, state.keyLight?.intensity || 0.8);
+    scene.add(rendererState.keyLight);
+
+    // Fill light (softens shadows)
+    rendererState.fillLight = new THREE.DirectionalLight(0xffffff, state.fillLight?.intensity || 0);
+    scene.add(rendererState.fillLight);
+
+    // Rim light (creates edge highlight)
+    rendererState.rimLight = new THREE.DirectionalLight(0xffffff, state.rimLight?.intensity || 0);
+    scene.add(rendererState.rimLight);
+
+    // Initialize light positions using the same function as animation loop
+    updateLightsForCamera();
 
     scene.add(new THREE.AxesHelper(5));
 
@@ -138,7 +158,34 @@
     requestAnimationFrame(animate);
     if (!rendererState.renderer || !rendererState.controls) return;
     rendererState.controls.update();
+    updateLightsForCamera();
     rendererState.renderer.render(rendererState.scene, rendererState.camera);
+  }
+
+  function updateLightsForCamera() {
+    if (!rendererState.camera || !rendererState.keyLight ||
+        !rendererState.fillLight || !rendererState.rimLight) {
+      return;
+    }
+
+    const camera = rendererState.camera;
+
+    // Get base offset directions from state (these define light directions relative to camera)
+    const keyOffset = new THREE.Vector3(state.keyLight?.x || 10, state.keyLight?.y || 10, state.keyLight?.z || 10);
+    const fillOffset = new THREE.Vector3(state.fillLight?.x || -10, state.fillLight?.y || -5, state.fillLight?.z || 5);
+    const rimOffset = new THREE.Vector3(state.rimLight?.x || 0, state.rimLight?.y || 5, state.rimLight?.z || -10);
+
+    // Apply camera rotation to get world-space directions
+    keyOffset.applyQuaternion(camera.quaternion);
+    fillOffset.applyQuaternion(camera.quaternion);
+    rimOffset.applyQuaternion(camera.quaternion);
+
+    // Set light positions: place lights far away in the direction they should shine FROM
+    // DirectionalLight shines toward its target (default is scene origin)
+    const distance = 50;
+    rendererState.keyLight.position.copy(keyOffset.normalize().multiplyScalar(distance));
+    rendererState.fillLight.position.copy(fillOffset.normalize().multiplyScalar(distance));
+    rendererState.rimLight.position.copy(rimOffset.normalize().multiplyScalar(distance));
   }
 
   function onResize() {
@@ -216,6 +263,7 @@
       rendererState.scene.remove(line);
     }
     rendererState.bondLines = [];
+    rendererState.bondMeshes = [];
 
     if (rendererState.unitCellGroup) {
       rendererState.scene.remove(rendererState.unitCellGroup);
@@ -235,9 +283,10 @@
         const isSelected = selectable && (!!atom.selected || selectedSet.has(atom.id));
         const sphereRadius = Math.max(atom.radius * sizeScale, 0.12) * (isSelected ? 1.12 : 1);
         const geometry = new THREE.SphereGeometry(sphereRadius, 32, 32);
-        const material = new THREE.MeshBasicMaterial({
+        const material = new THREE.MeshPhongMaterial({
           color: new THREE.Color(isSelected ? '#f6d55c' : atom.color),
-          wireframe: !isSelected,
+          specular: new THREE.Color(0x333333),
+          shininess: 30,
         });
         const mesh = new THREE.Mesh(geometry, material);
         mesh.position.set(
@@ -256,8 +305,11 @@
     }
 
     if (renderBonds) {
+      const selectedBondKey = data.selectedBondKey || null;
       for (const bond of renderBonds) {
+        const isSelectedBond = selectedBondKey && bond.key && selectedBondKey === bond.key;
         const highlightBond =
+          isSelectedBond ||
           bond.atomId1 &&
           bond.atomId2 &&
           selectedSet.has(bond.atomId1) &&
@@ -275,23 +327,64 @@
         const direction = end.clone().sub(start);
         const length = direction.length();
         const bondRadius = Math.max(bond.radius * sizeScale, 0.03) * (highlightBond ? 1.35 : 1);
-        const geometry = new THREE.CylinderGeometry(bondRadius, bondRadius, length, 8);
-        const material = new THREE.MeshBasicMaterial({
-          color: new THREE.Color(highlightBond ? '#f6d55c' : bond.color),
-        });
-        const cylinder = new THREE.Mesh(geometry, material);
+
+        // Create half-bonds with two colors
         const midpoint = start.clone().add(end).multiplyScalar(0.5);
-        cylinder.position.copy(midpoint);
-        if (direction.length() > 0.0001) {
+        const directionNormalized = direction.clone().normalize();
+
+        // First half (from start to midpoint) - color1
+        const halfLength1 = length / 2;
+        const geometry1 = new THREE.CylinderGeometry(bondRadius, bondRadius, halfLength1, 8);
+        const material1 = new THREE.MeshPhongMaterial({
+          color: new THREE.Color(bond.color1 || bond.color),
+          specular: new THREE.Color(0x333333),
+          emissive: new THREE.Color(isSelectedBond ? '#704214' : '#000000'),
+          shininess: 30,
+        });
+        const cylinder1 = new THREE.Mesh(geometry1, material1);
+        const midPoint1 = start.clone().add(midpoint).multiplyScalar(0.5);
+        cylinder1.position.copy(midPoint1);
+        if (directionNormalized.length() > 0.0001) {
           const axis = new THREE.Vector3(0, 1, 0);
-          const rotationAxis = axis.clone().cross(direction.clone().normalize());
+          const rotationAxis = axis.clone().cross(directionNormalized);
           if (rotationAxis.length() > 0.0001) {
-            const angle = Math.acos(axis.dot(direction.normalize()) / direction.length());
-            cylinder.setRotationFromAxisAngle(rotationAxis.normalize(), angle);
+            const angle = Math.acos(axis.dot(directionNormalized));
+            cylinder1.setRotationFromAxisAngle(rotationAxis.normalize(), angle);
           }
         }
-        rendererState.scene.add(cylinder);
-        rendererState.bondLines.push(cylinder);
+        if (bond.key) {
+          cylinder1.userData = { bondKey: bond.key };
+          rendererState.bondMeshes.push(cylinder1);
+        }
+        rendererState.scene.add(cylinder1);
+        rendererState.bondLines.push(cylinder1);
+
+        // Second half (from midpoint to end) - color2
+        const halfLength2 = length / 2;
+        const geometry2 = new THREE.CylinderGeometry(bondRadius, bondRadius, halfLength2, 8);
+        const material2 = new THREE.MeshPhongMaterial({
+          color: new THREE.Color(bond.color2 || bond.color),
+          specular: new THREE.Color(0x333333),
+          emissive: new THREE.Color(isSelectedBond ? '#704214' : '#000000'),
+          shininess: 30,
+        });
+        const cylinder2 = new THREE.Mesh(geometry2, material2);
+        const midPoint2 = midpoint.clone().add(end).multiplyScalar(0.5);
+        cylinder2.position.copy(midPoint2);
+        if (directionNormalized.length() > 0.0001) {
+          const axis = new THREE.Vector3(0, 1, 0);
+          const rotationAxis = axis.clone().cross(directionNormalized);
+          if (rotationAxis.length() > 0.0001) {
+            const angle = Math.acos(axis.dot(directionNormalized));
+            cylinder2.setRotationFromAxisAngle(rotationAxis.normalize(), angle);
+          }
+        }
+        if (bond.key) {
+          cylinder2.userData = { bondKey: bond.key };
+          rendererState.bondMeshes.push(cylinder2);
+        }
+        rendererState.scene.add(cylinder2);
+        rendererState.bondLines.push(cylinder2);
       }
     }
 
@@ -309,7 +402,7 @@
       }
       const geometry = new THREE.BufferGeometry();
       geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
-      const color = data.unitCell.edges[0].color || '#FF6600';
+      const color = state.unitCellColor || '#FF6600';
       const material = new THREE.LineBasicMaterial({ color: new THREE.Color(color) });
       const lines = new THREE.LineSegments(geometry, material);
       rendererState.scene.add(lines);
@@ -406,6 +499,10 @@
     return rendererState.atomMeshes;
   }
 
+  function getBondMeshes() {
+    return rendererState.bondMeshes;
+  }
+
   function getDragPlane() {
     return rendererState.dragPlane;
   }
@@ -420,6 +517,35 @@
     return rendererState.lastScale || 1;
   }
 
+  function updateLighting() {
+    if (!rendererState.ambientLight || !rendererState.keyLight || 
+        !rendererState.fillLight || !rendererState.rimLight || !rendererState.camera) {
+      return;
+    }
+
+    const enabled = state.lightingEnabled !== false;
+    
+    rendererState.ambientLight.intensity = enabled ? (state.ambientIntensity || 0.5) : 0;
+    rendererState.keyLight.intensity = enabled ? (state.keyLight?.intensity || 0.8) : 0;
+    rendererState.fillLight.intensity = enabled ? (state.fillLight?.intensity || 0) : 0;
+    rendererState.rimLight.intensity = enabled ? (state.rimLight?.intensity || 0) : 0;
+
+    // Also update positions
+    updateLightsForCamera();
+  }
+
+  function updateDisplaySettings() {
+    // Update background color
+    if (rendererState.scene && state.backgroundColor) {
+      rendererState.scene.background = new THREE.Color(state.backgroundColor);
+    }
+    
+    // Update unit cell color
+    if (rendererState.unitCellGroup && state.unitCellColor) {
+      rendererState.unitCellGroup.material.color = new THREE.Color(state.unitCellColor);
+    }
+  }
+
   window.ACoordRenderer = {
     init,
     renderStructure,
@@ -430,7 +556,10 @@
     getMouse,
     getCamera,
     getAtomMeshes,
+    getBondMeshes,
     getDragPlane,
     setControlsEnabled,
+    updateLighting,
+    updateDisplaySettings,
   };
 })();

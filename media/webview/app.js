@@ -202,6 +202,7 @@
       state.adsorptionAdsorbateIds = normalizedSelectedIds.slice();
     }
     updateSelectedInputs(selected);
+    updateAtomColorPreview();
     updateMeasurements();
     updateAdsorptionUI();
     updateStatusBar();
@@ -227,6 +228,7 @@
     }
     const selectedId = next.length > 0 ? next[next.length - 1] : null;
     updateAtomList(atoms, next, selectedId);
+    setSelectedBond(null, false);
     if (!(preserve && alreadySelected)) {
       vscode.postMessage({ command: 'selectAtom', atomId, add: !!add });
     }
@@ -269,12 +271,88 @@
     }
     const selectedId = next.length > 0 ? next[next.length - 1] : null;
     updateAtomList(atoms, next, selectedId);
+    setSelectedBond(null, false);
     vscode.postMessage({ command: 'setSelection', atomIds: next });
   }
 
   function getAtomById(atomId) {
     if (!state.currentStructure || !state.currentStructure.atoms) return null;
     return state.currentStructure.atoms.find((atom) => atom.id === atomId) || null;
+  }
+
+  function normalizeHexColor(value) {
+    if (typeof value !== 'string') {
+      return null;
+    }
+    const trimmed = value.trim();
+    if (!/^#[0-9a-fA-F]{6}$/.test(trimmed)) {
+      return null;
+    }
+    return trimmed.toUpperCase();
+  }
+
+  function parseBondPairFromKey(bondKey) {
+    if (!bondKey || typeof bondKey !== 'string') {
+      return null;
+    }
+    const parts = bondKey.split('|');
+    if (parts.length !== 2 || !parts[0] || !parts[1]) {
+      return null;
+    }
+    return [parts[0], parts[1]];
+  }
+
+  function updateBondSelectionUI() {
+    const label = document.getElementById('bond-selected');
+    const deleteBtn = document.getElementById('btn-delete-bond');
+    if (!label || !deleteBtn) {
+      return;
+    }
+    const pair = parseBondPairFromKey(state.currentSelectedBondKey);
+    if (!pair) {
+      label.textContent = '--';
+    } else {
+      const atom1 = getAtomById(pair[0]);
+      const atom2 = getAtomById(pair[1]);
+      const left = atom1 ? `${atom1.element}(${pair[0].slice(-4)})` : pair[0];
+      const right = atom2 ? `${atom2.element}(${pair[1].slice(-4)})` : pair[1];
+      label.textContent = `${left} - ${right}`;
+    }
+    deleteBtn.disabled = !(state.currentSelectedBondKey || (state.selectedAtomIds && state.selectedAtomIds.length >= 2));
+  }
+
+  function setSelectedBond(bondKey, syncBackend) {
+    state.currentSelectedBondKey = bondKey || null;
+    updateBondSelectionUI();
+    if (syncBackend) {
+      vscode.postMessage({ command: 'selectBond', bondKey: state.currentSelectedBondKey });
+    }
+  }
+
+  function updateAtomColorPreview() {
+    const atomColorPicker = document.getElementById('atom-color-picker');
+    const atomColorText = document.getElementById('atom-color-text');
+    if (!atomColorPicker || !atomColorText) {
+      return;
+    }
+
+    let previewColor = null;
+    if (state.currentSelectedAtom && state.currentSelectedAtom.color) {
+      previewColor = normalizeHexColor(state.currentSelectedAtom.color);
+    }
+    if (!previewColor && state.selectedAtomIds && state.selectedAtomIds.length > 0) {
+      const focusAtomId = state.selectedAtomIds[state.selectedAtomIds.length - 1];
+      const atom = getAtomById(focusAtomId);
+      if (atom && atom.color) {
+        previewColor = normalizeHexColor(atom.color);
+      }
+    }
+    if (!previewColor) {
+      return;
+    }
+
+    atomColorPicker.value = previewColor;
+    atomColorText.value = previewColor;
   }
 
   function updateAtomPosition(atomId, x, y, z) {
@@ -789,6 +867,91 @@
       });
     };
 
+    const atomColorPicker = document.getElementById('atom-color-picker');
+    const atomColorText = document.getElementById('atom-color-text');
+    const btnApplyAtomColor = document.getElementById('btn-apply-atom-color');
+
+    const syncColorInputs = (rawValue) => {
+      const normalized = normalizeHexColor(rawValue);
+      if (!normalized) {
+        return null;
+      }
+      atomColorPicker.value = normalized;
+      atomColorText.value = normalized;
+      return normalized;
+    };
+
+    atomColorPicker.addEventListener('input', (event) => {
+      const target = event.target;
+      syncColorInputs(target.value);
+    });
+
+    atomColorText.addEventListener('change', (event) => {
+      const target = event.target;
+      const normalized = syncColorInputs(target.value);
+      if (!normalized) {
+        target.value = atomColorPicker.value;
+      }
+    });
+
+    btnApplyAtomColor.onclick = () => {
+      const color = syncColorInputs(atomColorText.value || atomColorPicker.value);
+      if (!color || !state.selectedAtomIds || state.selectedAtomIds.length === 0) {
+        return;
+      }
+      vscode.postMessage({
+        command: 'setAtomColor',
+        atomIds: state.selectedAtomIds,
+        color,
+      });
+    };
+
+    const btnCreateBond = document.getElementById('btn-create-bond');
+    const btnDeleteBond = document.getElementById('btn-delete-bond');
+    const btnRecalculateBonds = document.getElementById('btn-recalculate-bonds');
+
+    btnCreateBond.onclick = () => {
+      if (!state.selectedAtomIds || state.selectedAtomIds.length < 2) {
+        return;
+      }
+      vscode.postMessage({ command: 'createBond', atomIds: state.selectedAtomIds.slice(-2) });
+    };
+
+    btnDeleteBond.onclick = () => {
+      if (state.currentSelectedBondKey) {
+        vscode.postMessage({ command: 'deleteBond', bondKey: state.currentSelectedBondKey });
+        return;
+      }
+      if (state.selectedAtomIds && state.selectedAtomIds.length >= 2) {
+        vscode.postMessage({ command: 'deleteBond', atomIds: state.selectedAtomIds.slice(-2) });
+      }
+    };
+
+    btnRecalculateBonds.onclick = () => {
+      vscode.postMessage({ command: 'recalculateBonds' });
+    };
+
+    document.addEventListener('keydown', (event) => {
+      const target = event.target;
+      const tagName = target && target.tagName ? target.tagName.toLowerCase() : '';
+      const editable = tagName === 'input' || tagName === 'textarea' || (target && target.isContentEditable);
+      if (editable) {
+        return;
+      }
+      if (event.key !== 'Delete' && event.key !== 'Backspace') {
+        return;
+      }
+      if (state.currentSelectedBondKey) {
+        vscode.postMessage({ command: 'deleteBond', bondKey: state.currentSelectedBondKey });
+        event.preventDefault();
+        return;
+      }
+      if (state.currentStructure && state.currentStructure.selectedAtomId) {
+        vscode.postMessage({ command: 'deleteAtom', atomId: state.currentStructure.selectedAtomId });
+        event.preventDefault();
+      }
+    });
+
     const adsorptionSlider = document.getElementById('adsorption-slider');
     const adsorptionInput = document.getElementById('adsorption-input');
 
@@ -922,12 +1085,15 @@
       };
     }
     setProjection(state.projectionMode || 'perspective');
+    updateBondSelectionUI();
   }
 
   function setupInteraction() {
     const canvas = document.getElementById('canvas');
     interaction.init(canvas, {
       onSelectAtom: (atomId, add, preserve) => handleSelect(atomId, add, preserve),
+      onSelectBond: (bondKey) => setSelectedBond(bondKey, true),
+      onClearSelection: () => applySelectionFromIds([], 'replace'),
       onBoxSelect: (atomIds, mode) => applySelectionFromIds(atomIds, mode),
       onBeginDrag: (atomId) => vscode.postMessage({ command: 'beginDrag', atomId }),
       onDragAtom: (atomId, intersection) => {
@@ -1004,6 +1170,7 @@
     if (event.data.command === 'render') {
       state.currentStructure = event.data.data;
       state.selectedAtomIds = event.data.data.selectedAtomIds || [];
+      state.currentSelectedBondKey = event.data.data.selectedBondKey || null;
       state.supercell = event.data.data.supercell || [1, 1, 1];
       if (state.selectedAtomIds.length >= 2) {
         state.adsorptionReferenceId = state.selectedAtomIds[state.selectedAtomIds.length - 1];
@@ -1059,7 +1226,9 @@
       const selected = atoms.find((atom) => atom.id === selectedId) || null;
       state.currentSelectedAtom = selected;
       updateSelectedInputs(selected);
+      updateAtomColorPreview();
       updateAdsorptionUI();
+      updateBondSelectionUI();
     }
   });
 

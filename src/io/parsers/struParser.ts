@@ -1,7 +1,7 @@
 import { Structure } from '../../models/structure';
 import { Atom } from '../../models/atom';
 import { UnitCell } from '../../models/unitCell';
-import { ELEMENT_DATA, ElementInfo } from '../../utils/elementData';
+import { DEFAULT_NUMERICAL_ORBITALS, ELEMENT_DATA, ElementInfo } from '../../utils/elementData';
 import { parseElement } from '../../utils/elementData';
 import { StructureParser } from './structureParser';
 
@@ -185,7 +185,14 @@ export class STRUParser implements StructureParser {
     lines.push('ATOMIC_SPECIES');
     for (const [element] of elements) {
       const mass = this.getAtomicMass(element);
-      lines.push(`${element}  ${mass.toFixed(3)}  ${element}.upf`);
+      lines.push(`${element}  ${mass.toFixed(3)}  ${element}_ONCV_PBE-1.0.upf`);
+    }
+    lines.push('');
+
+    lines.push('NUMERICAL_ORBITAL');
+    for (const [element] of elements) {
+      const orbital = DEFAULT_NUMERICAL_ORBITALS[element] ?? `${element}.orb`;
+      lines.push(orbital);
     }
     lines.push('');
 

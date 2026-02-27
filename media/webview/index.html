@@ -144,6 +144,18 @@
       </div>
 
       <div class="panel">
+        <div class="panel-title">Atom Color</div>
+        <div class="input-group">
+          <label>Color</label>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <input type="color" id="atom-color-picker" value="#C0C0C0" style="width:40px;height:32px;border:none;cursor:pointer;" />
+            <input type="text" id="atom-color-text" value="#C0C0C0" maxlength="7" style="flex:1;" placeholder="#RRGGBB" />
+          </div>
+        </div>
+        <button id="btn-apply-atom-color">Apply to Selected</button>
+      </div>
+
+      <div class="panel">
         <div class="panel-title">Display Scale</div>
         <div class="input-group">
           <label class="checkbox-row">
@@ -162,6 +174,96 @@
       </div>
 
       <div class="panel">
+        <div class="panel-title">Display Settings</div>
+        <div class="input-group">
+          <label>Background Color</label>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <input type="color" id="bg-color-picker" value="#0d1015" style="width:40px;height:32px;border:none;cursor:pointer;" />
+            <input type="text" id="bg-color-text" value="#0d1015" maxlength="7" style="flex:1;" placeholder="#0d1015" />
+          </div>
+        </div>
+        <div class="input-group">
+          <label>Unit Cell Color</label>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <input type="color" id="lattice-color-picker" value="#FF6600" style="width:40px;height:32px;border:none;cursor:pointer;" />
+            <input type="text" id="lattice-color-text" value="#FF6600" maxlength="7" style="flex:1;" placeholder="#FF6600" />
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-title">Lighting</div>
+        <div class="input-group">
+          <label class="checkbox-row">
+            <input type="checkbox" id="lighting-enabled" checked />
+            Enable custom lighting
+          </label>
+        </div>
+        <div class="input-group">
+          <label>Ambient Intensity: <span id="ambient-value">0.5</span></label>
+          <input type="range" id="ambient-slider" min="0" max="2" step="0.1" value="0.5" />
+        </div>
+        <div class="light-sub-panel">
+          <div class="light-sub-title">Key Light</div>
+          <div class="input-group">
+            <label>Intensity: <span id="key-intensity-value">0.8</span></label>
+            <input type="range" id="key-intensity-slider" min="0" max="3" step="0.1" value="0.8" />
+          </div>
+          <div class="input-group">
+            <label>X: <span id="key-x-value">10</span></label>
+            <input type="range" id="key-x-slider" min="-50" max="50" step="1" value="10" />
+          </div>
+          <div class="input-group">
+            <label>Y: <span id="key-y-value">10</span></label>
+            <input type="range" id="key-y-slider" min="-50" max="50" step="1" value="10" />
+          </div>
+          <div class="input-group">
+            <label>Z: <span id="key-z-value">10</span></label>
+            <input type="range" id="key-z-slider" min="-50" max="50" step="1" value="10" />
+          </div>
+        </div>
+        <div class="light-sub-panel">
+          <div class="light-sub-title">Fill Light</div>
+          <div class="input-group">
+            <label>Intensity: <span id="fill-intensity-value">0</span></label>
+            <input type="range" id="fill-intensity-slider" min="0" max="3" step="0.1" value="0" />
+          </div>
+          <div class="input-group">
+            <label>X: <span id="fill-x-value">-10</span></label>
+            <input type="range" id="fill-x-slider" min="-50" max="50" step="1" value="-10" />
+          </div>
+          <div class="input-group">
+            <label>Y: <span id="fill-y-value">-5</span></label>
+            <input type="range" id="fill-y-slider" min="-50" max="50" step="1" value="-5" />
+          </div>
+          <div class="input-group">
+            <label>Z: <span id="fill-z-value">5</span></label>
+            <input type="range" id="fill-z-slider" min="-50" max="50" step="1" value="5" />
+          </div>
+        </div>
+        <div class="light-sub-panel">
+          <div class="light-sub-title">Rim Light</div>
+          <div class="input-group">
+            <label>Intensity: <span id="rim-intensity-value">0</span></label>
+            <input type="range" id="rim-intensity-slider" min="0" max="3" step="0.1" value="0" />
+          </div>
+          <div class="input-group">
+            <label>X: <span id="rim-x-value">0</span></label>
+            <input type="range" id="rim-x-slider" min="-50" max="50" step="1" value="0" />
+          </div>
+          <div class="input-group">
+            <label>Y: <span id="rim-y-value">5</span></label>
+            <input type="range" id="rim-y-slider" min="-50" max="50" step="1" value="5" />
+          </div>
+          <div class="input-group">
+            <label>Z: <span id="rim-z-value">-10</span></label>
+            <input type="range" id="rim-z-slider" min="-50" max="50" step="1" value="-10" />
+          </div>
+        </div>
+        <button id="btn-reset-lighting">Reset Lighting</button>
+      </div>
+
+      <div class="panel">
         <div class="panel-title">Atoms</div>
         <div class="atom-list" id="atom-list"></div>
       </div>
@@ -171,6 +273,7 @@
         <div id="measurements">
           <div>Bond length: <span id="bond-length">--</span> A</div>
           <div>Bond angle: <span id="bond-angle">--</span> deg</div>
+          <div>Selected bond: <span id="bond-selected">--</span></div>
         </div>
         <div class="input-group">
           <label>Set bond length (A)</label>
@@ -182,6 +285,11 @@
           <input type="number" id="bond-angle-input" step="0.1" />
         </div>
         <button id="btn-apply-angle">Apply Bond Angle</button>
+        <div class="input-group" style="display:flex;gap:6px;flex-direction:row;">
+          <button id="btn-create-bond" type="button">Create Bond (2 selected atoms)</button>
+          <button id="btn-delete-bond" type="button">Delete Selected Bond</button>
+        </div>
+        <button id="btn-recalculate-bonds" type="button">Recalculate All Bonds</button>
       </div>
 
       <div class="panel">

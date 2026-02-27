@@ -17,13 +17,14 @@
       const mouse = renderer.getMouse();
       const camera = renderer.getCamera();
       const meshes = Array.from(renderer.getAtomMeshes().values());
-      if (!raycaster || !mouse || !camera || meshes.length === 0) return;
+      const bondMeshes = renderer.getBondMeshes ? renderer.getBondMeshes() : [];
+      if (!raycaster || !mouse || !camera) return;
 
       const rect = canvas.getBoundingClientRect();
       mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
       mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
       raycaster.setFromCamera(mouse, camera);
-      const hits = raycaster.intersectObjects(meshes);
+      const hits = meshes.length > 0 ? raycaster.intersectObjects(meshes) : [];
       if (hits.length > 0) {
         const hit = hits[0];
         const atomId = hit.object.userData && hit.object.userData.atomId;
@@ -59,7 +60,21 @@
           handlers.onSelectAtom(atomId, event.ctrlKey || event.metaKey, false);
           return;
         }
-      } else if (event.shiftKey) {
+      }
+
+      if (bondMeshes.length > 0) {
+        const bondHits = raycaster.intersectObjects(bondMeshes);
+        if (bondHits.length > 0) {
+          const hit = bondHits[0];
+          const bondKey = hit.object.userData && hit.object.userData.bondKey;
+          if (bondKey && handlers.onSelectBond) {
+            handlers.onSelectBond(bondKey);
+            return;
+          }
+        }
+      }
+
+      if (event.shiftKey) {
         const rect = canvas.getBoundingClientRect();
         const localX = event.clientX - rect.left;
         const localY = event.clientY - rect.top;
@@ -75,6 +90,10 @@
           selectionBox.style.width = '0px';
           selectionBox.style.height = '0px';
         }
+      } else if (handlers.onClearSelection) {
+        handlers.onClearSelection();
+      } else if (handlers.onSelectBond) {
+        handlers.onSelectBond(null);
       }
     });
 
@@ -211,6 +230,190 @@
 
     canvas.addEventListener('pointerup', endDrag);
     canvas.addEventListener('pointerleave', endDrag);
+
+    // Lighting panel event handlers
+    function initLightingPanel() {
+      // Lighting enabled checkbox
+      const lightingEnabled = document.getElementById('lighting-enabled');
+      if (lightingEnabled) {
+        lightingEnabled.addEventListener('change', () => {
+          state.lightingEnabled = lightingEnabled.checked;
+          if (window.ACoordRenderer && window.ACoordRenderer.updateLighting) {
+            window.ACoordRenderer.updateLighting();
+          }
+        });
+      }
+
+      // Ambient intensity
+      const ambientSlider = document.getElementById('ambient-slider');
+      const ambientValue = document.getElementById('ambient-value');
+      if (ambientSlider) {
+        ambientSlider.addEventListener('input', () => {
+          state.ambientIntensity = parseFloat(ambientSlider.value);
+          if (ambientValue) ambientValue.textContent = state.ambientIntensity.toFixed(1);
+          if (window.ACoordRenderer && window.ACoordRenderer.updateLighting) {
+            window.ACoordRenderer.updateLighting();
+          }
+        });
+      }
+
+      // Key Light
+      setupLightSliders('key', state.keyLight);
+      // Fill Light
+      setupLightSliders('fill', state.fillLight);
+      // Rim Light
+      setupLightSliders('rim', state.rimLight);
+
+      // Reset lighting button
+      const btnResetLighting = document.getElementById('btn-reset-lighting');
+      if (btnResetLighting) {
+        btnResetLighting.addEventListener('click', () => {
+          state.keyLight = { intensity: 0.8, x: 10, y: 10, z: 10 };
+          state.fillLight = { intensity: 0, x: -10, y: -5, z: 5 };
+          state.rimLight = { intensity: 0, x: 0, y: 5, z: -10 };
+          state.ambientIntensity = 0.5;
+          state.lightingEnabled = true;
+
+          // Update UI
+          if (lightingEnabled) lightingEnabled.checked = true;
+          if (ambientSlider) ambientSlider.value = '0.5';
+          if (ambientValue) ambientValue.textContent = '0.5';
+
+          updateLightSliderUI('key', { intensity: 0.8, x: 10, y: 10, z: 10 });
+          updateLightSliderUI('fill', { intensity: 0, x: -10, y: -5, z: 5 });
+          updateLightSliderUI('rim', { intensity: 0, x: 0, y: 5, z: -10 });
+
+          if (window.ACoordRenderer && window.ACoordRenderer.updateLighting) {
+            window.ACoordRenderer.updateLighting();
+          }
+        });
+      }
+    }
+
+    function setupLightSliders(prefix, lightObj) {
+      const intensitySlider = document.getElementById(`${prefix}-intensity-slider`);
+      const intensityValue = document.getElementById(`${prefix}-intensity-value`);
+      const xSlider = document.getElementById(`${prefix}-x-slider`);
+      const xValue = document.getElementById(`${prefix}-x-value`);
+      const ySlider = document.getElementById(`${prefix}-y-slider`);
+      const yValue = document.getElementById(`${prefix}-y-value`);
+      const zSlider = document.getElementById(`${prefix}-z-slider`);
+      const zValue = document.getElementById(`${prefix}-z-value`);
+
+      if (intensitySlider) {
+        intensitySlider.addEventListener('input', () => {
+          lightObj.intensity = parseFloat(intensitySlider.value);
+          if (intensityValue) intensityValue.textContent = lightObj.intensity.toFixed(1);
+          if (window.ACoordRenderer && window.ACoordRenderer.updateLighting) {
+            window.ACoordRenderer.updateLighting();
+          }
+        });
+      }
+      if (xSlider) {
+        xSlider.addEventListener('input', () => {
+          lightObj.x = parseInt(xSlider.value);
+          if (xValue) xValue.textContent = lightObj.x;
+          if (window.ACoordRenderer && window.ACoordRenderer.updateLighting) {
+            window.ACoordRenderer.updateLighting();
+          }
+        });
+      }
+      if (ySlider) {
+        ySlider.addEventListener('input', () => {
+          lightObj.y = parseInt(ySlider.value);
+          if (yValue) yValue.textContent = lightObj.y;
+          if (window.ACoordRenderer && window.ACoordRenderer.updateLighting) {
+            window.ACoordRenderer.updateLighting();
+          }
+        });
+      }
+      if (zSlider) {
+        zSlider.addEventListener('input', () => {
+          lightObj.z = parseInt(zSlider.value);
+          if (zValue) zValue.textContent = lightObj.z;
+          if (window.ACoordRenderer && window.ACoordRenderer.updateLighting) {
+            window.ACoordRenderer.updateLighting();
+          }
+        });
+      }
+    }
+
+    function updateLightSliderUI(prefix, lightObj) {
+      const intensitySlider = document.getElementById(`${prefix}-intensity-slider`);
+      const intensityValue = document.getElementById(`${prefix}-intensity-value`);
+      const xSlider = document.getElementById(`${prefix}-x-slider`);
+      const xValue = document.getElementById(`${prefix}-x-value`);
+      const ySlider = document.getElementById(`${prefix}-y-slider`);
+      const yValue = document.getElementById(`${prefix}-y-value`);
+      const zSlider = document.getElementById(`${prefix}-z-slider`);
+      const zValue = document.getElementById(`${prefix}-z-value`);
+
+      if (intensitySlider) intensitySlider.value = lightObj.intensity;
+      if (intensityValue) intensityValue.textContent = lightObj.intensity.toFixed(1);
+      if (xSlider) xSlider.value = lightObj.x;
+      if (xValue) xValue.textContent = lightObj.x;
+      if (ySlider) ySlider.value = lightObj.y;
+      if (yValue) yValue.textContent = lightObj.y;
+      if (zSlider) zSlider.value = lightObj.z;
+      if (zValue) zValue.textContent = lightObj.z;
+    }
+
+    // Initialize lighting panel
+    initLightingPanel();
+
+    // Initialize display settings panel
+    initDisplaySettingsPanel();
+  }
+
+  function initDisplaySettingsPanel() {
+    const bgColorPicker = document.getElementById('bg-color-picker');
+    const bgColorText = document.getElementById('bg-color-text');
+    const latticeColorPicker = document.getElementById('lattice-color-picker');
+    const latticeColorText = document.getElementById('lattice-color-text');
+
+    // Background color
+    if (bgColorPicker && bgColorText) {
+      bgColorPicker.addEventListener('input', () => {
+        state.backgroundColor = bgColorPicker.value;
+        bgColorText.value = bgColorPicker.value;
+        if (window.ACoordRenderer && window.ACoordRenderer.updateDisplaySettings) {
+          window.ACoordRenderer.updateDisplaySettings();
+        }
+      });
+
+      bgColorText.addEventListener('change', () => {
+        const color = bgColorText.value.trim();
+        if (/^#[0-9A-Fa-f]{6}$/.test(color)) {
+          state.backgroundColor = color;
+          bgColorPicker.value = color;
+          if (window.ACoordRenderer && window.ACoordRenderer.updateDisplaySettings) {
+            window.ACoordRenderer.updateDisplaySettings();
+          }
+        }
+      });
+    }
+
+    // Unit cell color
+    if (latticeColorPicker && latticeColorText) {
+      latticeColorPicker.addEventListener('input', () => {
+        state.unitCellColor = latticeColorPicker.value;
+        latticeColorText.value = latticeColorPicker.value;
+        if (window.ACoordRenderer && window.ACoordRenderer.updateDisplaySettings) {
+          window.ACoordRenderer.updateDisplaySettings();
+        }
+      });
+
+      latticeColorText.addEventListener('change', () => {
+        const color = latticeColorText.value.trim();
+        if (/^#[0-9A-Fa-f]{6}$/.test(color)) {
+          state.unitCellColor = color;
+          latticeColorPicker.value = color;
+          if (window.ACoordRenderer && window.ACoordRenderer.updateDisplaySettings) {
+            window.ACoordRenderer.updateDisplaySettings();
+          }
+        }
+      });
+    }
   }
 
   window.ACoordInteraction = { init };

@@ -17,6 +17,7 @@ export interface RendererState {
   showUnitCell: boolean;
   selectedAtomId?: string;
   selectedAtomIds: string[];
+  selectedBondKey?: string;
 }
 
 /**
@@ -30,6 +31,7 @@ export class ThreeJSRenderer {
       structure,
       showUnitCell: !!structure.unitCell,
       selectedAtomIds: [],
+      selectedBondKey: undefined,
     };
   }
 
@@ -78,6 +80,15 @@ export class ThreeJSRenderer {
     }
     this.state.selectedAtomIds = validIds;
     this.state.selectedAtomId = validIds.length > 0 ? validIds[validIds.length - 1] : undefined;
+    this.state.selectedBondKey = undefined;
+  }
+
+  selectBond(bondKey?: string): void {
+    this.state.selectedBondKey = bondKey || undefined;
+  }
+
+  deselectBond(): void {
+    this.state.selectedBondKey = undefined;
   }
 
   /**
@@ -107,6 +118,7 @@ export class ThreeJSRenderer {
         supercell: this.getEffectiveSupercell(),
         selectedAtomId: this.state.selectedAtomId,
         selectedAtomIds: this.state.selectedAtomIds,
+        selectedBondKey: this.state.selectedBondKey,
       },
     };
   }
@@ -126,7 +138,7 @@ export class ThreeJSRenderer {
         element: symbol,
         position: [atom.x, atom.y, atom.z],
         radius: radius,
-        color: info?.color || '#C0C0C0',
+        color: atom.color || info?.color || '#C0C0C0',
         selected: atom.selected,
       };
     });
@@ -150,13 +162,22 @@ export class ThreeJSRenderer {
           return null;
         }
 
+        const symbol1 = parseElement(atom1.element) || atom1.element;
+        const symbol2 = parseElement(atom2.element) || atom2.element;
+        const info1 = ELEMENT_DATA[symbol1];
+        const info2 = ELEMENT_DATA[symbol2];
+
         return {
+          key: Structure.bondKey(atom1.id, atom2.id),
           atomId1: atom1.id,
           atomId2: atom2.id,
           start: [atom1.x, atom1.y, atom1.z],
           end: [atom2.x, atom2.y, atom2.z],
           radius: 0.04,
           color: '#C0C0C0',
+          color1: atom1.color || info1?.color || '#C0C0C0',
+          color2: atom2.color || info2?.color || '#C0C0C0',
+          selected: this.state.selectedBondKey === Structure.bondKey(atom1.id, atom2.id),
         };
       })
       .filter((b) => b !== null);
@@ -186,6 +207,12 @@ export class ThreeJSRenderer {
 
     const bonds: any[] = [];
     const tolerance = 1.1;
+    const suppressed = new Set(
+      (structure.suppressedAutoBonds || []).map(([a, b]) => Structure.bondKey(a, b))
+    );
+    const manual = new Set(
+      (structure.manualBonds || []).map(([a, b]) => Structure.bondKey(a, b))
+    );
 
     for (let i = 0; i < atoms.length; i++) {
       const atomA = atoms[i];
@@ -194,6 +221,7 @@ export class ThreeJSRenderer {
 
       for (let j = 0; j < atoms.length; j++) {
         const atomB = atoms[j];
+        const bondKey = Structure.bondKey(atomA.id, atomB.id);
         const symbolB = parseElement(atomB.element) || atomB.element;
         const radiusB = ELEMENT_DATA[symbolB]?.covalentRadius || 1.5;
         const bondLength = (radiusA + radiusB) * tolerance;
@@ -215,14 +243,24 @@ export class ThreeJSRenderer {
             atomB.z + ox * vectors[0][2] + oy * vectors[1][2] + oz * vectors[2][2] - atomA.z;
 
           const distance = Math.sqrt(dx * dx + dy * dy + dz * dz);
-          if (distance < bondLength) {
+          const autoBond = distance < bondLength;
+          const manualBaseBond = manual.has(bondKey) && ox === 0 && oy === 0 && oz === 0 && j > i;
+          if ((autoBond && !suppressed.has(bondKey)) || manualBaseBond) {
+            const symbolA = parseElement(atomA.element) || atomA.element;
+            const symbolB = parseElement(atomB.element) || atomB.element;
+            const infoA = ELEMENT_DATA[symbolA];
+            const infoB = ELEMENT_DATA[symbolB];
             bonds.push({
+              key: bondKey,
               atomId1: atomA.id,
               atomId2: atomB.id,
               start: [atomA.x, atomA.y, atomA.z],
               end: [atomA.x + dx, atomA.y + dy, atomA.z + dz],
               radius: 0.04,
               color: '#C0C0C0',
+              color1: atomA.color || infoA?.color || '#C0C0C0',
+              color2: atomB.color || infoB?.color || '#C0C0C0',
+              selected: this.state.selectedBondKey === bondKey,
             });
           }
         }
