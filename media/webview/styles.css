@@ -157,8 +157,45 @@ button:hover {
     var(--acoord-panel);
   border-left: 1px solid var(--acoord-border);
   padding: 12px;
-  overflow-y: auto;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
   box-shadow: inset 8px 0 16px rgba(0, 0, 0, 0.25);
+}
+
+.tab-nav {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.tab-button {
+  border-radius: 10px;
+  padding: 6px 4px;
+  font-size: 11px;
+}
+
+.tab-button.active {
+  border-color: rgba(245, 158, 11, 0.8);
+  box-shadow: 0 6px 18px rgba(245, 158, 11, 0.35);
+  background:
+    linear-gradient(135deg, rgba(245, 158, 11, 0.35), rgba(245, 158, 11, 0.1)),
+    #1b2026;
+}
+
+.tab-content {
+  flex: 1;
+  overflow-y: auto;
+  padding-right: 2px;
+}
+
+.tab-pane {
+  display: none;
+}
+
+.tab-pane.active {
+  display: block;
 }
 
 #status-bar {

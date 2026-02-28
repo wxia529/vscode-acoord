@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## 0.1.7
 
+- Reorganized the sidebar into 4 tabs (Edit, Lattice, Display, Tools) to reduce scrolling.
+- Moved Atom Color to the top of the Display tab and restored Copy/Delete actions to the top toolbar.
 - Added bond thickness control in Display Scale panel with real-time rendering updates.
 - Refined Atom size slider precision (step 0.05) and updated value display to 2 decimal places.
 - Reduced Atom size slider maximum from 20 to 3 for tighter visual scaling control.

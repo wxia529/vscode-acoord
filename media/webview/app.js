@@ -727,7 +727,41 @@
     });
   }
 
+  function setupTabs() {
+    const tabButtons = Array.from(document.querySelectorAll('.tab-button'));
+    const tabPanes = Array.from(document.querySelectorAll('.tab-pane'));
+    if (tabButtons.length === 0 || tabPanes.length === 0) {
+      return;
+    }
+
+    const activateTab = (targetId) => {
+      tabButtons.forEach((button) => {
+        button.classList.toggle('active', button.dataset.tabTarget === targetId);
+      });
+      tabPanes.forEach((pane) => {
+        pane.classList.toggle('active', pane.id === targetId);
+      });
+    };
+
+    tabButtons.forEach((button) => {
+      button.addEventListener('click', () => {
+        const targetId = button.dataset.tabTarget;
+        if (!targetId) {
+          return;
+        }
+        activateTab(targetId);
+      });
+    });
+
+    const defaultTarget = tabButtons[0].dataset.tabTarget;
+    if (defaultTarget) {
+      activateTab(defaultTarget);
+    }
+  }
+
   function setupUI() {
+    setupTabs();
+
     document.getElementById('btn-add-atom').onclick = () => {
       document.getElementById('element-input').focus();
     };
