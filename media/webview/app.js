@@ -989,7 +989,15 @@
 
     document.getElementById('size-slider').addEventListener('input', (event) => {
       state.atomSizeScale = parseFloat(event.target.value);
-      document.getElementById('size-value').textContent = state.atomSizeScale.toFixed(1);
+      document.getElementById('size-value').textContent = state.atomSizeScale.toFixed(2);
+      if (state.currentStructure) {
+        renderer.renderStructure(state.currentStructure, { updateCounts, updateAtomList });
+      }
+    });
+
+    document.getElementById('bond-size-slider').addEventListener('input', (event) => {
+      state.bondThicknessScale = parseFloat(event.target.value);
+      document.getElementById('bond-size-value').textContent = state.bondThicknessScale.toFixed(1);
       if (state.currentStructure) {
         renderer.renderStructure(state.currentStructure, { updateCounts, updateAtomList });
       }

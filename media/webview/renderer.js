@@ -326,7 +326,8 @@
         );
         const direction = end.clone().sub(start);
         const length = direction.length();
-        const bondRadius = Math.max(bond.radius * sizeScale, 0.03) * (highlightBond ? 1.35 : 1);
+        const bondThicknessScale = Number.isFinite(state.bondThicknessScale) ? state.bondThicknessScale : 1;
+        const bondRadius = Math.max(bond.radius * sizeScale * bondThicknessScale, 0.03) * (highlightBond ? 1.35 : 1);
 
         // Create half-bonds with two colors
         const midpoint = start.clone().add(end).multiplyScalar(0.5);

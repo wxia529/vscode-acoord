@@ -11,6 +11,7 @@
     manualScale: 1,
     autoScaleEnabled: false,
     atomSizeScale: 1,
+    bondThicknessScale: 1,
     viewZoom: 1,
     projectionMode: 'orthographic',
     scaleAtomsWithLattice: false,

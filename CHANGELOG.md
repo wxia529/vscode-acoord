@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## 0.1.7
+
+- Added bond thickness control in Display Scale panel with real-time rendering updates.
+- Refined Atom size slider precision (step 0.05) and updated value display to 2 decimal places.
+- Reduced Atom size slider maximum from 20 to 3 for tighter visual scaling control.
+
 ## 0.1.6
 
 - Added atom color editing for selected atoms, with bond segment colors synchronized to atom colors.
