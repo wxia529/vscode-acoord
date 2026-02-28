@@ -7,6 +7,7 @@ All notable changes to this project will be documented in this file.
 - Added bond thickness control in Display Scale panel with real-time rendering updates.
 - Refined Atom size slider precision (step 0.05) and updated value display to 2 decimal places.
 - Reduced Atom size slider maximum from 20 to 3 for tighter visual scaling control.
+- Refined CIF io.
 
 ## 0.1.6
 

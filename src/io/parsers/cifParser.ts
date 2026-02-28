@@ -11,161 +11,9 @@ import { StructureParser } from './structureParser';
 export class CIFParser implements StructureParser {
   parse(content: string): Structure {
     const structure = new Structure('', true);
-
-    // Parse unit cell parameters
-    const cellA = this.extractValue(content, '_cell_length_a');
-    const cellB = this.extractValue(content, '_cell_length_b');
-    const cellC = this.extractValue(content, '_cell_length_c');
-    const cellAlpha = this.extractValue(content, '_cell_angle_alpha');
-    const cellBeta = this.extractValue(content, '_cell_angle_beta');
-    const cellGamma = this.extractValue(content, '_cell_angle_gamma');
-
-    if (cellA && cellB && cellC) {
-      structure.unitCell = new UnitCell(
-        cellA,
-        cellB,
-        cellC,
-        cellAlpha || 90,
-        cellBeta || 90,
-        cellGamma || 90
-      );
-    }
-
-    // Parse atom positions
-    const lines = content.split('\n');
-    let inAtomLoop = false;
-    const atomLineBuffer: string[] = [];
-    let labelIdx = -1,
-      typeIdx = -1,
-      xIdx = -1,
-      yIdx = -1,
-      zIdx = -1,
-      cartXIdx = -1,
-      cartYIdx = -1,
-      cartZIdx = -1;
-
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i].trim();
-
-      if (line.includes('loop_')) {
-        inAtomLoop = false;
-      }
-
-      if (line.startsWith('_atom_site')) {
-        inAtomLoop = true;
-        // Reset indices
-        labelIdx = typeIdx = xIdx = yIdx = zIdx = -1;
-        cartXIdx = cartYIdx = cartZIdx = -1;
-        let colIdx = 0;
-
-        // Parse column headers
-        while (i + 1 < lines.length) {
-          const header = lines[i].trim();
-          if (!header.startsWith('_atom_site')) {break;}
-
-          if (header.includes('_atom_site_label')) {labelIdx = colIdx;}
-          else if (header.includes('_atom_site_type_symbol')) {typeIdx = colIdx;}
-          else if (header.includes('_atom_site_fract_x')) {xIdx = colIdx;}
-          else if (header.includes('_atom_site_fract_y')) {yIdx = colIdx;}
-          else if (header.includes('_atom_site_fract_z')) {zIdx = colIdx;}
-          else if (header.includes('_atom_site_cartn_x')) {cartXIdx = colIdx;}
-          else if (header.includes('_atom_site_cartn_y')) {cartYIdx = colIdx;}
-          else if (header.includes('_atom_site_cartn_z')) {cartZIdx = colIdx;}
-          colIdx++;
-          i++;
-        }
-        i--;
-        continue;
-      }
-
-      if (
-        inAtomLoop &&
-        line &&
-        !line.startsWith('#') &&
-        !line.startsWith('_')
-      ) {
-        atomLineBuffer.push(line);
-        const parts = line.split(/\s+/);
-
-        const element =
-          typeIdx >= 0 && typeIdx < parts.length
-            ? parseElement(parts[typeIdx])
-            : this.parseElementFromLabel(labelIdx >= 0 ? parts[labelIdx] : parts[0]);
-
-        if (element) {
-          const hasCart = cartXIdx >= 0 && cartYIdx >= 0 && cartZIdx >= 0;
-          const hasFrac = xIdx >= 0 && yIdx >= 0 && zIdx >= 0;
-
-          let x = 0;
-          let y = 0;
-          let z = 0;
-
-          if (hasCart) {
-            x = this.parseNumeric(parts[cartXIdx]);
-            y = this.parseNumeric(parts[cartYIdx]);
-            z = this.parseNumeric(parts[cartZIdx]);
-          } else if (hasFrac) {
-            x = this.parseNumeric(parts[xIdx]);
-            y = this.parseNumeric(parts[yIdx]);
-            z = this.parseNumeric(parts[zIdx]);
-
-            if (structure.unitCell) {
-              const [aVec, bVec, cVec] = structure.unitCell.getLatticeVectors();
-              const cartX = x * aVec[0] + y * bVec[0] + z * cVec[0];
-              const cartY = x * aVec[1] + y * bVec[1] + z * cVec[1];
-              const cartZ = x * aVec[2] + y * bVec[2] + z * cVec[2];
-              x = cartX;
-              y = cartY;
-              z = cartZ;
-            }
-          }
-
-          if (!isNaN(x) && !isNaN(y) && !isNaN(z)) {
-            structure.addAtom(new Atom(element, x, y, z));
-          }
-        }
-      }
-    }
-
-    if (structure.atoms.length === 0 && atomLineBuffer.length > 0) {
-      const hasCart = cartXIdx >= 0 && cartYIdx >= 0 && cartZIdx >= 0;
-      const useFractional = !hasCart && Boolean(structure.unitCell);
-
-      for (const rawLine of atomLineBuffer) {
-        const parts = rawLine.split(/\s+/);
-        const element =
-          parseElement(parts[parts.length - 1]) ||
-          this.parseElementFromLabel(parts[0]);
-
-        if (!element) {
-          continue;
-        }
-
-        const numericVals = parts
-          .map((value) => this.parseNumeric(value))
-          .filter((value) => !isNaN(value));
-
-        if (numericVals.length < 3) {
-          continue;
-        }
-
-        let x = numericVals[numericVals.length - 3];
-        let y = numericVals[numericVals.length - 2];
-        let z = numericVals[numericVals.length - 1];
-
-        if (useFractional && structure.unitCell) {
-          const [aVec, bVec, cVec] = structure.unitCell.getLatticeVectors();
-          const cartX = x * aVec[0] + y * bVec[0] + z * cVec[0];
-          const cartY = x * aVec[1] + y * bVec[1] + z * cVec[1];
-          const cartZ = x * aVec[2] + y * bVec[2] + z * cVec[2];
-          x = cartX;
-          y = cartY;
-          z = cartZ;
-        }
-
-        structure.addAtom(new Atom(element, x, y, z));
-      }
-    }
+    const lines = content.split(/\r?\n/);
+    this.parseUnitCell(lines, structure);
+    this.parseAtomLoops(lines, structure);
 
     return structure;
   }
@@ -186,6 +34,13 @@ export class CIFParser implements StructureParser {
     lines.push(`_cell_angle_alpha ${uc.alpha.toFixed(6)}`);
     lines.push(`_cell_angle_beta  ${uc.beta.toFixed(6)}`);
     lines.push(`_cell_angle_gamma ${uc.gamma.toFixed(6)}`);
+    lines.push('');
+    lines.push('_space_group_name_H-M_alt    "P 1"');
+    lines.push('_space_group_IT_number       1');
+    lines.push('');
+    lines.push('loop_');
+    lines.push('  _space_group_symop_operation_xyz');
+    lines.push("  'x, y, z'");
     lines.push('');
 
     // Write atoms
@@ -214,15 +69,240 @@ export class CIFParser implements StructureParser {
     return lines.join('\n');
   }
 
-  private extractValue(content: string, key: string): number | null {
-    const regex = new RegExp(`${key}\\s+([\\d.]+)`, 'i');
-    const match = content.match(regex);
-    return match ? parseFloat(match[1]) : null;
+  private parseUnitCell(lines: string[], structure: Structure) {
+    const cellA = this.extractTagNumber(lines, '_cell_length_a');
+    const cellB = this.extractTagNumber(lines, '_cell_length_b');
+    const cellC = this.extractTagNumber(lines, '_cell_length_c');
+    const cellAlpha = this.extractTagNumber(lines, '_cell_angle_alpha');
+    const cellBeta = this.extractTagNumber(lines, '_cell_angle_beta');
+    const cellGamma = this.extractTagNumber(lines, '_cell_angle_gamma');
+
+    if (cellA !== null && cellB !== null && cellC !== null) {
+      structure.unitCell = new UnitCell(
+        cellA,
+        cellB,
+        cellC,
+        cellAlpha ?? 90,
+        cellBeta ?? 90,
+        cellGamma ?? 90
+      );
+    }
+  }
+
+  private parseAtomLoops(lines: string[], structure: Structure) {
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].trim().toLowerCase();
+      if (line !== 'loop_') {
+        continue;
+      }
+
+      const headers: string[] = [];
+      let j = i + 1;
+      while (j < lines.length) {
+        const header = lines[j].trim();
+        if (!header.startsWith('_')) {
+          break;
+        }
+        headers.push(header.toLowerCase().split(/\s+/, 1)[0]);
+        j++;
+      }
+
+      if (headers.length === 0) {
+        i = j;
+        continue;
+      }
+
+      const rows = this.parseLoopRows(lines, j, headers.length);
+      i = rows.nextIndex - 1;
+      if (!headers.some((header) => header.startsWith('_atom_site_'))) {
+        continue;
+      }
+      this.addAtomsFromLoop(headers, rows.rows, structure);
+    }
+  }
+
+  private parseLoopRows(lines: string[], startIndex: number, nColumns: number): {
+    rows: string[][];
+    nextIndex: number;
+  } {
+    const rows: string[][] = [];
+    let buffer: string[] = [];
+    let i = startIndex;
+
+    for (; i < lines.length; i++) {
+      const raw = lines[i].trim();
+      const lower = raw.toLowerCase();
+      if (
+        raw.length === 0 ||
+        raw.startsWith('_') ||
+        lower.startsWith('loop_') ||
+        lower.startsWith('data_')
+      ) {
+        break;
+      }
+      if (raw.startsWith('#')) {
+        continue;
+      }
+
+      const tokens = raw.startsWith(';')
+        ? [this.parseMultilineValue(lines, i)]
+        : this.tokenize(this.stripInlineComment(raw));
+      if (raw.startsWith(';')) {
+        while (i + 1 < lines.length && !lines[i + 1].trim().startsWith(';')) {
+          i++;
+        }
+        i++;
+      }
+
+      buffer.push(...tokens);
+      while (buffer.length >= nColumns) {
+        rows.push(buffer.slice(0, nColumns));
+        buffer = buffer.slice(nColumns);
+      }
+    }
+
+    return { rows, nextIndex: i };
+  }
+
+  private addAtomsFromLoop(headers: string[], rows: string[][], structure: Structure) {
+    const byHeader = new Map<string, number>();
+    headers.forEach((header, idx) => {
+      if (!byHeader.has(header)) {
+        byHeader.set(header, idx);
+      }
+    });
+
+    const getIdx = (keys: string[]): number => {
+      for (const key of keys) {
+        const idx = byHeader.get(key);
+        if (idx !== undefined) {
+          return idx;
+        }
+      }
+      return -1;
+    };
+
+    const typeIdx = getIdx(['_atom_site_type_symbol']);
+    const labelIdx = getIdx(['_atom_site_label']);
+    const fracXIdx = getIdx(['_atom_site_fract_x']);
+    const fracYIdx = getIdx(['_atom_site_fract_y']);
+    const fracZIdx = getIdx(['_atom_site_fract_z']);
+    const cartXIdx = getIdx(['_atom_site_cartn_x']);
+    const cartYIdx = getIdx(['_atom_site_cartn_y']);
+    const cartZIdx = getIdx(['_atom_site_cartn_z']);
+    const hasFrac = fracXIdx >= 0 && fracYIdx >= 0 && fracZIdx >= 0;
+    const hasCart = cartXIdx >= 0 && cartYIdx >= 0 && cartZIdx >= 0;
+
+    for (const row of rows) {
+      const symbolRaw = this.getRowValue(row, typeIdx) || this.getRowValue(row, labelIdx);
+      const symbol = symbolRaw ? this.parseElementFromLabel(symbolRaw) : undefined;
+      if (!symbol) {
+        continue;
+      }
+
+      let x: number;
+      let y: number;
+      let z: number;
+
+      if (hasFrac) {
+        x = this.parseNumeric(this.getRowValue(row, fracXIdx));
+        y = this.parseNumeric(this.getRowValue(row, fracYIdx));
+        z = this.parseNumeric(this.getRowValue(row, fracZIdx));
+        if (structure.unitCell) {
+          [x, y, z] = structure.unitCell.fractionalToCartesian(x, y, z);
+        }
+      } else if (hasCart) {
+        x = this.parseNumeric(this.getRowValue(row, cartXIdx));
+        y = this.parseNumeric(this.getRowValue(row, cartYIdx));
+        z = this.parseNumeric(this.getRowValue(row, cartZIdx));
+      } else {
+        continue;
+      }
+
+      if (Number.isFinite(x) && Number.isFinite(y) && Number.isFinite(z)) {
+        structure.addAtom(new Atom(symbol, x, y, z));
+      }
+    }
+  }
+
+  private extractTagNumber(lines: string[], key: string): number | null {
+    const loweredKey = key.toLowerCase();
+    for (let i = 0; i < lines.length; i++) {
+      const raw = lines[i].trim();
+      if (!raw) {
+        continue;
+      }
+      const line = this.stripInlineComment(raw);
+      const lowered = line.toLowerCase();
+      if (!lowered.startsWith(loweredKey)) {
+        continue;
+      }
+
+      const tokens = this.tokenize(line);
+      if (tokens.length >= 2) {
+        const value = this.parseNumeric(tokens[1]);
+        return Number.isFinite(value) ? value : null;
+      }
+
+      if (i + 1 < lines.length) {
+        const next = this.tokenize(this.stripInlineComment(lines[i + 1].trim()));
+        if (next.length > 0) {
+          const value = this.parseNumeric(next[0]);
+          return Number.isFinite(value) ? value : null;
+        }
+      }
+    }
+    return null;
+  }
+
+  private stripInlineComment(line: string): string {
+    const idx = line.indexOf(' #');
+    return idx >= 0 ? line.slice(0, idx).trim() : line;
+  }
+
+  private tokenize(line: string): string[] {
+    if (!line) {
+      return [];
+    }
+    return (line.match(/(?:'[^']*'|"[^"]*"|\S+)/g) || []).map((token) =>
+      token.replace(/^['"]|['"]$/g, '')
+    );
+  }
+
+  private parseMultilineValue(lines: string[], index: number): string {
+    const first = lines[index].trim();
+    const chunks: string[] = [first.slice(1).trimStart()];
+    for (let i = index + 1; i < lines.length; i++) {
+      const line = lines[i];
+      if (line.trim().startsWith(';')) {
+        break;
+      }
+      chunks.push(line.trim());
+    }
+    return chunks.join('\n').trim();
+  }
+
+  private getRowValue(row: string[], idx: number): string {
+    if (idx < 0 || idx >= row.length) {
+      return '';
+    }
+    return row[idx];
   }
 
   private parseNumeric(value: string): number {
-    const cleaned = value.replace(/[()]/g, '').replace(/\?/, '').trim();
-    return parseFloat(cleaned);
+    const raw = (value || '').trim();
+    if (!raw || raw === '.' || raw === '?') {
+      return Number.NaN;
+    }
+    const cleaned = raw.replace(/^['"]|['"]$/g, '');
+    const uncertaintyMatch = cleaned.match(
+      /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?\(\d+\)?$/
+    );
+    if (uncertaintyMatch) {
+      const numberPart = cleaned.split('(')[0];
+      return Number.parseFloat(numberPart);
+    }
+    return Number.parseFloat(cleaned);
   }
 
   private parseElementFromLabel(label: string): string | undefined {
