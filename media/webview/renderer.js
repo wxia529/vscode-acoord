@@ -547,6 +547,81 @@
     }
   }
 
+  function exportHighResolutionImage(options) {
+    if (!rendererState.renderer || !rendererState.camera || !rendererState.scene) {
+      return null;
+    }
+
+    const renderer = rendererState.renderer;
+    const camera = rendererState.camera;
+    const scene = rendererState.scene;
+    const requestedScale =
+      options && Number.isFinite(Number(options.scale)) ? Number(options.scale) : 4;
+    const scale = Math.max(1, requestedScale);
+
+    const originalSize = renderer.getSize(new THREE.Vector2());
+    const originalWidth = Math.max(1, Math.round(originalSize.x));
+    const originalHeight = Math.max(1, Math.round(originalSize.y));
+    const originalPixelRatio = renderer.getPixelRatio();
+    const perspectiveAspect = camera.isPerspectiveCamera ? camera.aspect : null;
+    const orthoFrustum = camera.isOrthographicCamera
+      ? {
+        left: camera.left,
+        right: camera.right,
+        top: camera.top,
+        bottom: camera.bottom,
+        zoom: camera.zoom,
+      }
+      : null;
+
+    const maxTextureSize = renderer.capabilities?.maxTextureSize || 8192;
+    const targetWidthRaw = Math.max(1, Math.round(originalWidth * scale));
+    const targetHeightRaw = Math.max(1, Math.round(originalHeight * scale));
+    const maxTarget = Math.max(targetWidthRaw, targetHeightRaw);
+    const limitScale = maxTarget > maxTextureSize ? maxTextureSize / maxTarget : 1;
+    const targetWidth = Math.max(1, Math.floor(targetWidthRaw * limitScale));
+    const targetHeight = Math.max(1, Math.floor(targetHeightRaw * limitScale));
+
+    try {
+      renderer.setPixelRatio(1);
+      renderer.setSize(targetWidth, targetHeight, false);
+      if (camera.isPerspectiveCamera) {
+        camera.aspect = targetWidth / targetHeight;
+      } else if (camera.isOrthographicCamera) {
+        const frustum = getOrthoFrustum(targetWidth, targetHeight);
+        camera.left = frustum.left;
+        camera.right = frustum.right;
+        camera.top = frustum.top;
+        camera.bottom = frustum.bottom;
+        camera.zoom = state.viewZoom || 1;
+      }
+      camera.updateProjectionMatrix();
+      updateLightsForCamera();
+      renderer.render(scene, camera);
+
+      return {
+        dataUrl: renderer.domElement.toDataURL('image/png'),
+        width: targetWidth,
+        height: targetHeight,
+      };
+    } finally {
+      renderer.setPixelRatio(originalPixelRatio);
+      renderer.setSize(originalWidth, originalHeight, false);
+      if (camera.isPerspectiveCamera && perspectiveAspect) {
+        camera.aspect = perspectiveAspect;
+      } else if (camera.isOrthographicCamera && orthoFrustum) {
+        camera.left = orthoFrustum.left;
+        camera.right = orthoFrustum.right;
+        camera.top = orthoFrustum.top;
+        camera.bottom = orthoFrustum.bottom;
+        camera.zoom = orthoFrustum.zoom;
+      }
+      camera.updateProjectionMatrix();
+      updateLightsForCamera();
+      renderer.render(scene, camera);
+    }
+  }
+
   window.ACoordRenderer = {
     init,
     renderStructure,
@@ -562,5 +637,6 @@
     setControlsEnabled,
     updateLighting,
     updateDisplaySettings,
+    exportHighResolutionImage,
   };
 })();

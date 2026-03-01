@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## 0.1.8
+
+- Added HD PNG export from the 3D view.
+- Updated HD export flow to use VS Code Save dialog for custom file name and location.
+
 ## 0.1.7
 
 - Reorganized the sidebar into 4 tabs (Edit, Lattice, Display, Tools) to reduce scrolling.

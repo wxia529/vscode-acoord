@@ -11,6 +11,7 @@ Atomic Coordinate Toolkit for visualizing and editing atomic structures inside V
 - Center atoms to unit cell (with confirmation).
 - Manual and auto scaling for atom size and scene scale.
 - Format conversion through Save As.
+- HD PNG export from the current 3D view (custom file name/location).
 
 ## Supported Formats
 

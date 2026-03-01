@@ -609,6 +609,50 @@ export class StructureEditorProvider implements vscode.CustomEditorProvider {
         break;
       }
 
+      case 'saveRenderedImage': {
+        const dataUrl = typeof message.dataUrl === 'string' ? message.dataUrl : '';
+        const imageMatch = dataUrl.match(/^data:image\/png;base64,(.+)$/);
+        if (!imageMatch || !imageMatch[1]) {
+          const reason = 'Failed to export image: invalid PNG data.';
+          vscode.window.showErrorMessage(reason);
+          webviewPanel.webview.postMessage({ command: 'imageSaveFailed', data: { reason } });
+          break;
+        }
+
+        const rawName =
+          typeof message.suggestedName === 'string' && message.suggestedName.trim()
+            ? message.suggestedName.trim()
+            : `structure-hd-${Date.now()}.png`;
+        const fileName = rawName.toLowerCase().endsWith('.png') ? rawName : `${rawName}.png`;
+        const saveUri = await vscode.window.showSaveDialog({
+          saveLabel: 'Save HD Image',
+          defaultUri: vscode.Uri.joinPath(vscode.Uri.file(path.dirname(key)), fileName),
+          filters: {
+            'PNG Image': ['png'],
+          },
+        });
+
+        if (!saveUri) {
+          break;
+        }
+
+        try {
+          const bytes = Buffer.from(imageMatch[1], 'base64');
+          await vscode.workspace.fs.writeFile(saveUri, bytes);
+          const savedName = path.basename(saveUri.fsPath);
+          vscode.window.showInformationMessage(`Image exported to ${savedName}`);
+          webviewPanel.webview.postMessage({
+            command: 'imageSaved',
+            data: { fileName: savedName },
+          });
+        } catch (error) {
+          const reason = `Failed to export image: ${error instanceof Error ? error.message : String(error)}`;
+          vscode.window.showErrorMessage(reason);
+          webviewPanel.webview.postMessage({ command: 'imageSaveFailed', data: { reason } });
+        }
+        break;
+      }
+
       case 'openSource': {
         try {
           const doc = await vscode.workspace.openTextDocument(vscode.Uri.file(key));

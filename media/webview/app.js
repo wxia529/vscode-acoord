@@ -291,6 +291,13 @@
     return trimmed.toUpperCase();
   }
 
+  function getImageFileName() {
+    const now = new Date();
+    const pad = (n) => String(n).padStart(2, '0');
+    const stamp = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}-${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
+    return `structure-hd-${stamp}.png`;
+  }
+
   function parseBondPairFromKey(bondKey) {
     if (!bondKey || typeof bondKey !== 'string') {
       return null;
@@ -817,6 +824,27 @@
       vscode.postMessage({ command: 'saveStructureAs' });
     };
 
+    document.getElementById('btn-export-image').onclick = () => {
+      if (!renderer.exportHighResolutionImage) {
+        setError('HD image export is unavailable.');
+        return;
+      }
+      const result = renderer.exportHighResolutionImage({ scale: 4 });
+      if (!result || !result.dataUrl) {
+        setError('Failed to export HD image.');
+        return;
+      }
+      vscode.postMessage({
+        command: 'saveRenderedImage',
+        dataUrl: result.dataUrl,
+        suggestedName: getImageFileName(),
+        width: result.width,
+        height: result.height,
+      });
+      setError('');
+      setStatus(`HD image generated: ${result.width}x${result.height}`);
+    };
+
     document.getElementById('btn-open-source').onclick = () => {
       vscode.postMessage({ command: 'openSource' });
     };
@@ -1271,6 +1299,19 @@
       updateAtomColorPreview();
       updateAdsorptionUI();
       updateBondSelectionUI();
+      return;
+    }
+
+    if (event.data.command === 'imageSaved') {
+      const fileName = event.data?.data?.fileName || 'image.png';
+      setStatus(`HD image saved: ${fileName}`);
+      setError('');
+      return;
+    }
+
+    if (event.data.command === 'imageSaveFailed') {
+      const reason = event.data?.data?.reason || 'Failed to save image.';
+      setError(reason);
     }
   });
 
