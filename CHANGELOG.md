@@ -5,6 +5,8 @@ All notable changes to this project will be documented in this file.
 ## 0.1.10
 
 - Added a toggle switch for axis display.
+- Add atomic radius display settings
+- Bug fixes.
 
 ## 0.1.9
 

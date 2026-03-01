@@ -8,6 +8,8 @@
   let lastStatusSelectedId = null;
   let trajectoryPlaybackTimer = null;
   let trajectoryFrameRequestPending = false;
+  const ATOM_SIZE_MIN = 0.1;
+  const ATOM_SIZE_MAX = 2.0;
 
   function setError(message) {
     const banner = document.getElementById('error-banner');
@@ -272,6 +274,220 @@
     updateTrajectoryUI(state.trajectoryFrameIndex, state.trajectoryFrameCount);
   }
 
+  function clampAtomSize(value, fallback) {
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed)) {
+      return fallback;
+    }
+    return Math.max(ATOM_SIZE_MIN, Math.min(ATOM_SIZE_MAX, parsed));
+  }
+
+  function getBaseAtomId(atomId) {
+    if (typeof atomId !== 'string') {
+      return '';
+    }
+    return atomId.split('::')[0];
+  }
+
+  function getCurrentStructureAtoms() {
+    if (!state.currentStructure || !Array.isArray(state.currentStructure.atoms)) {
+      return [];
+    }
+    return state.currentStructure.atoms;
+  }
+
+  function getAvailableElements() {
+    const elementSet = new Set();
+    for (const atom of getCurrentStructureAtoms()) {
+      if (atom && typeof atom.element === 'string' && atom.element.trim().length > 0) {
+        elementSet.add(atom.element);
+      }
+    }
+    return Array.from(elementSet).sort((a, b) => a.localeCompare(b));
+  }
+
+  function cleanupAtomSizeOverrides() {
+    const atoms = getCurrentStructureAtoms();
+    if (!state.atomSizeByAtom || typeof state.atomSizeByAtom !== 'object') {
+      state.atomSizeByAtom = {};
+    }
+    if (!state.atomSizeByElement || typeof state.atomSizeByElement !== 'object') {
+      state.atomSizeByElement = {};
+    }
+    const atomIds = new Set(atoms.map((atom) => atom.id));
+    for (const atomId of Object.keys(state.atomSizeByAtom)) {
+      if (!atomIds.has(atomId)) {
+        delete state.atomSizeByAtom[atomId];
+      }
+    }
+    const elements = new Set(atoms.map((atom) => atom.element));
+    for (const element of Object.keys(state.atomSizeByElement)) {
+      if (!elements.has(element)) {
+        delete state.atomSizeByElement[element];
+      }
+    }
+  }
+
+  function hasAtomSizeOverride(atomId) {
+    const baseId = getBaseAtomId(atomId);
+    return Number.isFinite(state.atomSizeByAtom && state.atomSizeByAtom[baseId]);
+  }
+
+  function hasElementSizeOverride(element) {
+    return Number.isFinite(state.atomSizeByElement && state.atomSizeByElement[element]);
+  }
+
+  function getFallbackRadiusForAtom(atom) {
+    if (atom && Number.isFinite(atom.radius)) {
+      return atom.radius;
+    }
+    return clampAtomSize(state.atomSizeGlobal, 0.3);
+  }
+
+  function getAtomSizeForAtomId(atomId) {
+    const baseId = getBaseAtomId(atomId);
+    const atom = getCurrentStructureAtoms().find((candidate) => candidate.id === baseId) || null;
+    const fallback = getFallbackRadiusForAtom(atom);
+
+    if (state.atomSizeUseDefaultSettings !== false) {
+      return fallback;
+    }
+
+    const atomOverride = state.atomSizeByAtom && state.atomSizeByAtom[baseId];
+    if (Number.isFinite(atomOverride)) {
+      return clampAtomSize(atomOverride, fallback);
+    }
+
+    const elementOverride = atom && state.atomSizeByElement
+      ? state.atomSizeByElement[atom.element]
+      : undefined;
+    if (Number.isFinite(elementOverride)) {
+      return clampAtomSize(elementOverride, fallback);
+    }
+
+    return clampAtomSize(state.atomSizeGlobal, fallback);
+  }
+
+  function getAtomSizeForElement(element) {
+    const atom = getCurrentStructureAtoms().find((candidate) => candidate.element === element) || null;
+    const fallback = getFallbackRadiusForAtom(atom);
+    if (state.atomSizeUseDefaultSettings !== false) {
+      return fallback;
+    }
+    const elementOverride = state.atomSizeByElement && state.atomSizeByElement[element];
+    if (Number.isFinite(elementOverride)) {
+      return clampAtomSize(elementOverride, fallback);
+    }
+    return clampAtomSize(state.atomSizeGlobal, fallback);
+  }
+
+  function rerenderCurrentStructure() {
+    if (!state.currentStructure) {
+      return;
+    }
+    renderer.renderStructure(state.currentStructure, { updateCounts, updateAtomList });
+  }
+
+  function updateAtomSizePanel() {
+    const globalSlider = document.getElementById('atom-size-global-slider');
+    const globalValue = document.getElementById('atom-size-global-value');
+    const useDefaultCheckbox = document.getElementById('atom-size-use-default');
+    const selectedSection = document.getElementById('atom-size-selected-section');
+    const selectedCount = document.getElementById('atom-size-selected-count');
+    const selectedSlider = document.getElementById('atom-size-selected-slider');
+    const selectedValue = document.getElementById('atom-size-selected-value');
+    const resetSelectedButton = document.getElementById('btn-atom-size-reset-selected');
+    const elementToggle = document.getElementById('atom-size-element-toggle');
+    const elementList = document.getElementById('atom-size-element-list');
+
+    if (!globalSlider || !globalValue || !useDefaultCheckbox || !selectedSection || !selectedCount ||
+      !selectedSlider || !selectedValue || !resetSelectedButton || !elementToggle || !elementList) {
+      return;
+    }
+
+    cleanupAtomSizeOverrides();
+
+    const manualEnabled = state.atomSizeUseDefaultSettings === false;
+    const selectedIds = Array.isArray(state.selectedAtomIds) ? state.selectedAtomIds : [];
+    const selectedAtomCount = selectedIds.length;
+    const currentSelectedId = selectedAtomCount > 0 ? selectedIds[selectedAtomCount - 1] : '';
+    const selectedAtomSize = selectedAtomCount > 0
+      ? getAtomSizeForAtomId(currentSelectedId)
+      : clampAtomSize(state.atomSizeGlobal, 0.3);
+    const selectedHasAtomOverride = selectedIds.some((id) => hasAtomSizeOverride(id));
+    const availableElements = getAvailableElements();
+
+    state.atomSizeGlobal = clampAtomSize(state.atomSizeGlobal, 0.3);
+    globalSlider.value = state.atomSizeGlobal.toFixed(2);
+    globalValue.textContent = `${state.atomSizeGlobal.toFixed(2)} Å`;
+    globalSlider.disabled = !manualEnabled;
+    useDefaultCheckbox.checked = !manualEnabled;
+
+    selectedSection.style.display = selectedAtomCount > 0 ? '' : 'none';
+    selectedCount.textContent = String(selectedAtomCount);
+    selectedSlider.value = selectedAtomSize.toFixed(2);
+    selectedValue.textContent = `${selectedAtomSize.toFixed(2)} Å`;
+    selectedSlider.disabled = !manualEnabled;
+    resetSelectedButton.disabled = !manualEnabled || !selectedHasAtomOverride;
+
+    if (availableElements.length === 0) {
+      state.atomSizeElementExpanded = false;
+    }
+    elementToggle.disabled = availableElements.length === 0;
+    elementToggle.textContent = `By Element ${state.atomSizeElementExpanded ? '▲' : '▼'}`;
+    elementList.style.display = state.atomSizeElementExpanded && availableElements.length > 0 ? '' : 'none';
+    elementList.innerHTML = '';
+
+    if (state.atomSizeElementExpanded && availableElements.length > 0) {
+      for (const element of availableElements) {
+        const size = getAtomSizeForElement(element);
+        const hasOverride = hasElementSizeOverride(element);
+
+        const row = document.createElement('div');
+        row.className = `atom-size-element-row${hasOverride ? ' size-override' : ''}`;
+
+        const header = document.createElement('div');
+        header.className = 'atom-size-element-header';
+
+        const title = document.createElement('span');
+        title.textContent = `${element}: ${size.toFixed(2)} Å`;
+
+        const resetButton = document.createElement('button');
+        resetButton.type = 'button';
+        resetButton.className = 'atom-size-element-reset';
+        resetButton.textContent = '↺';
+        resetButton.disabled = !manualEnabled || !hasOverride;
+        resetButton.onclick = () => {
+          delete state.atomSizeByElement[element];
+          updateAtomSizePanel();
+          rerenderCurrentStructure();
+        };
+
+        header.appendChild(title);
+        header.appendChild(resetButton);
+
+        const slider = document.createElement('input');
+        slider.type = 'range';
+        slider.min = String(ATOM_SIZE_MIN);
+        slider.max = String(ATOM_SIZE_MAX);
+        slider.step = '0.01';
+        slider.value = size.toFixed(2);
+        slider.disabled = !manualEnabled;
+        slider.oninput = (event) => {
+          const target = event.target;
+          const nextSize = clampAtomSize(target.value, size);
+          state.atomSizeByElement[element] = nextSize;
+          updateAtomSizePanel();
+          rerenderCurrentStructure();
+        };
+
+        row.appendChild(header);
+        row.appendChild(slider);
+        elementList.appendChild(row);
+      }
+    }
+  }
+
   function updateAtomList(atoms, selectedIds, selectedId) {
     const derivedSelectedIds = atoms.filter((atom) => atom.selected).map((atom) => atom.id);
     const fallbackIds = state.selectedAtomIds || [];
@@ -296,7 +512,10 @@
     atoms.forEach((atom, index) => {
       const item = document.createElement('div');
       const isSelected = normalizedSelectedIds.includes(atom.id);
-      item.className = 'atom-item' + (isSelected ? ' selected' : '');
+      const hasSizeOverride = hasAtomSizeOverride(atom.id);
+      item.className = 'atom-item'
+        + (isSelected ? ' selected' : '')
+        + (hasSizeOverride ? ' size-override' : '');
       item.textContent = atom.element + ' #' + (index + 1);
       item.title = atom.id;
       item.onclick = (event) =>
@@ -318,6 +537,7 @@
     updateAtomColorPreview();
     updateMeasurements();
     updateAdsorptionUI();
+    updateAtomSizePanel();
     updateStatusBar();
   }
 
@@ -909,6 +1129,69 @@
     });
   }
 
+  function setupAtomSizePanel() {
+    const globalSlider = document.getElementById('atom-size-global-slider');
+    const useDefaultCheckbox = document.getElementById('atom-size-use-default');
+    const selectedSlider = document.getElementById('atom-size-selected-slider');
+    const resetSelectedButton = document.getElementById('btn-atom-size-reset-selected');
+    const elementToggle = document.getElementById('atom-size-element-toggle');
+
+    if (!globalSlider || !useDefaultCheckbox || !selectedSlider || !resetSelectedButton || !elementToggle) {
+      return;
+    }
+
+    globalSlider.addEventListener('input', (event) => {
+      const target = event.target;
+      state.atomSizeGlobal = clampAtomSize(target.value, state.atomSizeGlobal || 0.3);
+      updateAtomSizePanel();
+      rerenderCurrentStructure();
+    });
+
+    useDefaultCheckbox.addEventListener('change', (event) => {
+      const target = event.target;
+      state.atomSizeUseDefaultSettings = !!target.checked;
+      updateAtomSizePanel();
+      rerenderCurrentStructure();
+    });
+
+    selectedSlider.addEventListener('input', (event) => {
+      if (state.atomSizeUseDefaultSettings !== false) {
+        updateAtomSizePanel();
+        return;
+      }
+      const target = event.target;
+      const nextSize = clampAtomSize(target.value, state.atomSizeGlobal || 0.3);
+      const selectedIds = Array.isArray(state.selectedAtomIds) ? state.selectedAtomIds : [];
+      for (const atomId of selectedIds) {
+        const baseId = getBaseAtomId(atomId);
+        if (baseId) {
+          state.atomSizeByAtom[baseId] = nextSize;
+        }
+      }
+      updateAtomSizePanel();
+      rerenderCurrentStructure();
+    });
+
+    resetSelectedButton.addEventListener('click', () => {
+      const selectedIds = Array.isArray(state.selectedAtomIds) ? state.selectedAtomIds : [];
+      for (const atomId of selectedIds) {
+        const baseId = getBaseAtomId(atomId);
+        if (baseId) {
+          delete state.atomSizeByAtom[baseId];
+        }
+      }
+      updateAtomSizePanel();
+      rerenderCurrentStructure();
+    });
+
+    elementToggle.addEventListener('click', () => {
+      state.atomSizeElementExpanded = !state.atomSizeElementExpanded;
+      updateAtomSizePanel();
+    });
+
+    updateAtomSizePanel();
+  }
+
   function setupTabs() {
     const tabButtons = Array.from(document.querySelectorAll('.tab-button'));
     const tabPanes = Array.from(document.querySelectorAll('.tab-pane'));
@@ -943,6 +1226,7 @@
 
   function setupUI() {
     setupTabs();
+    setupAtomSizePanel();
 
     document.getElementById('btn-add-atom').onclick = () => {
       document.getElementById('element-input').focus();
@@ -1489,6 +1773,7 @@
     if (event.data.command === 'render') {
       trajectoryFrameRequestPending = false;
       state.currentStructure = event.data.data;
+      cleanupAtomSizeOverrides();
       state.selectedAtomIds = event.data.data.selectedAtomIds || [];
       state.selectedBondKeys = Array.isArray(event.data.data.selectedBondKeys)
         ? event.data.data.selectedBondKeys
@@ -1560,6 +1845,7 @@
       updateAtomColorPreview();
       updateAdsorptionUI();
       updateBondSelectionUI();
+      updateAtomSizePanel();
       return;
     }
 

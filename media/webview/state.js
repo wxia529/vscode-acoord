@@ -35,6 +35,11 @@
     unitCellColor: '#FF6600',
     unitCellThickness: 1,
     unitCellLineStyle: 'solid',
+    atomSizeUseDefaultSettings: true,
+    atomSizeGlobal: 0.3,
+    atomSizeByElement: {},
+    atomSizeByAtom: {},
+    atomSizeElementExpanded: false,
     // Lighting settings
     lightingEnabled: true,
     ambientIntensity: 0.5,

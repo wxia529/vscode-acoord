@@ -240,6 +240,50 @@
     return { scale, sizeScale };
   }
 
+  function clampAtomSize(value, fallback) {
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed)) {
+      return fallback;
+    }
+    return Math.max(0.1, Math.min(2.0, parsed));
+  }
+
+  function getBaseAtomId(atomId) {
+    if (typeof atomId !== 'string') {
+      return '';
+    }
+    return atomId.split('::')[0];
+  }
+
+  function getConfiguredAtomRadius(atom, baseAtomsById) {
+    const baseId = getBaseAtomId(atom.id);
+    const baseAtom = baseAtomsById.get(baseId);
+    const fallbackRadius = Number.isFinite(atom.radius)
+      ? atom.radius
+      : Number.isFinite(baseAtom?.radius)
+        ? baseAtom.radius
+        : 0.1;
+
+    if (state.atomSizeUseDefaultSettings !== false) {
+      return fallbackRadius;
+    }
+
+    const atomOverrides = state.atomSizeByAtom || {};
+    const atomOverride = atomOverrides[baseId];
+    if (Number.isFinite(atomOverride)) {
+      return clampAtomSize(atomOverride, fallbackRadius);
+    }
+
+    const elementOverrides = state.atomSizeByElement || {};
+    const element = atom.element || baseAtom?.element;
+    const elementOverride = element ? elementOverrides[element] : undefined;
+    if (Number.isFinite(elementOverride)) {
+      return clampAtomSize(elementOverride, fallbackRadius);
+    }
+
+    return clampAtomSize(state.atomSizeGlobal, fallbackRadius);
+  }
+
   function disposeMaterial(material) {
     if (!material) {
       return;
@@ -384,6 +428,7 @@
     const selectedSet = new Set(data.selectedAtomIds || []);
     const renderAtoms = data.renderAtoms || data.atoms;
     const renderBonds = data.renderBonds || data.bonds;
+    const baseAtomsById = new Map((data.atoms || []).map((atom) => [atom.id, atom]));
 
     if (renderAtoms) {
       for (const atom of renderAtoms) {
@@ -392,7 +437,8 @@
         }
         const selectable = atom.selectable !== false;
         const isSelected = selectable && (!!atom.selected || selectedSet.has(atom.id));
-        const sphereRadius = Math.max(atom.radius * sizeScale, 0.12) * (isSelected ? 1.12 : 1);
+        const configuredRadius = getConfiguredAtomRadius(atom, baseAtomsById);
+        const sphereRadius = Math.max(configuredRadius * sizeScale, 0.12) * (isSelected ? 1.12 : 1);
         const geometry = new THREE.SphereGeometry(sphereRadius, 32, 32);
         const material = new THREE.MeshPhongMaterial({
           color: new THREE.Color(isSelected ? '#f6d55c' : atom.color),

@@ -190,6 +190,29 @@
           </div>
 
           <div class="panel">
+            <div class="panel-title">Atom Size (Å)</div>
+            <div class="input-group">
+              <label>Global: <span id="atom-size-global-value">0.30 Å</span></label>
+              <input type="range" id="atom-size-global-slider" min="0.1" max="2.0" step="0.01" value="0.3" />
+            </div>
+            <div class="input-group">
+              <label class="checkbox-row">
+                <input type="checkbox" id="atom-size-use-default" checked />
+                Use default settings
+              </label>
+            </div>
+            <div class="input-group" id="atom-size-selected-section" style="display:none;">
+              <label>Selected (<span id="atom-size-selected-count">0</span>): <span id="atom-size-selected-value">0.30 Å</span></label>
+              <input type="range" id="atom-size-selected-slider" min="0.1" max="2.0" step="0.01" value="0.3" />
+              <button id="btn-atom-size-reset-selected" type="button">Reset to default</button>
+            </div>
+            <div class="input-group">
+              <button id="atom-size-element-toggle" type="button" class="atom-size-element-toggle">By Element ▼</button>
+            </div>
+            <div id="atom-size-element-list" class="atom-size-element-list" style="display:none;"></div>
+          </div>
+
+          <div class="panel">
             <div class="panel-title">Display Scale</div>
             <div class="input-group">
               <label class="checkbox-row">
