@@ -185,12 +185,17 @@ export class XDATCARParser implements StructureParser {
       modeIndex++;
     }
 
+    const totalAtoms = counts.reduce((sum, count) => sum + count, 0);
+    if (totalAtoms <= 0) {
+      return null;
+    }
+
     return {
       label,
       latticeVectors,
       elements: normalizedElements,
       counts,
-      totalAtoms: counts.reduce((sum, count) => sum + count, 0),
+      totalAtoms,
       coordinateMode,
       nextIndex: modeIndex,
     };
@@ -289,7 +294,11 @@ export class XDATCARParser implements StructureParser {
   }
 
   private parseCounts(line: string): number[] {
-    return this.tokenize(line)
+    const tokens = this.tokenize(line);
+    if (tokens.some((token) => !/^[+-]?\d+$/.test(token))) {
+      return [];
+    }
+    return tokens
       .map((token) => parseInt(token, 10))
       .filter((value) => Number.isFinite(value) && value >= 0);
   }

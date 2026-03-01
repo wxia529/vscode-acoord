@@ -2,6 +2,10 @@
 
 All notable changes to this project will be documented in this file.
 
+## 0.1.9
+
+- Fixed XDATCAR trajectory parsing for files that use `Direct configuration=     N` frame markers.
+
 ## 0.1.8
 
 - Added HD PNG export from the 3D view.
