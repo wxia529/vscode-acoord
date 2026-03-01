@@ -30,6 +30,7 @@
     rotationAxis: 'z',
     rotationInProgress: false,
     // Display settings
+    showAxes: true,
     backgroundColor: '#0d1015',
     unitCellColor: '#FF6600',
     unitCellThickness: 1,

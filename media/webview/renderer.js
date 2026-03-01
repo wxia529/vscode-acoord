@@ -25,6 +25,7 @@
     keyLight: null,
     fillLight: null,
     rimLight: null,
+    axesHelper: null,
   };
 
   function getOrthoFrustum(width, height) {
@@ -133,7 +134,9 @@
     // Initialize light positions using the same function as animation loop
     updateLightsForCamera();
 
-    scene.add(new THREE.AxesHelper(5));
+    rendererState.axesHelper = new THREE.AxesHelper(5);
+    rendererState.axesHelper.visible = state.showAxes !== false;
+    scene.add(rendererState.axesHelper);
 
     applyControls(camera);
 
@@ -630,6 +633,10 @@
   }
 
   function updateDisplaySettings() {
+    if (rendererState.axesHelper) {
+      rendererState.axesHelper.visible = state.showAxes !== false;
+    }
+
     // Update background color
     if (rendererState.scene && state.backgroundColor) {
       rendererState.scene.background = new THREE.Color(state.backgroundColor);

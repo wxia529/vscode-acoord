@@ -405,6 +405,7 @@
   }
 
   function initDisplaySettingsPanel() {
+    const showAxes = document.getElementById('show-axes');
     const bgColorPicker = document.getElementById('bg-color-picker');
     const bgColorText = document.getElementById('bg-color-text');
     const latticeColorPicker = document.getElementById('lattice-color-picker');
@@ -419,6 +420,16 @@
       }
       window.ACoordRenderer.renderStructure(state.currentStructure);
     };
+
+    if (showAxes) {
+      showAxes.checked = state.showAxes !== false;
+      showAxes.addEventListener('change', () => {
+        state.showAxes = showAxes.checked;
+        if (window.ACoordRenderer && window.ACoordRenderer.updateDisplaySettings) {
+          window.ACoordRenderer.updateDisplaySettings();
+        }
+      });
+    }
 
     // Background color
     if (bgColorPicker && bgColorText) {
