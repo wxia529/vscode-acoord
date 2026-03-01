@@ -5,7 +5,7 @@ Atomic Coordinate Toolkit for visualizing and editing atomic structures inside V
 ## Features
 
 - 3D viewer (Three.js) with selection, measurement, and basic editing.
-- Trajectory support (frame navigation + playback speed control) for XYZ and QE output logs.
+- Trajectory support (frame navigation + playback speed control) for XYZ, QE logs, XDATCAR, and OUTCAR.
 - Projection toggle (orthographic/perspective).
 - Lattice editor (a/b/c + alpha/beta/gamma) with optional atom scaling.
 - Supercell display with periodic bonds.
@@ -22,6 +22,8 @@ Input and output:
 - XYZ
 - CIF
 - POSCAR / VASP (Selective dynamics preserved via fixed flags).
+- XDATCAR trajectory (.xdatcar / XDATCAR)
+- OUTCAR trajectory read (.outcar / OUTCAR)
 - PDB (basic CRYST1 + ATOM/HETATM)
 - Gaussian input (.gjf)
 - ORCA input (.inp)
@@ -34,7 +36,9 @@ Input and output:
 - extxyz: comment line may include `Lattice="..."` and `Properties=species:S:1:pos:R:3`.
 - XYZ trajectory files (multi-frame XYZ/extxyz) can be opened and exported.
 - QE output logs with multiple `ATOMIC_POSITIONS` blocks are loaded as trajectories.
-- POSCAR: fixed atoms are written as `F F F` in Selective dynamics.
+- POSCAR: improved parsing for VASP 4/5 styles, scaling factors, and selective dynamics flags.
+- XDATCAR trajectories can be opened and exported.
+- OUTCAR can be read as trajectory frames from `POSITION ... TOTAL-FORCE` blocks.
 - STRU: fixed atoms are written as `0 0 0` and free atoms `1 1 1`.
 - ORCA export uses the default header:
   - `! B3LYP D3 def2-SVP`

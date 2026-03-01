@@ -16,7 +16,9 @@
     "cif",
     "xyz",
     "vasp",
-    "poscar"
+    "poscar",
+    "xdatcar",
+    "outcar"
   ],
   "homepage": "https://github.com/wxia529/vscode-acoord",
   "bugs": {
@@ -69,6 +71,18 @@
             "filenamePattern": "*CONTCAR"
           },
           {
+            "filenamePattern": "*.xdatcar"
+          },
+          {
+            "filenamePattern": "*XDATCAR"
+          },
+          {
+            "filenamePattern": "*.outcar"
+          },
+          {
+            "filenamePattern": "*OUTCAR"
+          },
+          {
             "filenamePattern": "*.pdb"
           },
           {
@@ -105,7 +119,7 @@
       "editor/title": [
         {
           "command": "acoord.openStructureEditor",
-          "when": "resourceExtname =~ /\\.(cif|xyz|poscar|vasp|pdb|gjf|com|inp|in|pwi|out|pwo|log|stru)$/i || resourceFilename =~ /^(POSCAR|CONTCAR|STRU)$/i",
+            "when": "resourceExtname =~ /\\.(cif|xyz|poscar|vasp|xdatcar|outcar|pdb|gjf|com|inp|in|pwi|out|pwo|log|stru)$/i || resourceFilename =~ /^(POSCAR|CONTCAR|XDATCAR|OUTCAR|STRU)$/i",
           "group": "navigation"
         }
       ]

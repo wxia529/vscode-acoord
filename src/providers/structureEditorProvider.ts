@@ -641,6 +641,7 @@ export class StructureEditorProvider implements vscode.CustomEditorProvider {
         const formatOptions = [
           { id: 'cif', label: 'CIF (.cif)' },
           { id: 'xyz', label: 'XYZ (.xyz)' },
+          { id: 'xdatcar', label: 'XDATCAR (.xdatcar)' },
           { id: 'poscar', label: 'POSCAR' },
           { id: 'vasp', label: 'VASP (.vasp)' },
           { id: 'pdb', label: 'PDB (.pdb)' },
@@ -659,8 +660,13 @@ export class StructureEditorProvider implements vscode.CustomEditorProvider {
         }
         const selectedFormat = selected.id;
         let exportFrames: Structure[] = [structureToSave];
-        if (selectedFormat === 'xyz' && trajectoryFrames.length > 1) {
-          const chosen = await this.pickXyzExportFrames(key, trajectoryFrames, structureToSave);
+        if ((selectedFormat === 'xyz' || selectedFormat === 'xdatcar') && trajectoryFrames.length > 1) {
+          const chosen = await this.pickTrajectoryExportFrames(
+            key,
+            trajectoryFrames,
+            structureToSave,
+            selectedFormat.toUpperCase()
+          );
           if (!chosen) {
             break;
           }
@@ -804,10 +810,11 @@ export class StructureEditorProvider implements vscode.CustomEditorProvider {
     return Math.max(0, frames.length - 1);
   }
 
-  private async pickXyzExportFrames(
+  private async pickTrajectoryExportFrames(
     key: string,
     trajectoryFrames: Structure[],
-    currentStructure: Structure
+    currentStructure: Structure,
+    formatLabel: string
   ): Promise<Structure[] | null> {
     if (trajectoryFrames.length <= 1) {
       return [currentStructure];
@@ -825,7 +832,7 @@ export class StructureEditorProvider implements vscode.CustomEditorProvider {
         },
       ],
       {
-        placeHolder: 'Select XYZ export scope',
+        placeHolder: `Select ${formatLabel} export scope`,
         ignoreFocusOut: true,
       }
     );
@@ -993,21 +1000,26 @@ export class StructureEditorProvider implements vscode.CustomEditorProvider {
     try {
       const frames = this.trajectories.get(document.uri.fsPath) || [structure];
       let exportFrames: Structure[] = [structure];
-      if (format === 'xyz' && frames.length > 1) {
-        const chosen = await this.pickXyzExportFrames(document.uri.fsPath, frames, structure);
+      if ((format === 'xyz' || format === 'xdatcar') && frames.length > 1) {
+        const chosen = await this.pickTrajectoryExportFrames(
+          document.uri.fsPath,
+          frames,
+          structure,
+          format.toUpperCase()
+        );
         if (!chosen) {
           return;
         }
         exportFrames = chosen;
       }
-      if (format === 'xyz' && exportFrames.length > 1) {
+      if ((format === 'xyz' || format === 'xdatcar') && exportFrames.length > 1) {
         for (const frame of exportFrames) {
           FileManager.ensureStructureName(frame, destination.fsPath);
         }
       }
       FileManager.ensureStructureName(exportFrames[0], destination.fsPath);
       const content =
-        format === 'xyz' && exportFrames.length > 1
+        (format === 'xyz' || format === 'xdatcar') && exportFrames.length > 1
           ? FileManager.saveStructures(exportFrames, format)
           : FileManager.saveStructure(exportFrames[0], format);
       await vscode.workspace.fs.writeFile(destination, new TextEncoder().encode(content));

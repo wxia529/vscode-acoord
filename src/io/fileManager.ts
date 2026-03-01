@@ -6,6 +6,8 @@ import {
   GJFParser,
   ORCAParser,
   QEParser,
+  XDATCARParser,
+  OUTCARParser,
   PDBParser,
   STRUParser,
   StructureParser,
@@ -27,11 +29,13 @@ const PARSER_MAP: Record<string, StructureParser> = {
   out: new QEParser(),
   pwo: new QEParser(),
   log: new QEParser(),
+  xdatcar: new XDATCARParser(),
+  outcar: new OUTCARParser(),
   pdb: new PDBParser(),
   stru: new STRUParser(),
 };
 
-const READ_ONLY_FORMATS = new Set(['out', 'pwo', 'log']);
+const READ_ONLY_FORMATS = new Set(['out', 'pwo', 'log', 'outcar']);
 
 /**
  * Manage structure file I/O
@@ -158,6 +162,12 @@ export class FileManager {
     const upper = baseName.toUpperCase();
     if (upper === 'POSCAR' || upper === 'CONTCAR') {
       return 'poscar';
+    }
+    if (upper === 'XDATCAR') {
+      return 'xdatcar';
+    }
+    if (upper === 'OUTCAR') {
+      return 'outcar';
     }
     if (upper === 'STRU') {
       return 'stru';

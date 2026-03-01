@@ -11,6 +11,9 @@ All notable changes to this project will be documented in this file.
 - Improved playback stability by disposing WebGL resources during re-render and reducing frame-request buildup.
 - Improved sidebar tab usability with adaptive multi-row tab layout when width is limited.
 - Added unit-cell display controls for lattice thickness and solid/dashed line style.
+- Improved POSCAR read/write compatibility (VASP 4/5 style headers, scaling factors, selective dynamics handling).
+- Added XDATCAR trajectory read/write support.
+- Added OUTCAR trajectory read support.
 
 ## 0.1.7
 

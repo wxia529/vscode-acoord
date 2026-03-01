@@ -144,14 +144,14 @@ export function activate(context: vscode.ExtensionContext) {
           );
           const primaryStructure = structures[structures.length - 1];
           let exportStructures: Structure[] = [primaryStructure];
-          if (selectedFormat === 'xyz' && structures.length > 1) {
+          if ((selectedFormat === 'xyz' || selectedFormat === 'xdatcar') && structures.length > 1) {
             const scope = await vscode.window.showQuickPick(
               [
                 { id: 'current', label: 'Current Frame (last frame)' },
                 { id: 'all', label: `Whole Trajectory (${structures.length} frames)` },
               ],
               {
-                placeHolder: 'Select XYZ export scope',
+                placeHolder: `Select ${selectedFormat.toUpperCase()} export scope`,
                 ignoreFocusOut: true,
               }
             );
@@ -161,7 +161,7 @@ export function activate(context: vscode.ExtensionContext) {
             exportStructures = scope.id === 'all' ? structures : [primaryStructure];
           }
           const exportContent =
-            selectedFormat === 'xyz' && exportStructures.length > 1
+            (selectedFormat === 'xyz' || selectedFormat === 'xdatcar') && exportStructures.length > 1
               ? FileManager.saveStructures(exportStructures, selectedFormat)
               : FileManager.saveStructure(exportStructures[0], selectedFormat);
 
@@ -183,10 +183,10 @@ export function activate(context: vscode.ExtensionContext) {
             defaultUri: vscode.Uri.joinPath(workspaceFolder.uri, defaultFileName),
           };
           if (!isPoscarFormat) {
-            saveOptions.filters = {
-              'Structure Files': ['cif', 'xyz', 'poscar', 'vasp', 'pdb', 'gjf', 'inp', 'in', 'pwi', 'stru'],
-            };
-          }
+              saveOptions.filters = {
+                'Structure Files': ['cif', 'xyz', 'poscar', 'vasp', 'xdatcar', 'pdb', 'gjf', 'inp', 'in', 'pwi', 'stru'],
+              };
+            }
 
           const exportUri = await vscode.window.showSaveDialog(saveOptions);
           if (!exportUri) {

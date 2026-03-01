@@ -4,6 +4,8 @@ export { POSCARParser } from './poscarParser';
 export { GJFParser } from './gjfParser';
 export { ORCAParser } from './orcaParser';
 export { QEParser } from './qeParser';
+export { XDATCARParser } from './xdatcarParser';
+export { OUTCARParser } from './outcarParser';
 export { PDBParser } from './pdbParser';
 export { STRUParser } from './struParser';
 export { StructureParser } from './structureParser';
