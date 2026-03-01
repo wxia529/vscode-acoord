@@ -18,6 +18,9 @@ export interface RendererState {
   selectedAtomId?: string;
   selectedAtomIds: string[];
   selectedBondKey?: string;
+  selectedBondKeys: string[];
+  trajectoryFrameIndex: number;
+  trajectoryFrameCount: number;
 }
 
 /**
@@ -32,6 +35,9 @@ export class ThreeJSRenderer {
       showUnitCell: !!structure.unitCell,
       selectedAtomIds: [],
       selectedBondKey: undefined,
+      selectedBondKeys: [],
+      trajectoryFrameIndex: 0,
+      trajectoryFrameCount: 1,
     };
   }
 
@@ -54,6 +60,11 @@ export class ThreeJSRenderer {
    */
   setShowUnitCell(show: boolean): void {
     this.state.showUnitCell = show;
+  }
+
+  setTrajectoryFrameInfo(frameIndex: number, frameCount: number): void {
+    this.state.trajectoryFrameIndex = Math.max(0, Math.floor(frameIndex || 0));
+    this.state.trajectoryFrameCount = Math.max(1, Math.floor(frameCount || 1));
   }
 
   /**
@@ -81,14 +92,28 @@ export class ThreeJSRenderer {
     this.state.selectedAtomIds = validIds;
     this.state.selectedAtomId = validIds.length > 0 ? validIds[validIds.length - 1] : undefined;
     this.state.selectedBondKey = undefined;
+    this.state.selectedBondKeys = [];
   }
 
   selectBond(bondKey?: string): void {
-    this.state.selectedBondKey = bondKey || undefined;
+    this.setBondSelection(bondKey ? [bondKey] : []);
+  }
+
+  setBondSelection(bondKeys: string[]): void {
+    const normalized = Array.from(
+      new Set(
+        (bondKeys || [])
+          .map((key) => (typeof key === 'string' ? key.trim() : ''))
+          .filter((key) => key.length > 0)
+      )
+    );
+    this.state.selectedBondKeys = normalized;
+    this.state.selectedBondKey = normalized.length > 0 ? normalized[normalized.length - 1] : undefined;
   }
 
   deselectBond(): void {
     this.state.selectedBondKey = undefined;
+    this.state.selectedBondKeys = [];
   }
 
   /**
@@ -119,6 +144,9 @@ export class ThreeJSRenderer {
         selectedAtomId: this.state.selectedAtomId,
         selectedAtomIds: this.state.selectedAtomIds,
         selectedBondKey: this.state.selectedBondKey,
+        selectedBondKeys: this.state.selectedBondKeys,
+        trajectoryFrameIndex: this.state.trajectoryFrameIndex,
+        trajectoryFrameCount: this.state.trajectoryFrameCount,
       },
     };
   }
@@ -177,7 +205,7 @@ export class ThreeJSRenderer {
           color: '#C0C0C0',
           color1: atom1.color || info1?.color || '#C0C0C0',
           color2: atom2.color || info2?.color || '#C0C0C0',
-          selected: this.state.selectedBondKey === Structure.bondKey(atom1.id, atom2.id),
+          selected: this.state.selectedBondKeys.includes(Structure.bondKey(atom1.id, atom2.id)),
         };
       })
       .filter((b) => b !== null);
@@ -260,7 +288,7 @@ export class ThreeJSRenderer {
               color: '#C0C0C0',
               color1: atomA.color || infoA?.color || '#C0C0C0',
               color2: atomB.color || infoB?.color || '#C0C0C0',
-              selected: this.state.selectedBondKey === bondKey,
+              selected: this.state.selectedBondKeys.includes(bondKey),
             });
           }
         }

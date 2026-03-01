@@ -5,6 +5,7 @@ import {
   POSCARParser,
   GJFParser,
   ORCAParser,
+  QEParser,
   PDBParser,
   STRUParser,
   StructureParser,
@@ -21,9 +22,16 @@ const PARSER_MAP: Record<string, StructureParser> = {
   gjf: new GJFParser(),
   com: new GJFParser(),
   inp: new ORCAParser(),
+  in: new QEParser(),
+  pwi: new QEParser(),
+  out: new QEParser(),
+  pwo: new QEParser(),
+  log: new QEParser(),
   pdb: new PDBParser(),
   stru: new STRUParser(),
 };
+
+const READ_ONLY_FORMATS = new Set(['out', 'pwo', 'log']);
 
 /**
  * Manage structure file I/O
@@ -38,6 +46,17 @@ export class FileManager {
     filePath: string,
     content: string
   ): Structure {
+    const structures = this.loadStructures(filePath, content);
+    if (structures.length === 0) {
+      throw new Error('No structure found in file');
+    }
+    return structures[0];
+  }
+
+  static loadStructures(
+    filePath: string,
+    content: string
+  ): Structure[] {
     const ext = this.getFileExtension(filePath).toLowerCase();
     const parser = PARSER_MAP[ext];
 
@@ -46,9 +65,13 @@ export class FileManager {
     }
 
     try {
-      const structure = parser.parse(content);
-      this.ensureStructureName(structure, filePath);
-      return structure;
+      const structures = parser.parseTrajectory
+        ? parser.parseTrajectory(content)
+        : [parser.parse(content)];
+      for (const structure of structures) {
+        this.ensureStructureName(structure, filePath);
+      }
+      return structures;
     } catch (error) {
       throw new Error(`Failed to parse ${ext} file: ${error instanceof Error ? error.message : String(error)}`);
     }
@@ -61,14 +84,31 @@ export class FileManager {
     structure: Structure,
     format: string
   ): string {
+    return this.saveStructures([structure], format);
+  }
+
+  static saveStructures(
+    structures: Structure[],
+    format: string
+  ): string {
+    if (!structures || structures.length === 0) {
+      throw new Error('No structure available to save');
+    }
     const ext = this.resolveFormat(format);
     const parser = PARSER_MAP[ext];
 
     if (!parser) {
       throw new Error(`Unsupported export format: ${ext}`);
     }
+    if (READ_ONLY_FORMATS.has(ext)) {
+      throw new Error(`Unsupported export format: ${ext}`);
+    }
 
-    return parser.serialize(structure);
+    if (structures.length > 1 && parser.serializeTrajectory) {
+      return parser.serializeTrajectory(structures);
+    }
+
+    return parser.serialize(structures[0]);
   }
 
   static ensureStructureName(structure: Structure, filePath?: string) {
@@ -84,7 +124,7 @@ export class FileManager {
    * Get supported formats
    */
   static getSupportedFormats(): string[] {
-    return Object.keys(PARSER_MAP);
+    return Object.keys(PARSER_MAP).filter((format) => !READ_ONLY_FORMATS.has(format));
   }
 
   /**

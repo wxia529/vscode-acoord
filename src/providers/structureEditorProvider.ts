@@ -20,6 +20,8 @@ export class StructureEditorProvider implements vscode.CustomEditorProvider {
   private webviewPanels = new Map<string, vscode.WebviewPanel>();
   private renderers = new Map<string, ThreeJSRenderer>();
   private structures = new Map<string, Structure>();
+  private trajectories = new Map<string, Structure[]>();
+  private trajectoryFrameIndices = new Map<string, number>();
   private undoStacks = new Map<string, Structure[]>();
   private readonly maxUndoDepth = 100;
 
@@ -41,25 +43,32 @@ export class StructureEditorProvider implements vscode.CustomEditorProvider {
     const uri = document.uri.fsPath;
 
     // Try to load structure from file
-    let structure: Structure;
+    let frames: Structure[];
     try {
       const fileContent = await vscode.workspace.fs.readFile(document.uri);
       const content = new TextDecoder().decode(fileContent);
-      structure = FileManager.loadStructure(uri, content);
+      frames = FileManager.loadStructures(uri, content);
     } catch (error) {
       vscode.window.showErrorMessage(
         `Failed to load structure: ${error instanceof Error ? error.message : String(error)}`
       );
       return;
     }
+    if (!frames || frames.length === 0) {
+      vscode.window.showErrorMessage('Failed to load structure: no frame found.');
+      return;
+    }
+    const initialFrameIndex = this.getDefaultTrajectoryFrameIndex(frames);
+    const structure = frames[initialFrameIndex];
 
     // Store references
     const key = uri;
-    this.structures.set(key, structure);
+    this.setTrajectoryState(key, frames, initialFrameIndex);
     this.undoStacks.set(key, []);
     this.webviewPanels.set(key, webviewPanel);
 
     const renderer = new ThreeJSRenderer(structure);
+    renderer.setTrajectoryFrameInfo(initialFrameIndex, frames.length);
     this.renderers.set(key, renderer);
 
     // Setup webview
@@ -83,11 +92,18 @@ export class StructureEditorProvider implements vscode.CustomEditorProvider {
         }
         try {
           const content = savedDoc.getText();
-          const updated = FileManager.loadStructure(key, content);
-          this.structures.set(key, updated);
+          const updatedFrames = FileManager.loadStructures(key, content);
+          if (!updatedFrames || updatedFrames.length === 0) {
+            return;
+          }
+          const initialFrameIndex = this.getDefaultTrajectoryFrameIndex(updatedFrames);
+          this.setTrajectoryState(key, updatedFrames, initialFrameIndex);
           this.undoStacks.set(key, []);
-          renderer.setStructure(updated);
+          renderer.setStructure(updatedFrames[initialFrameIndex]);
+          renderer.setShowUnitCell(!!updatedFrames[initialFrameIndex].unitCell);
+          renderer.setTrajectoryFrameInfo(initialFrameIndex, updatedFrames.length);
           renderer.deselectAtom();
+          renderer.deselectBond();
           this.renderStructure(key, webviewPanel);
         } catch (error) {
           vscode.window.showErrorMessage(
@@ -105,6 +121,8 @@ export class StructureEditorProvider implements vscode.CustomEditorProvider {
       this.webviewPanels.delete(key);
       this.renderers.delete(key);
       this.structures.delete(key);
+      this.trajectories.delete(key);
+      this.trajectoryFrameIndices.delete(key);
       this.undoStacks.delete(key);
       saveListener.dispose();
     });
@@ -125,6 +143,29 @@ export class StructureEditorProvider implements vscode.CustomEditorProvider {
       case 'getState':
         this.renderStructure(key, webviewPanel);
         break;
+
+      case 'setTrajectoryFrame': {
+        const frames = this.trajectories.get(key) || [];
+        if (frames.length <= 1) {
+          break;
+        }
+        const requestedIndex = Number(message.frameIndex);
+        if (!Number.isFinite(requestedIndex)) {
+          break;
+        }
+        const nextIndex = Math.max(0, Math.min(frames.length - 1, Math.floor(requestedIndex)));
+        this.trajectoryFrameIndices.set(key, nextIndex);
+        const nextStructure = frames[nextIndex];
+        this.structures.set(key, nextStructure);
+        renderer.setStructure(nextStructure);
+        renderer.setShowUnitCell(!!nextStructure.unitCell);
+        renderer.setTrajectoryFrameInfo(nextIndex, frames.length);
+        renderer.deselectAtom();
+        renderer.deselectBond();
+        this.undoStacks.set(key, []);
+        this.renderStructure(key, webviewPanel);
+        break;
+      }
 
       case 'beginDrag':
         if (message.atomId) {
@@ -193,7 +234,24 @@ export class StructureEditorProvider implements vscode.CustomEditorProvider {
         const bondKey = typeof message.bondKey === 'string' && message.bondKey.trim()
           ? message.bondKey.trim()
           : undefined;
-        renderer.selectBond(bondKey);
+        if (message.add && bondKey) {
+          const current = renderer.getState().selectedBondKeys || [];
+          const next = current.includes(bondKey)
+            ? current.filter((key) => key !== bondKey)
+            : [...current, bondKey];
+          renderer.setBondSelection(next);
+        } else {
+          renderer.selectBond(bondKey);
+        }
+        this.renderStructure(key, webviewPanel);
+        break;
+      }
+
+      case 'setBondSelection': {
+        const keys: string[] = Array.isArray(message.bondKeys)
+          ? message.bondKeys.filter((key: unknown) => typeof key === 'string')
+          : [];
+        renderer.setBondSelection(keys);
         this.renderStructure(key, webviewPanel);
         break;
       }
@@ -485,21 +543,42 @@ export class StructureEditorProvider implements vscode.CustomEditorProvider {
       }
 
       case 'deleteBond': {
-        let pair: [string, string] | null = null;
-        if (typeof message.bondKey === 'string') {
-          pair = Structure.bondKeyToPair(message.bondKey);
-        }
-        if (!pair) {
-          const ids: string[] = Array.isArray(message.atomIds) ? message.atomIds : [];
-          if (ids.length >= 2) {
-            pair = Structure.normalizeBondPair(ids[0], ids[1]);
+        const selectedPairs: Array<[string, string]> = [];
+        if (Array.isArray(message.bondKeys)) {
+          for (const key of message.bondKeys) {
+            if (typeof key !== 'string') {
+              continue;
+            }
+            const pair = Structure.bondKeyToPair(key);
+            if (pair) {
+              selectedPairs.push(pair);
+            }
           }
         }
-        if (!pair) {
+
+        if (selectedPairs.length === 0) {
+          let pair: [string, string] | null = null;
+          if (typeof message.bondKey === 'string') {
+            pair = Structure.bondKeyToPair(message.bondKey);
+          }
+          if (!pair) {
+            const ids: string[] = Array.isArray(message.atomIds) ? message.atomIds : [];
+            if (ids.length >= 2) {
+              pair = Structure.normalizeBondPair(ids[0], ids[1]);
+            }
+          }
+          if (pair) {
+            selectedPairs.push(pair);
+          }
+        }
+
+        if (selectedPairs.length === 0) {
           break;
         }
         this.pushUndoSnapshot(key, structure);
-        structure.removeBond(pair[0], pair[1]);
+        for (const pair of selectedPairs) {
+          structure.removeBond(pair[0], pair[1]);
+        }
         renderer.setStructure(structure);
         renderer.deselectBond();
         this.renderStructure(key, webviewPanel);
@@ -555,6 +634,7 @@ export class StructureEditorProvider implements vscode.CustomEditorProvider {
 
       case 'saveStructureAs': {
         const structureToSave = this.structures.get(key);
+        const trajectoryFrames = this.trajectories.get(key) || (structureToSave ? [structureToSave] : []);
         if (!structureToSave) {
           break;
         }
@@ -566,6 +646,7 @@ export class StructureEditorProvider implements vscode.CustomEditorProvider {
           { id: 'pdb', label: 'PDB (.pdb)' },
           { id: 'gjf', label: 'Gaussian input (.gjf)' },
           { id: 'inp', label: 'ORCA input (.inp)' },
+          { id: 'in', label: 'QE input (.in)' },
           { id: 'stru', label: 'ABACUS STRU (.stru)' },
         ];
         const selected = await vscode.window.showQuickPick(formatOptions, {
@@ -577,6 +658,14 @@ export class StructureEditorProvider implements vscode.CustomEditorProvider {
           break;
         }
         const selectedFormat = selected.id;
+        let exportFrames: Structure[] = [structureToSave];
+        if (selectedFormat === 'xyz' && trajectoryFrames.length > 1) {
+          const chosen = await this.pickXyzExportFrames(key, trajectoryFrames, structureToSave);
+          if (!chosen) {
+            break;
+          }
+          exportFrames = chosen;
+        }
 
         const baseName = path.basename(key, path.extname(key));
         const isPoscarFormat = ['poscar', 'vasp'].includes(selectedFormat.toLowerCase());
@@ -598,8 +687,16 @@ export class StructureEditorProvider implements vscode.CustomEditorProvider {
           break;
         }
         try {
-          FileManager.ensureStructureName(structureToSave, uri.fsPath);
-          const content = FileManager.saveStructure(structureToSave, selectedFormat);
+          if (selectedFormat === 'xyz' && exportFrames.length > 1) {
+            for (const frame of exportFrames) {
+              FileManager.ensureStructureName(frame, uri.fsPath);
+            }
+          }
+          FileManager.ensureStructureName(exportFrames[0], uri.fsPath);
+          const content =
+            selectedFormat === 'xyz' && exportFrames.length > 1
+              ? FileManager.saveStructures(exportFrames, selectedFormat)
+              : FileManager.saveStructure(exportFrames[0], selectedFormat);
           await vscode.workspace.fs.writeFile(uri, new TextEncoder().encode(content));
         } catch (error) {
           vscode.window.showErrorMessage(
@@ -669,12 +766,18 @@ export class StructureEditorProvider implements vscode.CustomEditorProvider {
         try {
           const fileContent = await vscode.workspace.fs.readFile(vscode.Uri.file(key));
           const content = new TextDecoder().decode(fileContent);
-          const updated = FileManager.loadStructure(key, content);
-          this.structures.set(key, updated);
+          const updatedFrames = FileManager.loadStructures(key, content);
+          if (!updatedFrames || updatedFrames.length === 0) {
+            break;
+          }
+          const initialFrameIndex = this.getDefaultTrajectoryFrameIndex(updatedFrames);
+          this.setTrajectoryState(key, updatedFrames, initialFrameIndex);
           this.undoStacks.set(key, []);
-          renderer.setStructure(updated);
-          renderer.setShowUnitCell(!!updated.unitCell);
+          renderer.setStructure(updatedFrames[initialFrameIndex]);
+          renderer.setTrajectoryFrameInfo(initialFrameIndex, updatedFrames.length);
+          renderer.setShowUnitCell(!!updatedFrames[initialFrameIndex].unitCell);
           renderer.deselectAtom();
+          renderer.deselectBond();
           this.renderStructure(key, webviewPanel);
         } catch (error) {
           vscode.window.showErrorMessage(
@@ -683,6 +786,67 @@ export class StructureEditorProvider implements vscode.CustomEditorProvider {
         }
         break;
       }
+    }
+  }
+
+  private setTrajectoryState(key: string, frames: Structure[], activeIndex: number) {
+    const normalizedFrames = frames.length > 0 ? frames : [new Structure('')];
+    const index = Math.max(0, Math.min(normalizedFrames.length - 1, Math.floor(activeIndex || 0)));
+    this.trajectories.set(key, normalizedFrames);
+    this.trajectoryFrameIndices.set(key, index);
+    this.structures.set(key, normalizedFrames[index]);
+  }
+
+  private getDefaultTrajectoryFrameIndex(frames: Structure[]): number {
+    if (!frames || frames.length === 0) {
+      return 0;
+    }
+    return Math.max(0, frames.length - 1);
+  }
+
+  private async pickXyzExportFrames(
+    key: string,
+    trajectoryFrames: Structure[],
+    currentStructure: Structure
+  ): Promise<Structure[] | null> {
+    if (trajectoryFrames.length <= 1) {
+      return [currentStructure];
+    }
+    const currentIndex = this.trajectoryFrameIndices.get(key) ?? 0;
+    const selected = await vscode.window.showQuickPick(
+      [
+        {
+          id: 'current',
+          label: `Current Frame (${currentIndex + 1}/${trajectoryFrames.length})`,
+        },
+        {
+          id: 'all',
+          label: `Whole Trajectory (${trajectoryFrames.length} frames)`,
+        },
+      ],
+      {
+        placeHolder: 'Select XYZ export scope',
+        ignoreFocusOut: true,
+      }
+    );
+    if (!selected) {
+      return null;
+    }
+    if (selected.id === 'all') {
+      return trajectoryFrames;
+    }
+    return [currentStructure];
+  }
+
+  private updateCurrentFrame(key: string, structure: Structure) {
+    this.structures.set(key, structure);
+    const frames = this.trajectories.get(key);
+    if (!frames || frames.length === 0) {
+      return;
+    }
+    const index = this.trajectoryFrameIndices.get(key) ?? 0;
+    if (index >= 0 && index < frames.length) {
+      frames[index] = structure;
     }
   }
 
@@ -707,7 +871,7 @@ export class StructureEditorProvider implements vscode.CustomEditorProvider {
     if (!previous) {
       return;
     }
-    this.structures.set(key, previous);
+    this.updateCurrentFrame(key, previous);
     renderer.setStructure(previous);
     renderer.setShowUnitCell(!!previous.unitCell);
     renderer.deselectAtom();
@@ -721,6 +885,10 @@ export class StructureEditorProvider implements vscode.CustomEditorProvider {
   ) {
     const renderer = this.renderers.get(key);
     if (renderer) {
+      const frames = this.trajectories.get(key);
+      const frameCount = frames && frames.length > 0 ? frames.length : 1;
+      const frameIndex = this.trajectoryFrameIndices.get(key) ?? 0;
+      renderer.setTrajectoryFrameInfo(frameIndex, frameCount);
       const message = renderer.getRenderMessage();
       webviewPanel.webview.postMessage(message);
     }
@@ -734,8 +902,18 @@ export class StructureEditorProvider implements vscode.CustomEditorProvider {
 
     try {
       const format = FileManager.resolveFormat(key, 'xyz');
-      FileManager.ensureStructureName(structure, key);
-      const content = FileManager.saveStructure(structure, format);
+      const frames = this.trajectories.get(key) || [structure];
+      if (format === 'xyz' && frames.length > 1) {
+        for (const frame of frames) {
+          FileManager.ensureStructureName(frame, key);
+        }
+      } else {
+        FileManager.ensureStructureName(structure, key);
+      }
+      const content =
+        format === 'xyz' && frames.length > 1
+          ? FileManager.saveStructures(frames, format)
+          : FileManager.saveStructure(structure, format);
       const uri = vscode.Uri.file(key);
       await vscode.workspace.fs.writeFile(
         uri,
@@ -802,25 +980,41 @@ export class StructureEditorProvider implements vscode.CustomEditorProvider {
     return this.saveStructure(document.uri.fsPath);
   }
 
-  saveCustomDocumentAs(
+  async saveCustomDocumentAs(
     document: any,
     destination: vscode.Uri,
     _cancellationToken: vscode.CancellationToken
-  ): Thenable<void> {
+  ): Promise<void> {
     const structure = this.structures.get(document.uri.fsPath);
     if (!structure) {
-      return Promise.resolve();
+      return;
     }
     const format = FileManager.resolveFormat(destination.fsPath, 'xyz');
     try {
-      FileManager.ensureStructureName(structure, destination.fsPath);
-      const content = FileManager.saveStructure(structure, format);
-      return vscode.workspace.fs.writeFile(destination, new TextEncoder().encode(content));
+      const frames = this.trajectories.get(document.uri.fsPath) || [structure];
+      let exportFrames: Structure[] = [structure];
+      if (format === 'xyz' && frames.length > 1) {
+        const chosen = await this.pickXyzExportFrames(document.uri.fsPath, frames, structure);
+        if (!chosen) {
+          return;
+        }
+        exportFrames = chosen;
+      }
+      if (format === 'xyz' && exportFrames.length > 1) {
+        for (const frame of exportFrames) {
+          FileManager.ensureStructureName(frame, destination.fsPath);
+        }
+      }
+      FileManager.ensureStructureName(exportFrames[0], destination.fsPath);
+      const content =
+        format === 'xyz' && exportFrames.length > 1
+          ? FileManager.saveStructures(exportFrames, format)
+          : FileManager.saveStructure(exportFrames[0], format);
+      await vscode.workspace.fs.writeFile(destination, new TextEncoder().encode(content));
     } catch (error) {
       vscode.window.showErrorMessage(
         `Failed to export structure: ${error instanceof Error ? error.message : String(error)}`
       );
-      return Promise.resolve();
     }
   }
 

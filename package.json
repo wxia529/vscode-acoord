@@ -81,6 +81,21 @@
             "filenamePattern": "*.inp"
           },
           {
+            "filenamePattern": "*.in"
+          },
+          {
+            "filenamePattern": "*.pwi"
+          },
+          {
+            "filenamePattern": "*.out"
+          },
+          {
+            "filenamePattern": "*.pwo"
+          },
+          {
+            "filenamePattern": "*.log"
+          },
+          {
             "filenamePattern": "*.stru"
           }
         ]
@@ -90,7 +105,7 @@
       "editor/title": [
         {
           "command": "acoord.openStructureEditor",
-          "when": "resourceExtname =~ /\\.(cif|xyz|poscar|vasp|pdb|gjf|com|inp|stru)$/i || resourceFilename =~ /^(POSCAR|CONTCAR|STRU)$/i",
+          "when": "resourceExtname =~ /\\.(cif|xyz|poscar|vasp|pdb|gjf|com|inp|in|pwi|out|pwo|log|stru)$/i || resourceFilename =~ /^(POSCAR|CONTCAR|STRU)$/i",
           "group": "navigation"
         }
       ]

@@ -138,11 +138,32 @@ export function activate(context: vscode.ExtensionContext) {
         const content = new TextDecoder().decode(fileContent);
 
         try {
-          const structure = FileManager.loadStructure(
+          const structures = FileManager.loadStructures(
             fileUri.fsPath,
             content
           );
-          const exportContent = FileManager.saveStructure(structure, selectedFormat);
+          const primaryStructure = structures[structures.length - 1];
+          let exportStructures: Structure[] = [primaryStructure];
+          if (selectedFormat === 'xyz' && structures.length > 1) {
+            const scope = await vscode.window.showQuickPick(
+              [
+                { id: 'current', label: 'Current Frame (last frame)' },
+                { id: 'all', label: `Whole Trajectory (${structures.length} frames)` },
+              ],
+              {
+                placeHolder: 'Select XYZ export scope',
+                ignoreFocusOut: true,
+              }
+            );
+            if (!scope) {
+              return;
+            }
+            exportStructures = scope.id === 'all' ? structures : [primaryStructure];
+          }
+          const exportContent =
+            selectedFormat === 'xyz' && exportStructures.length > 1
+              ? FileManager.saveStructures(exportStructures, selectedFormat)
+              : FileManager.saveStructure(exportStructures[0], selectedFormat);
 
           const originalName =
             fileUri.fsPath.split(/[\\/]/).pop()?.split('.')[0] || 'structure';
@@ -163,7 +184,7 @@ export function activate(context: vscode.ExtensionContext) {
           };
           if (!isPoscarFormat) {
             saveOptions.filters = {
-              'Structure Files': ['cif', 'xyz', 'poscar', 'vasp', 'pdb'],
+              'Structure Files': ['cif', 'xyz', 'poscar', 'vasp', 'pdb', 'gjf', 'inp', 'in', 'pwi', 'stru'],
             };
           }
 

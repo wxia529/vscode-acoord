@@ -237,6 +237,110 @@
     return { scale, sizeScale };
   }
 
+  function disposeMaterial(material) {
+    if (!material) {
+      return;
+    }
+    if (Array.isArray(material)) {
+      for (const item of material) {
+        if (item && item.dispose) {
+          item.dispose();
+        }
+      }
+      return;
+    }
+    if (material.dispose) {
+      material.dispose();
+    }
+  }
+
+  function disposeObject3D(object) {
+    if (!object) {
+      return;
+    }
+    object.traverse((node) => {
+      if (node.geometry && node.geometry.dispose) {
+        node.geometry.dispose();
+      }
+      disposeMaterial(node.material);
+    });
+  }
+
+  function createUnitCellEdgeMesh(start, end, radius, color) {
+    const direction = end.clone().sub(start);
+    const length = direction.length();
+    if (length <= 1e-6) {
+      return null;
+    }
+    const geometry = new THREE.CylinderGeometry(radius, radius, length, 12);
+    const material = new THREE.MeshBasicMaterial({ color });
+    const mesh = new THREE.Mesh(geometry, material);
+    mesh.position.copy(start).add(end).multiplyScalar(0.5);
+    const up = new THREE.Vector3(0, 1, 0);
+    mesh.quaternion.setFromUnitVectors(up, direction.clone().normalize());
+    return mesh;
+  }
+
+  function buildUnitCellGroup(edges, scale) {
+    if (!Array.isArray(edges) || edges.length === 0) {
+      return null;
+    }
+
+    const color = state.unitCellColor || '#FF6600';
+    const thickness = Number.isFinite(state.unitCellThickness)
+      ? Math.max(0.5, Math.min(6, state.unitCellThickness))
+      : 1;
+    const style = state.unitCellLineStyle === 'dashed' ? 'dashed' : 'solid';
+    const radius = Math.max(0.01, thickness * 0.03);
+    const dashLength = 0.45;
+    const gapLength = 0.28;
+    const group = new THREE.Group();
+
+    for (const edge of edges) {
+      const start = new THREE.Vector3(
+        edge.start[0] * scale,
+        edge.start[1] * scale,
+        edge.start[2] * scale
+      );
+      const end = new THREE.Vector3(
+        edge.end[0] * scale,
+        edge.end[1] * scale,
+        edge.end[2] * scale
+      );
+      const direction = end.clone().sub(start);
+      const edgeLength = direction.length();
+      if (edgeLength <= 1e-6) {
+        continue;
+      }
+
+      if (style === 'solid') {
+        const solidMesh = createUnitCellEdgeMesh(start, end, radius, color);
+        if (solidMesh) {
+          group.add(solidMesh);
+        }
+        continue;
+      }
+
+      const edgeDirection = direction.clone().normalize();
+      let cursor = 0;
+      while (cursor < edgeLength) {
+        const segmentStartDistance = cursor;
+        const segmentEndDistance = Math.min(edgeLength, cursor + dashLength);
+        if (segmentEndDistance > segmentStartDistance + 1e-4) {
+          const segmentStart = start.clone().addScaledVector(edgeDirection, segmentStartDistance);
+          const segmentEnd = start.clone().addScaledVector(edgeDirection, segmentEndDistance);
+          const dashMesh = createUnitCellEdgeMesh(segmentStart, segmentEnd, radius, color);
+          if (dashMesh) {
+            group.add(dashMesh);
+          }
+        }
+        cursor += dashLength + gapLength;
+      }
+    }
+
+    return group.children.length > 0 ? group : null;
+  }
+
   function renderStructure(data, uiHooks, options) {
     state.currentStructure = data;
     let scale = state.manualScale;
@@ -251,22 +355,26 @@
 
     for (const mesh of rendererState.atomMeshes.values()) {
       rendererState.scene.remove(mesh);
+      disposeObject3D(mesh);
     }
     rendererState.atomMeshes.clear();
 
     for (const mesh of rendererState.extraMeshes) {
       rendererState.scene.remove(mesh);
+      disposeObject3D(mesh);
     }
     rendererState.extraMeshes = [];
 
     for (const line of rendererState.bondLines) {
       rendererState.scene.remove(line);
+      disposeObject3D(line);
     }
     rendererState.bondLines = [];
     rendererState.bondMeshes = [];
 
     if (rendererState.unitCellGroup) {
       rendererState.scene.remove(rendererState.unitCellGroup);
+      disposeObject3D(rendererState.unitCellGroup);
       rendererState.unitCellGroup = null;
     }
 
@@ -305,9 +413,8 @@
     }
 
     if (renderBonds) {
-      const selectedBondKey = data.selectedBondKey || null;
       for (const bond of renderBonds) {
-        const isSelectedBond = selectedBondKey && bond.key && selectedBondKey === bond.key;
+        const isSelectedBond = !!bond.selected;
         const highlightBond =
           isSelectedBond ||
           bond.atomId1 &&
@@ -390,24 +497,11 @@
     }
 
     if (data.unitCell && data.unitCell.edges && data.unitCell.edges.length > 0) {
-      const vertices = [];
-      for (const edge of data.unitCell.edges) {
-        vertices.push(
-          edge.start[0] * scale,
-          edge.start[1] * scale,
-          edge.start[2] * scale,
-          edge.end[0] * scale,
-          edge.end[1] * scale,
-          edge.end[2] * scale
-        );
+      const unitCellGroup = buildUnitCellGroup(data.unitCell.edges, scale);
+      if (unitCellGroup) {
+        rendererState.scene.add(unitCellGroup);
+        rendererState.unitCellGroup = unitCellGroup;
       }
-      const geometry = new THREE.BufferGeometry();
-      geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
-      const color = state.unitCellColor || '#FF6600';
-      const material = new THREE.LineBasicMaterial({ color: new THREE.Color(color) });
-      const lines = new THREE.LineSegments(geometry, material);
-      rendererState.scene.add(lines);
-      rendererState.unitCellGroup = lines;
     }
 
     if (uiHooks) {
@@ -543,7 +637,18 @@
     
     // Update unit cell color
     if (rendererState.unitCellGroup && state.unitCellColor) {
-      rendererState.unitCellGroup.material.color = new THREE.Color(state.unitCellColor);
+      const nextColor = new THREE.Color(state.unitCellColor);
+      rendererState.unitCellGroup.traverse((node) => {
+        if (!node.material) {
+          return;
+        }
+        const materials = Array.isArray(node.material) ? node.material : [node.material];
+        for (const material of materials) {
+          if (material && material.color) {
+            material.color.set(nextColor);
+          }
+        }
+      });
     }
   }
 

@@ -14,6 +14,7 @@ export class CIFParser implements StructureParser {
     const lines = content.split(/\r?\n/);
     this.parseUnitCell(lines, structure);
     this.parseAtomLoops(lines, structure);
+    this.applySymmetryOperations(lines, structure);
 
     return structure;
   }
@@ -119,6 +120,105 @@ export class CIFParser implements StructureParser {
       }
       this.addAtomsFromLoop(headers, rows.rows, structure);
     }
+  }
+
+  private applySymmetryOperations(lines: string[], structure: Structure): void {
+    if (!structure.unitCell || structure.atoms.length === 0) {
+      return;
+    }
+    const operations = this.parseSymmetryOperations(lines);
+    if (operations.length <= 1) {
+      return;
+    }
+
+    const sourceAtoms = structure.atoms.slice();
+    const expandedAtoms: Atom[] = [];
+    const seen = new Set<string>();
+    for (const atom of sourceAtoms) {
+      const [fx, fy, fz] = structure.unitCell.cartesianToFractional(atom.x, atom.y, atom.z);
+      for (const operation of operations) {
+        const transformed = this.applySymmetryOperation(operation, fx, fy, fz);
+        if (!transformed) {
+          continue;
+        }
+        const nx = this.normalizeFractional(transformed[0]);
+        const ny = this.normalizeFractional(transformed[1]);
+        const nz = this.normalizeFractional(transformed[2]);
+        const key = this.makeSymmetryDedupKey(atom.element, nx, ny, nz);
+        if (seen.has(key)) {
+          continue;
+        }
+        seen.add(key);
+        const [x, y, z] = structure.unitCell.fractionalToCartesian(nx, ny, nz);
+        expandedAtoms.push(new Atom(atom.element, x, y, z, undefined, atom.color));
+      }
+    }
+
+    if (expandedAtoms.length > 0) {
+      structure.atoms = expandedAtoms;
+    }
+  }
+
+  private parseSymmetryOperations(lines: string[]): string[] {
+    const operations: string[] = [];
+    const seen = new Set<string>();
+    const addOperation = (raw: string) => {
+      const cleaned = raw.trim().replace(/^['"]|['"]$/g, '').replace(/\s+/g, '');
+      if (!cleaned || cleaned === '.' || cleaned === '?') {
+        return;
+      }
+      if (seen.has(cleaned)) {
+        return;
+      }
+      seen.add(cleaned);
+      operations.push(cleaned);
+    };
+
+    const operationHeaders = new Set([
+      '_symmetry_equiv_pos_as_xyz',
+      '_space_group_symop_operation_xyz',
+      '_space_group_symop.operation_xyz',
+    ]);
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].trim().toLowerCase();
+      if (line !== 'loop_') {
+        continue;
+      }
+
+      const headers: string[] = [];
+      let j = i + 1;
+      while (j < lines.length) {
+        const header = lines[j].trim();
+        if (!header.startsWith('_')) {
+          break;
+        }
+        headers.push(header.toLowerCase().split(/\s+/, 1)[0]);
+        j++;
+      }
+
+      if (headers.length === 0) {
+        i = j;
+        continue;
+      }
+
+      const rows = this.parseLoopRows(lines, j, headers.length);
+      i = rows.nextIndex - 1;
+      const opIdx = headers.findIndex((header) => operationHeaders.has(header));
+      if (opIdx < 0) {
+        continue;
+      }
+      for (const row of rows.rows) {
+        const op = this.getRowValue(row, opIdx);
+        addOperation(op);
+      }
+    }
+
+    if (operations.length === 0) {
+      operations.push('x,y,z');
+    }
+
+    return operations;
   }
 
   private parseLoopRows(lines: string[], startIndex: number, nColumns: number): {
@@ -303,6 +403,113 @@ export class CIFParser implements StructureParser {
       return Number.parseFloat(numberPart);
     }
     return Number.parseFloat(cleaned);
+  }
+
+  private applySymmetryOperation(
+    operation: string,
+    x: number,
+    y: number,
+    z: number
+  ): [number, number, number] | null {
+    const parts = operation.split(',');
+    if (parts.length !== 3) {
+      return null;
+    }
+    const nx = this.evaluateSymmetryExpression(parts[0], x, y, z);
+    const ny = this.evaluateSymmetryExpression(parts[1], x, y, z);
+    const nz = this.evaluateSymmetryExpression(parts[2], x, y, z);
+    if (!Number.isFinite(nx) || !Number.isFinite(ny) || !Number.isFinite(nz)) {
+      return null;
+    }
+    return [nx, ny, nz];
+  }
+
+  private evaluateSymmetryExpression(expr: string, x: number, y: number, z: number): number {
+    const normalized = expr.trim().toLowerCase().replace(/\s+/g, '');
+    if (!normalized) {
+      return Number.NaN;
+    }
+
+    const terms = normalized.match(/[+-]?[^+-]+/g);
+    if (!terms || terms.length === 0) {
+      return Number.NaN;
+    }
+
+    let result = 0;
+    for (const rawTerm of terms) {
+      if (!rawTerm) {
+        continue;
+      }
+      const sign = rawTerm.startsWith('-') ? -1 : 1;
+      const term = rawTerm.startsWith('+') || rawTerm.startsWith('-')
+        ? rawTerm.slice(1)
+        : rawTerm;
+      if (!term) {
+        continue;
+      }
+
+      const variable = term.endsWith('x')
+        ? 'x'
+        : term.endsWith('y')
+          ? 'y'
+          : term.endsWith('z')
+            ? 'z'
+            : null;
+
+      if (variable) {
+        const coeffRaw = term.slice(0, -1);
+        const coeff = coeffRaw ? this.parseFraction(coeffRaw) : 1;
+        if (!Number.isFinite(coeff)) {
+          return Number.NaN;
+        }
+        const varValue = variable === 'x' ? x : variable === 'y' ? y : z;
+        result += sign * coeff * varValue;
+      } else {
+        const constant = this.parseFraction(term);
+        if (!Number.isFinite(constant)) {
+          return Number.NaN;
+        }
+        result += sign * constant;
+      }
+    }
+
+    return result;
+  }
+
+  private parseFraction(raw: string): number {
+    const value = raw.trim();
+    if (!value) {
+      return Number.NaN;
+    }
+    const parts = value.split('/');
+    if (parts.length === 2) {
+      const numerator = Number.parseFloat(parts[0]);
+      const denominator = Number.parseFloat(parts[1]);
+      if (!Number.isFinite(numerator) || !Number.isFinite(denominator) || Math.abs(denominator) < 1e-12) {
+        return Number.NaN;
+      }
+      return numerator / denominator;
+    }
+    if (parts.length > 2) {
+      return Number.NaN;
+    }
+    return Number.parseFloat(value);
+  }
+
+  private normalizeFractional(value: number): number {
+    if (!Number.isFinite(value)) {
+      return value;
+    }
+    let wrapped = value - Math.floor(value);
+    if (Math.abs(wrapped) < 1e-10 || Math.abs(wrapped - 1) < 1e-10) {
+      wrapped = 0;
+    }
+    return wrapped;
+  }
+
+  private makeSymmetryDedupKey(element: string, x: number, y: number, z: number): string {
+    const round = (value: number) => Math.round(value * 1e6) / 1e6;
+    return `${element}|${round(x)}|${round(y)}|${round(z)}`;
   }
 
   private parseElementFromLabel(label: string): string | undefined {

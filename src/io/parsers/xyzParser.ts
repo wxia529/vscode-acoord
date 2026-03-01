@@ -14,55 +14,100 @@ import { StructureParser } from './structureParser';
  */
 export class XYZParser implements StructureParser {
   parse(content: string): Structure {
-    const lines = content.trim().split('\n');
-    if (lines.length < 3) {
-      throw new Error('Invalid XYZ format: insufficient lines');
+    const frames = this.parseTrajectory(content);
+    if (frames.length === 0) {
+      throw new Error('Invalid XYZ format: no frame found');
     }
+    return frames[0];
+  }
 
-    const atomCount = parseInt(lines[0].trim());
-    if (isNaN(atomCount)) {
-      throw new Error('Invalid XYZ format: first line must be atom count');
-    }
+  parseTrajectory(content: string): Structure[] {
+    const lines = content.split(/\r?\n/);
+    const frames: Structure[] = [];
+    let i = 0;
 
-    const comment = lines[1] || '';
-    const structure = new Structure(comment || '');
-
-    const latticeVectors = this.parseLatticeFromComment(comment);
-    if (latticeVectors) {
-      structure.isCrystal = true;
-      structure.unitCell = this.unitCellFromLattice(latticeVectors);
-    }
-
-    const properties = this.parsePropertiesFromComment(comment);
-    const speciesIndex = properties?.speciesIndex ?? 0;
-    const positionIndex = properties?.positionIndex ?? 1;
-
-    for (let i = 2; i < 2 + atomCount && i < lines.length; i++) {
-      const parts = lines[i].trim().split(/\s+/);
-      if (parts.length < 4) {
-        continue;
+    while (i < lines.length) {
+      while (i < lines.length && !lines[i].trim()) {
+        i++;
+      }
+      if (i >= lines.length) {
+        break;
       }
 
-      const elementToken = parts[speciesIndex];
-      const element = parseElement(elementToken);
-      if (!element) {
-        console.warn(`Unknown element: ${elementToken}`);
-        continue;
+      const atomCount = parseInt(lines[i].trim(), 10);
+      if (!Number.isFinite(atomCount) || atomCount < 0) {
+        if (frames.length === 0) {
+          throw new Error('Invalid XYZ format: first line must be atom count');
+        }
+        break;
+      }
+      if (i + 1 >= lines.length) {
+        break;
       }
 
-      const x = parseFloat(parts[positionIndex]);
-      const y = parseFloat(parts[positionIndex + 1]);
-      const z = parseFloat(parts[positionIndex + 2]);
+      const comment = lines[i + 1] || '';
+      const structure = new Structure(comment || '');
+      const latticeVectors = this.parseLatticeFromComment(comment);
+      if (latticeVectors) {
+        structure.isCrystal = true;
+        structure.unitCell = this.unitCellFromLattice(latticeVectors);
+      }
 
-      if (!isNaN(x) && !isNaN(y) && !isNaN(z)) {
+      const properties = this.parsePropertiesFromComment(comment);
+      const speciesIndex = properties?.speciesIndex ?? 0;
+      const positionIndex = properties?.positionIndex ?? 1;
+
+      const start = i + 2;
+      const end = Math.min(lines.length, start + atomCount);
+      for (let lineIndex = start; lineIndex < end; lineIndex++) {
+        const parts = lines[lineIndex].trim().split(/\s+/);
+        if (parts.length < 4) {
+          continue;
+        }
+
+        const elementToken = parts[speciesIndex];
+        const element = parseElement(elementToken);
+        if (!element) {
+          continue;
+        }
+
+        const x = parseFloat(parts[positionIndex]);
+        const y = parseFloat(parts[positionIndex + 1]);
+        const z = parseFloat(parts[positionIndex + 2]);
+        if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(z)) {
+          continue;
+        }
         structure.addAtom(new Atom(element, x, y, z));
       }
+
+      frames.push(structure);
+      i = start + atomCount;
     }
 
-    return structure;
+    if (frames.length === 0) {
+      throw new Error('Invalid XYZ format: no frame found');
+    }
+
+    return frames;
   }
 
   serialize(structure: Structure): string {
+    return this.serializeTrajectory([structure]);
+  }
+
+  serializeTrajectory(structures: Structure[]): string {
+    if (!structures || structures.length === 0) {
+      return '';
+    }
+
+    const chunks: string[] = [];
+    for (const structure of structures) {
+      chunks.push(this.serializeSingleFrame(structure));
+    }
+    return chunks.join('\n');
+  }
+
+  private serializeSingleFrame(structure: Structure): string {
     const lines: string[] = [];
     lines.push(structure.atoms.length.toString());
     let comment = structure.name || 'Structure';

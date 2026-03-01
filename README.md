@@ -5,9 +5,11 @@ Atomic Coordinate Toolkit for visualizing and editing atomic structures inside V
 ## Features
 
 - 3D viewer (Three.js) with selection, measurement, and basic editing.
+- Trajectory support (frame navigation + playback speed control) for XYZ and QE output logs.
 - Projection toggle (orthographic/perspective).
 - Lattice editor (a/b/c + alpha/beta/gamma) with optional atom scaling.
 - Supercell display with periodic bonds.
+- Unit-cell display tuning (color, thickness, solid/dashed line style).
 - Center atoms to unit cell (with confirmation).
 - Manual and auto scaling for atom size and scene scale.
 - Format conversion through Save As.
@@ -23,11 +25,15 @@ Input and output:
 - PDB (basic CRYST1 + ATOM/HETATM)
 - Gaussian input (.gjf)
 - ORCA input (.inp)
+- Quantum ESPRESSO input (.in / .pwi)
+- Quantum ESPRESSO output log (.out / .pwo / .log)
 - ABACUS STRU (.stru)
 
 ### Notes
 
 - extxyz: comment line may include `Lattice="..."` and `Properties=species:S:1:pos:R:3`.
+- XYZ trajectory files (multi-frame XYZ/extxyz) can be opened and exported.
+- QE output logs with multiple `ATOMIC_POSITIONS` blocks are loaded as trajectories.
 - POSCAR: fixed atoms are written as `F F F` in Selective dynamics.
 - STRU: fixed atoms are written as `0 0 0` and free atoms `1 1 1`.
 - ORCA export uses the default header:

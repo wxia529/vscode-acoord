@@ -6,6 +6,8 @@
   let renderStatus = 'Ready.';
   let statusSelectionLock = false;
   let lastStatusSelectedId = null;
+  let trajectoryPlaybackTimer = null;
+  let trajectoryFrameRequestPending = false;
 
   function setError(message) {
     const banner = document.getElementById('error-banner');
@@ -159,6 +161,117 @@
     superZ.disabled = !hasUnitCell;
   }
 
+  function updateTrajectoryUI(frameIndex, frameCount) {
+    const total = Number.isFinite(frameCount) ? Math.max(1, Math.floor(frameCount)) : 1;
+    const current = Number.isFinite(frameIndex)
+      ? Math.max(0, Math.min(total - 1, Math.floor(frameIndex)))
+      : 0;
+    state.trajectoryFrameIndex = current;
+    state.trajectoryFrameCount = total;
+
+    const statusFrame = document.getElementById('status-traj-frame');
+    const firstBtn = document.getElementById('btn-first-frame');
+    const prevBtn = document.getElementById('btn-prev-frame');
+    const nextBtn = document.getElementById('btn-next-frame');
+    const lastBtn = document.getElementById('btn-last-frame');
+    const frameInput = document.getElementById('traj-frame-input');
+    if (statusFrame) {
+      statusFrame.textContent = `Frame ${current + 1}/${total}`;
+    }
+    if (firstBtn) {
+      firstBtn.disabled = total <= 1 || current <= 0;
+    }
+    if (prevBtn) {
+      prevBtn.disabled = total <= 1 || current <= 0;
+    }
+    if (nextBtn) {
+      nextBtn.disabled = total <= 1 || current >= total - 1;
+    }
+    if (lastBtn) {
+      lastBtn.disabled = total <= 1 || current >= total - 1;
+    }
+    if (frameInput) {
+      frameInput.min = '1';
+      frameInput.max = String(total);
+      frameInput.disabled = total <= 1;
+      if (document.activeElement !== frameInput) {
+        frameInput.value = String(current + 1);
+      }
+    }
+
+    const playBtn = document.getElementById('btn-play-trajectory');
+    const speedSlider = document.getElementById('traj-speed-slider');
+    const speedValue = document.getElementById('traj-speed-value');
+    if (total <= 1 && state.trajectoryPlaying) {
+      setTrajectoryPlaying(false);
+    }
+    if (playBtn) {
+      playBtn.textContent = state.trajectoryPlaying ? 'Pause' : 'Play';
+      playBtn.disabled = total <= 1;
+    }
+    if (speedSlider) {
+      speedSlider.value = String(state.trajectoryPlaybackFps || 8);
+      speedSlider.disabled = total <= 1;
+    }
+    if (speedValue) {
+      speedValue.textContent = `${state.trajectoryPlaybackFps || 8} fps`;
+    }
+  }
+
+  function requestTrajectoryFrame(frameIndex, force) {
+    if (!force && trajectoryFrameRequestPending) {
+      return;
+    }
+    trajectoryFrameRequestPending = true;
+    vscode.postMessage({ command: 'setTrajectoryFrame', frameIndex });
+  }
+
+  function jumpToTrajectoryFrame(frameIndex) {
+    const total = Math.max(1, Math.floor(state.trajectoryFrameCount || 1));
+    const nextIndex = Math.max(0, Math.min(total - 1, Math.floor(frameIndex)));
+    if (nextIndex === state.trajectoryFrameIndex) {
+      updateTrajectoryUI(state.trajectoryFrameIndex, state.trajectoryFrameCount);
+      return;
+    }
+    requestTrajectoryFrame(nextIndex, true);
+  }
+
+  function stepTrajectoryFrame() {
+    if (state.trajectoryFrameCount <= 1) {
+      return;
+    }
+    const nextIndex =
+      state.trajectoryFrameIndex + 1 >= state.trajectoryFrameCount
+        ? 0
+        : state.trajectoryFrameIndex + 1;
+    requestTrajectoryFrame(nextIndex);
+  }
+
+  function restartTrajectoryPlaybackTimer() {
+    if (trajectoryPlaybackTimer) {
+      clearInterval(trajectoryPlaybackTimer);
+      trajectoryPlaybackTimer = null;
+    }
+    if (!state.trajectoryPlaying || state.trajectoryFrameCount <= 1) {
+      return;
+    }
+    const fps = Math.max(1, Math.floor(state.trajectoryPlaybackFps || 8));
+    const intervalMs = Math.max(16, Math.round(1000 / fps));
+    trajectoryPlaybackTimer = setInterval(() => {
+      if (state.trajectoryFrameCount <= 1) {
+        setTrajectoryPlaying(false);
+        return;
+      }
+      stepTrajectoryFrame();
+    }, intervalMs);
+  }
+
+  function setTrajectoryPlaying(playing) {
+    state.trajectoryPlaying = !!playing && state.trajectoryFrameCount > 1;
+    restartTrajectoryPlaybackTimer();
+    updateTrajectoryUI(state.trajectoryFrameIndex, state.trajectoryFrameCount);
+  }
+
   function updateAtomList(atoms, selectedIds, selectedId) {
     const derivedSelectedIds = atoms.filter((atom) => atom.selected).map((atom) => atom.id);
     const fallbackIds = state.selectedAtomIds || [];
@@ -228,7 +341,7 @@
     }
     const selectedId = next.length > 0 ? next[next.length - 1] : null;
     updateAtomList(atoms, next, selectedId);
-    setSelectedBond(null, false);
+    setSelectedBondSelection([], false);
     if (!(preserve && alreadySelected)) {
       vscode.postMessage({ command: 'selectAtom', atomId, add: !!add });
     }
@@ -271,8 +384,34 @@
     }
     const selectedId = next.length > 0 ? next[next.length - 1] : null;
     updateAtomList(atoms, next, selectedId);
-    setSelectedBond(null, false);
+    setSelectedBondSelection([], false);
     vscode.postMessage({ command: 'setSelection', atomIds: next });
+  }
+
+  function applyBondSelectionFromKeys(bondKeys, mode) {
+    const incoming = Array.isArray(bondKeys) ? bondKeys : [];
+    const current = getSelectedBondKeys();
+    const nextSet = new Set();
+    if (mode === 'add') {
+      for (const key of current) {
+        nextSet.add(key);
+      }
+      for (const key of incoming) {
+        nextSet.add(key);
+      }
+    } else if (mode === 'subtract') {
+      for (const key of current) {
+        nextSet.add(key);
+      }
+      for (const key of incoming) {
+        nextSet.delete(key);
+      }
+    } else {
+      for (const key of incoming) {
+        nextSet.add(key);
+      }
+    }
+    setSelectedBondSelection(Array.from(nextSet), true);
   }
 
   function getAtomById(atomId) {
@@ -309,31 +448,67 @@
     return [parts[0], parts[1]];
   }
 
+  function getSelectedBondKeys() {
+    const keys = Array.isArray(state.selectedBondKeys) ? state.selectedBondKeys : [];
+    return keys.filter((key) => typeof key === 'string' && key.trim().length > 0);
+  }
+
   function updateBondSelectionUI() {
     const label = document.getElementById('bond-selected');
     const deleteBtn = document.getElementById('btn-delete-bond');
     if (!label || !deleteBtn) {
       return;
     }
-    const pair = parseBondPairFromKey(state.currentSelectedBondKey);
-    if (!pair) {
+    const selectedBondKeys = getSelectedBondKeys();
+    if (selectedBondKeys.length === 0) {
       label.textContent = '--';
+    } else if (selectedBondKeys.length === 1) {
+      const pair = parseBondPairFromKey(selectedBondKeys[0]);
+      if (!pair) {
+        label.textContent = selectedBondKeys[0];
+      } else {
+        const atom1 = getAtomById(pair[0]);
+        const atom2 = getAtomById(pair[1]);
+        const left = atom1 ? `${atom1.element}(${pair[0].slice(-4)})` : pair[0];
+        const right = atom2 ? `${atom2.element}(${pair[1].slice(-4)})` : pair[1];
+        label.textContent = `${left} - ${right}`;
+      }
     } else {
-      const atom1 = getAtomById(pair[0]);
-      const atom2 = getAtomById(pair[1]);
-      const left = atom1 ? `${atom1.element}(${pair[0].slice(-4)})` : pair[0];
-      const right = atom2 ? `${atom2.element}(${pair[1].slice(-4)})` : pair[1];
-      label.textContent = `${left} - ${right}`;
+      label.textContent = `${selectedBondKeys.length} bonds selected`;
     }
-    deleteBtn.disabled = !(state.currentSelectedBondKey || (state.selectedAtomIds && state.selectedAtomIds.length >= 2));
+    deleteBtn.disabled = !(
+      selectedBondKeys.length > 0 ||
+      (state.selectedAtomIds && state.selectedAtomIds.length >= 2)
+    );
   }
 
-  function setSelectedBond(bondKey, syncBackend) {
-    state.currentSelectedBondKey = bondKey || null;
+  function setSelectedBondSelection(bondKeys, syncBackend) {
+    const normalized = Array.from(
+      new Set((Array.isArray(bondKeys) ? bondKeys : [])
+        .filter((key) => typeof key === 'string' && key.trim().length > 0))
+    );
+    state.selectedBondKeys = normalized;
+    state.currentSelectedBondKey = normalized.length > 0 ? normalized[normalized.length - 1] : null;
     updateBondSelectionUI();
     if (syncBackend) {
-      vscode.postMessage({ command: 'selectBond', bondKey: state.currentSelectedBondKey });
+      vscode.postMessage({ command: 'setBondSelection', bondKeys: normalized });
     }
+  }
+
+  function handleBondSelect(bondKey, add, syncBackend) {
+    if (!bondKey) {
+      setSelectedBondSelection([], syncBackend);
+      return;
+    }
+    const current = getSelectedBondKeys();
+    if (add) {
+      const next = current.includes(bondKey)
+        ? current.filter((key) => key !== bondKey)
+        : [...current, bondKey];
+      setSelectedBondSelection(next, syncBackend);
+      return;
+    }
+    setSelectedBondSelection([bondKey], syncBackend);
   }
 
   function updateAtomColorPreview() {
@@ -824,6 +999,70 @@
       vscode.postMessage({ command: 'saveStructureAs' });
     };
 
+    const firstFrameBtn = document.getElementById('btn-first-frame');
+    const prevFrameBtn = document.getElementById('btn-prev-frame');
+    const nextFrameBtn = document.getElementById('btn-next-frame');
+    const lastFrameBtn = document.getElementById('btn-last-frame');
+    const playTrajectoryBtn = document.getElementById('btn-play-trajectory');
+    const frameInput = document.getElementById('traj-frame-input');
+    const speedSlider = document.getElementById('traj-speed-slider');
+    if (firstFrameBtn) {
+      firstFrameBtn.onclick = () => {
+        jumpToTrajectoryFrame(0);
+      };
+    }
+    if (prevFrameBtn) {
+      prevFrameBtn.onclick = () => {
+        jumpToTrajectoryFrame(state.trajectoryFrameIndex - 1);
+      };
+    }
+    if (nextFrameBtn) {
+      nextFrameBtn.onclick = () => {
+        jumpToTrajectoryFrame(state.trajectoryFrameIndex + 1);
+      };
+    }
+    if (lastFrameBtn) {
+      lastFrameBtn.onclick = () => {
+        jumpToTrajectoryFrame(state.trajectoryFrameCount - 1);
+      };
+    }
+    if (playTrajectoryBtn) {
+      playTrajectoryBtn.onclick = () => {
+        setTrajectoryPlaying(!state.trajectoryPlaying);
+      };
+    }
+    if (frameInput) {
+      const commitFrameInput = () => {
+        const total = Math.max(1, Math.floor(state.trajectoryFrameCount || 1));
+        const parsed = Number.parseInt(frameInput.value, 10);
+        if (!Number.isFinite(parsed)) {
+          updateTrajectoryUI(state.trajectoryFrameIndex, total);
+          return;
+        }
+        jumpToTrajectoryFrame(parsed - 1);
+      };
+      frameInput.addEventListener('change', commitFrameInput);
+      frameInput.addEventListener('keydown', (event) => {
+        if (event.key !== 'Enter') {
+          return;
+        }
+        event.preventDefault();
+        commitFrameInput();
+      });
+    }
+    if (speedSlider) {
+      speedSlider.addEventListener('input', (event) => {
+        const target = event.target;
+        const nextFps = Math.max(1, Math.min(30, Math.floor(Number(target.value) || 8)));
+        state.trajectoryPlaybackFps = nextFps;
+        if (state.trajectoryPlaying) {
+          restartTrajectoryPlaybackTimer();
+        }
+        updateTrajectoryUI(state.trajectoryFrameIndex, state.trajectoryFrameCount);
+      });
+    }
+    updateTrajectoryUI(state.trajectoryFrameIndex, state.trajectoryFrameCount);
+
     document.getElementById('btn-export-image').onclick = () => {
       if (!renderer.exportHighResolutionImage) {
         setError('HD image export is unavailable.');
@@ -980,8 +1219,9 @@
     };
 
     btnDeleteBond.onclick = () => {
-      if (state.currentSelectedBondKey) {
-        vscode.postMessage({ command: 'deleteBond', bondKey: state.currentSelectedBondKey });
+      const selectedBondKeys = getSelectedBondKeys();
+      if (selectedBondKeys.length > 0) {
+        vscode.postMessage({ command: 'deleteBond', bondKeys: selectedBondKeys });
         return;
       }
       if (state.selectedAtomIds && state.selectedAtomIds.length >= 2) {
@@ -1003,8 +1243,9 @@
       if (event.key !== 'Delete' && event.key !== 'Backspace') {
         return;
       }
-      if (state.currentSelectedBondKey) {
-        vscode.postMessage({ command: 'deleteBond', bondKey: state.currentSelectedBondKey });
+      const selectedBondKeys = getSelectedBondKeys();
+      if (selectedBondKeys.length > 0) {
+        vscode.postMessage({ command: 'deleteBond', bondKeys: selectedBondKeys });
         event.preventDefault();
         return;
       }
@@ -1162,9 +1403,10 @@
     const canvas = document.getElementById('canvas');
     interaction.init(canvas, {
       onSelectAtom: (atomId, add, preserve) => handleSelect(atomId, add, preserve),
-      onSelectBond: (bondKey) => setSelectedBond(bondKey, true),
+      onSelectBond: (bondKey, add) => handleBondSelect(bondKey, add, true),
       onClearSelection: () => applySelectionFromIds([], 'replace'),
       onBoxSelect: (atomIds, mode) => applySelectionFromIds(atomIds, mode),
+      onBoxSelectBonds: (bondKeys, mode) => applyBondSelectionFromKeys(bondKeys, mode),
       onBeginDrag: (atomId) => vscode.postMessage({ command: 'beginDrag', atomId }),
       onDragAtom: (atomId, intersection) => {
         const scale = renderer.getScale();
@@ -1236,12 +1478,31 @@
     });
   }
 
+  window.addEventListener('beforeunload', () => {
+    if (trajectoryPlaybackTimer) {
+      clearInterval(trajectoryPlaybackTimer);
+      trajectoryPlaybackTimer = null;
+    }
+  });
+
   window.addEventListener('message', (event) => {
     if (event.data.command === 'render') {
+      trajectoryFrameRequestPending = false;
       state.currentStructure = event.data.data;
       state.selectedAtomIds = event.data.data.selectedAtomIds || [];
-      state.currentSelectedBondKey = event.data.data.selectedBondKey || null;
+      state.selectedBondKeys = Array.isArray(event.data.data.selectedBondKeys)
+        ? event.data.data.selectedBondKeys
+        : event.data.data.selectedBondKey
+          ? [event.data.data.selectedBondKey]
+          : [];
+      state.currentSelectedBondKey = state.selectedBondKeys.length > 0
+        ? state.selectedBondKeys[state.selectedBondKeys.length - 1]
+        : null;
       state.supercell = event.data.data.supercell || [1, 1, 1];
+      updateTrajectoryUI(
+        event.data.data.trajectoryFrameIndex || 0,
+        event.data.data.trajectoryFrameCount || 1
+      );
       if (state.selectedAtomIds.length >= 2) {
         state.adsorptionReferenceId = state.selectedAtomIds[state.selectedAtomIds.length - 1];
         state.adsorptionAdsorbateIds = state.selectedAtomIds.slice(0, -1);

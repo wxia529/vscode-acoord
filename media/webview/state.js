@@ -3,6 +3,7 @@
     currentStructure: null,
     currentSelectedAtom: null,
     currentSelectedBondKey: null,
+    selectedBondKeys: [],
     selectedAtomIds: [],
     isDragging: false,
     dragAtomId: null,
@@ -20,6 +21,10 @@
     renderAtomOffsets: {},
     shouldFitCamera: true,
     groupMoveActive: false,
+    trajectoryFrameIndex: 0,
+    trajectoryFrameCount: 1,
+    trajectoryPlaying: false,
+    trajectoryPlaybackFps: 8,
     lastDragWorld: null,
     dragPlaneNormal: null,
     rotationAxis: 'z',
@@ -27,6 +32,8 @@
     // Display settings
     backgroundColor: '#0d1015',
     unitCellColor: '#FF6600',
+    unitCellThickness: 1,
+    unitCellLineStyle: 'solid',
     // Lighting settings
     lightingEnabled: true,
     ambientIntensity: 0.5,

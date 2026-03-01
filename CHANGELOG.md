@@ -5,7 +5,12 @@ All notable changes to this project will be documented in this file.
 ## 0.1.8
 
 - Added HD PNG export from the 3D view.
-- Updated HD export flow to use VS Code Save dialog for custom file name and location.
+- Added Quantum ESPRESSO input/output parsing and IO support (`.in/.pwi/.out/.pwo/.log`), including trajectory extraction from QE output.
+- Added trajectory IO for XYZ/EXTXYZ, with support for reading, displaying, and exporting trajectory data.
+- Added trajectory playback with adjustable speed, defaulting newly opened trajectories to the last frame.
+- Improved playback stability by disposing WebGL resources during re-render and reducing frame-request buildup.
+- Improved sidebar tab usability with adaptive multi-row tab layout when width is limited.
+- Added unit-cell display controls for lattice thickness and solid/dashed line style.
 
 ## 0.1.7
 

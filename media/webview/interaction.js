@@ -45,6 +45,12 @@
               boxSelect = {
                 startX: localX,
                 startY: localY,
+                bondMode:
+                  event.altKey
+                    ? 'subtract'
+                    : event.ctrlKey || event.metaKey || event.shiftKey
+                      ? 'add'
+                      : 'replace',
               };
               renderer.setControlsEnabled(false);
               if (selectionBox) {
@@ -57,7 +63,11 @@
             }
             return;
           }
-          handlers.onSelectAtom(atomId, event.ctrlKey || event.metaKey, false);
+          handlers.onSelectAtom(
+            atomId,
+            event.ctrlKey || event.metaKey,
+            false
+          );
           return;
         }
       }
@@ -68,7 +78,7 @@
           const hit = bondHits[0];
           const bondKey = hit.object.userData && hit.object.userData.bondKey;
           if (bondKey && handlers.onSelectBond) {
-            handlers.onSelectBond(bondKey);
+            handlers.onSelectBond(bondKey, event.ctrlKey || event.metaKey || event.shiftKey);
             return;
           }
         }
@@ -81,6 +91,12 @@
         boxSelect = {
           startX: localX,
           startY: localY,
+          bondMode:
+            event.altKey
+              ? 'subtract'
+              : event.ctrlKey || event.metaKey || event.shiftKey
+                ? 'add'
+                : 'replace',
         };
         renderer.setControlsEnabled(false);
         if (selectionBox) {
@@ -93,7 +109,7 @@
       } else if (handlers.onClearSelection) {
         handlers.onClearSelection();
       } else if (handlers.onSelectBond) {
-        handlers.onSelectBond(null);
+        handlers.onSelectBond(null, false);
       }
     });
 
@@ -198,13 +214,17 @@
         const top = Math.min(boxSelect.startY, localY);
         const right = Math.max(boxSelect.startX, localX);
         const bottom = Math.max(boxSelect.startY, localY);
+        const modeForAtoms = event.altKey ? 'subtract' : event.ctrlKey || event.metaKey ? 'add' : 'replace';
+        const modeForBonds =
+          boxSelect.bondMode ||
+          (event.altKey ? 'subtract' : event.ctrlKey || event.metaKey || event.shiftKey ? 'add' : 'replace');
+        const minW = Math.max(0, left);
+        const maxW = Math.max(0, right);
+        const minH = Math.max(0, top);
+        const maxH = Math.max(0, bottom);
+        const camera = renderer.getCamera();
         if (handlers.onBoxSelect) {
           const ids = [];
-          const minW = Math.max(0, left);
-          const maxW = Math.max(0, right);
-          const minH = Math.max(0, top);
-          const maxH = Math.max(0, bottom);
-          const camera = renderer.getCamera();
           for (const [id, mesh] of renderer.getAtomMeshes()) {
             const projected = mesh.position.clone().project(camera);
             if (projected.z < -1 || projected.z > 1) {
@@ -216,8 +236,27 @@
               ids.push(id);
             }
           }
-          const mode = event.altKey ? 'subtract' : event.ctrlKey || event.metaKey ? 'add' : 'replace';
-          handlers.onBoxSelect(ids, mode);
+          handlers.onBoxSelect(ids, modeForAtoms);
+        }
+        if (handlers.onBoxSelectBonds) {
+          const selectedBondKeys = new Set();
+          const bondMeshes = renderer.getBondMeshes ? renderer.getBondMeshes() : [];
+          for (const mesh of bondMeshes) {
+            const bondKey = mesh.userData && mesh.userData.bondKey;
+            if (!bondKey) {
+              continue;
+            }
+            const projected = mesh.position.clone().project(camera);
+            if (projected.z < -1 || projected.z > 1) {
+              continue;
+            }
+            const screenX = (projected.x * 0.5 + 0.5) * rect.width;
+            const screenY = (-projected.y * 0.5 + 0.5) * rect.height;
+            if (screenX >= minW && screenX <= maxW && screenY >= minH && screenY <= maxH) {
+              selectedBondKeys.add(bondKey);
+            }
+          }
+          handlers.onBoxSelectBonds(Array.from(selectedBondKeys), modeForBonds);
         }
         if (selectionBox) {
           selectionBox.style.display = 'none';
@@ -370,6 +409,16 @@
     const bgColorText = document.getElementById('bg-color-text');
     const latticeColorPicker = document.getElementById('lattice-color-picker');
     const latticeColorText = document.getElementById('lattice-color-text');
+    const latticeThicknessSlider = document.getElementById('lattice-thickness-slider');
+    const latticeThicknessValue = document.getElementById('lattice-thickness-value');
+    const latticeLineStyle = document.getElementById('lattice-line-style');
+
+    const rerenderStructure = () => {
+      if (!state.currentStructure || !window.ACoordRenderer || !window.ACoordRenderer.renderStructure) {
+        return;
+      }
+      window.ACoordRenderer.renderStructure(state.currentStructure);
+    };
 
     // Background color
     if (bgColorPicker && bgColorText) {
@@ -412,6 +461,32 @@
             window.ACoordRenderer.updateDisplaySettings();
           }
         }
+      });
+    }
+
+    if (latticeThicknessSlider) {
+      const initialThickness = Number.isFinite(state.unitCellThickness)
+        ? state.unitCellThickness
+        : 1;
+      latticeThicknessSlider.value = String(initialThickness);
+      if (latticeThicknessValue) {
+        latticeThicknessValue.textContent = initialThickness.toFixed(1);
+      }
+      latticeThicknessSlider.addEventListener('input', () => {
+        const nextThickness = Math.max(0.5, Math.min(6, parseFloat(latticeThicknessSlider.value) || 1));
+        state.unitCellThickness = nextThickness;
+        if (latticeThicknessValue) {
+          latticeThicknessValue.textContent = nextThickness.toFixed(1);
+        }
+        rerenderStructure();
+      });
+    }
+
+    if (latticeLineStyle) {
+      latticeLineStyle.value = state.unitCellLineStyle === 'dashed' ? 'dashed' : 'solid';
+      latticeLineStyle.addEventListener('change', () => {
+        state.unitCellLineStyle = latticeLineStyle.value === 'dashed' ? 'dashed' : 'solid';
+        rerenderStructure();
       });
     }
   }

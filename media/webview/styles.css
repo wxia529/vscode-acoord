@@ -150,6 +150,17 @@ button:hover {
   font-size: 11px;
 }
 
+#traj-speed-slider {
+  width: 120px;
+}
+
+#traj-speed-value {
+  min-width: 42px;
+  text-align: right;
+  font-size: 11px;
+  color: var(--acoord-muted);
+}
+
 #sidebar {
   width: 260px;
   background:
@@ -165,7 +176,7 @@ button:hover {
 
 .tab-nav {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(78px, 1fr));
   gap: 6px;
   margin-bottom: 10px;
 }
@@ -174,6 +185,7 @@ button:hover {
   border-radius: 10px;
   padding: 6px 4px;
   font-size: 11px;
+  white-space: nowrap;
 }
 
 .tab-button.active {
@@ -209,6 +221,16 @@ button:hover {
   min-height: 26px;
   letter-spacing: 0.02em;
   user-select: text;
+}
+
+#status-text {
+  min-width: 0;
+}
+
+#status-traj-frame {
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--acoord-muted);
 }
 
 .panel {
@@ -250,6 +272,25 @@ button:hover {
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 8px;
   font-size: 12px;
+}
+
+.input-group select {
+  padding: 6px 8px;
+  background-color: #0e1116;
+  color: var(--acoord-text);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  font-size: 12px;
+}
+
+.trajectory-row {
+  flex-direction: row;
+  align-items: center;
+}
+
+#traj-frame-input {
+  width: 72px;
+  text-align: center;
 }
 
 .checkbox-row {

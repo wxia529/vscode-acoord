@@ -50,6 +50,7 @@
         <button class="tab-button" data-tab-target="tab-lattice" type="button">Lattice</button>
         <button class="tab-button" data-tab-target="tab-display" type="button">Display</button>
         <button class="tab-button" data-tab-target="tab-tools" type="button">Tools</button>
+        <button class="tab-button" data-tab-target="tab-trajectory" type="button">Trajectory</button>
       </div>
 
       <div class="tab-content">
@@ -216,6 +217,17 @@
                 <input type="text" id="lattice-color-text" value="#FF6600" maxlength="7" style="flex:1;" placeholder="#FF6600" />
               </div>
             </div>
+            <div class="input-group">
+              <label>Lattice Thickness: <span id="lattice-thickness-value">1.0</span></label>
+              <input type="range" id="lattice-thickness-slider" min="0.5" max="6" step="0.1" value="1" />
+            </div>
+            <div class="input-group">
+              <label>Lattice Line Style</label>
+              <select id="lattice-line-style">
+                <option value="solid">Solid</option>
+                <option value="dashed">Dashed</option>
+              </select>
+            </div>
           </div>
 
           <div class="panel">
@@ -361,12 +373,34 @@
             </div>
           </div>
         </div>
+
+        <div class="tab-pane" id="tab-trajectory">
+          <div class="panel">
+            <div class="panel-title">Trajectory Playback</div>
+            <div class="input-group trajectory-row">
+              <button id="btn-first-frame" type="button">|&lt;</button>
+              <button id="btn-prev-frame" type="button">&lt;</button>
+              <input type="number" id="traj-frame-input" min="1" step="1" value="1" />
+              <button id="btn-next-frame" type="button">&gt;</button>
+              <button id="btn-last-frame" type="button">&gt;|</button>
+            </div>
+            <div class="input-group trajectory-row">
+              <button id="btn-play-trajectory" type="button">Play</button>
+            </div>
+            <div class="input-group trajectory-row">
+              <label for="traj-speed-slider">Speed</label>
+              <input type="range" id="traj-speed-slider" min="1" max="30" step="1" value="8" />
+              <span id="traj-speed-value">8 fps</span>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   </div>
 
   <div id="status-bar">
     <span id="status-text">Ready.</span>
+    <span id="status-traj-frame">Frame 1/1</span>
   </div>
 
   <script src="{{threeUri}}"></script>
