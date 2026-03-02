@@ -265,6 +265,21 @@ button:hover {
   color: var(--acoord-muted);
 }
 
+.inline-slider-value {
+  cursor: text;
+  border-bottom: 1px dashed rgba(157, 167, 179, 0.55);
+}
+
+.inline-slider-editor {
+  width: 64px;
+  padding: 0 4px;
+  font-size: 11px;
+  color: var(--acoord-text);
+  background: #0e1116;
+  border: 1px solid rgba(245, 158, 11, 0.6);
+  border-radius: 4px;
+}
+
 .input-group input {
   padding: 6px 8px;
   background-color: #0e1116;
@@ -352,6 +367,26 @@ button:hover {
   margin-bottom: 6px;
   text-transform: uppercase;
   letter-spacing: 0.08em;
+}
+
+.light-pick-button {
+  width: 100%;
+  border-radius: 8px;
+}
+
+.light-pick-button.active {
+  border-color: rgba(245, 158, 11, 0.8);
+  box-shadow: 0 6px 18px rgba(245, 158, 11, 0.35);
+  background:
+    linear-gradient(135deg, rgba(245, 158, 11, 0.35), rgba(245, 158, 11, 0.1)),
+    #1b2026;
+}
+
+.light-pick-hint {
+  margin: 4px 0 8px;
+  font-size: 10px;
+  color: var(--acoord-muted);
+  line-height: 1.35;
 }
 
 .atom-size-element-toggle {

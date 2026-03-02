@@ -10,6 +10,7 @@ Atomic Coordinate Toolkit for visualizing and editing atomic structures inside V
 - Lattice editor (a/b/c + alpha/beta/gamma) with optional atom scaling.
 - Supercell display with periodic bonds.
 - Unit-cell display tuning (color, thickness, solid/dashed line style).
+- Lighting controls (ambient/key/fill/rim) with canvas drag picker for light direction.
 - Center atoms to unit cell (with confirmation).
 - Manual and auto scaling for atom size and scene scale.
 - Format conversion through Save As.
@@ -65,9 +66,12 @@ Input and output:
 - Rotate selection: pick axis (X/Y/Z) and move the angle slider (0-360).
 - Change element: use the Change Element panel and Apply to Selected.
 - Add or delete atoms: use the Add Atom panel or Delete button.
+- Keyboard shortcuts: Delete/Backspace (delete selected atom(s)), Ctrl/Cmd+Z (undo), Ctrl/Cmd+S (save), Ctrl/Cmd+Shift+S (save as).
 - Measure: select 2 atoms for bond length, 3 atoms for bond angle.
 - Adjust Distance: select at least two atoms; the last selected is the reference, and the rest move together along the reference-to-nearest-adsorbate direction to the target distance.
 - Scale: enable Auto scale or adjust Manual scale and Atom size.
+- Lighting: click "Pick in Canvas" under Key/Fill/Rim and drag in viewport to set light direction.
+- Slider values: double-click the numeric value label, type a number, and press Enter to apply.
 
 
 ## License

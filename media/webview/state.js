@@ -43,7 +43,7 @@
     // Lighting settings
     lightingEnabled: true,
     ambientIntensity: 0.5,
-    keyLight: { intensity: 0.8, x: 10, y: 10, z: 10 },
+    keyLight: { intensity: 0.8, x: 0, y: 0, z: 10 },
     fillLight: { intensity: 0, x: -10, y: -5, z: 5 },
     rimLight: { intensity: 0, x: 0, y: 5, z: -10 },
   };

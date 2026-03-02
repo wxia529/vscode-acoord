@@ -116,19 +116,19 @@
     }
 
     // Three-point lighting setup
-    rendererState.ambientLight = new THREE.AmbientLight(0xffffff, state.ambientIntensity || 0.5);
+    rendererState.ambientLight = new THREE.AmbientLight(0xffffff, state.ambientIntensity ?? 0.5);
     scene.add(rendererState.ambientLight);
 
     // Key light (main light source)
-    rendererState.keyLight = new THREE.DirectionalLight(0xffffff, state.keyLight?.intensity || 0.8);
+    rendererState.keyLight = new THREE.DirectionalLight(0xffffff, state.keyLight?.intensity ?? 0.8);
     scene.add(rendererState.keyLight);
 
     // Fill light (softens shadows)
-    rendererState.fillLight = new THREE.DirectionalLight(0xffffff, state.fillLight?.intensity || 0);
+    rendererState.fillLight = new THREE.DirectionalLight(0xffffff, state.fillLight?.intensity ?? 0);
     scene.add(rendererState.fillLight);
 
     // Rim light (creates edge highlight)
-    rendererState.rimLight = new THREE.DirectionalLight(0xffffff, state.rimLight?.intensity || 0);
+    rendererState.rimLight = new THREE.DirectionalLight(0xffffff, state.rimLight?.intensity ?? 0);
     scene.add(rendererState.rimLight);
 
     // Initialize light positions using the same function as animation loop
@@ -174,9 +174,9 @@
     const camera = rendererState.camera;
 
     // Get base offset directions from state (these define light directions relative to camera)
-    const keyOffset = new THREE.Vector3(state.keyLight?.x || 10, state.keyLight?.y || 10, state.keyLight?.z || 10);
-    const fillOffset = new THREE.Vector3(state.fillLight?.x || -10, state.fillLight?.y || -5, state.fillLight?.z || 5);
-    const rimOffset = new THREE.Vector3(state.rimLight?.x || 0, state.rimLight?.y || 5, state.rimLight?.z || -10);
+    const keyOffset = new THREE.Vector3(state.keyLight?.x ?? 0, state.keyLight?.y ?? 0, state.keyLight?.z ?? 10);
+    const fillOffset = new THREE.Vector3(state.fillLight?.x ?? -10, state.fillLight?.y ?? -5, state.fillLight?.z ?? 5);
+    const rimOffset = new THREE.Vector3(state.rimLight?.x ?? 0, state.rimLight?.y ?? 5, state.rimLight?.z ?? -10);
 
     // Apply camera rotation to get world-space directions
     keyOffset.applyQuaternion(camera.quaternion);
@@ -669,10 +669,10 @@
 
     const enabled = state.lightingEnabled !== false;
     
-    rendererState.ambientLight.intensity = enabled ? (state.ambientIntensity || 0.5) : 0;
-    rendererState.keyLight.intensity = enabled ? (state.keyLight?.intensity || 0.8) : 0;
-    rendererState.fillLight.intensity = enabled ? (state.fillLight?.intensity || 0) : 0;
-    rendererState.rimLight.intensity = enabled ? (state.rimLight?.intensity || 0) : 0;
+    rendererState.ambientLight.intensity = enabled ? (state.ambientIntensity ?? 0.5) : 0;
+    rendererState.keyLight.intensity = enabled ? (state.keyLight?.intensity ?? 0.8) : 0;
+    rendererState.fillLight.intensity = enabled ? (state.fillLight?.intensity ?? 0) : 0;
+    rendererState.rimLight.intensity = enabled ? (state.rimLight?.intensity ?? 0) : 0;
 
     // Also update positions
     updateLightsForCamera();

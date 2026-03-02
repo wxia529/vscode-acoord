@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## 0.1.11
+
+- Added keyboard shortcuts in the structure editor: Delete/Backspace (delete selected atom(s)), Ctrl/Cmd+Z (undo), Ctrl/Cmd+S (save), Ctrl/Cmd+Shift+S (save as).
+- Added canvas-based light direction picking for Key/Fill/Rim lights via "Pick in Canvas".
+- Fixed lighting defaults/updates to preserve zero values for X/Y/Z and intensity controls.
+- Changed Key Light default direction to (0, 0, 10).
+- Added inline numeric edit for slider values (double-click value label, press Enter to apply).
+
 ## 0.1.10
 
 - Added a toggle switch for axis display.

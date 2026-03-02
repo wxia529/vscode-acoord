@@ -204,6 +204,30 @@ export class StructureEditorProvider implements vscode.CustomEditorProvider {
         break;
       }
 
+      case 'deleteAtoms': {
+        const ids: string[] = Array.isArray(message.atomIds)
+          ? Array.from(
+            new Set(
+              message.atomIds.filter(
+                (id: unknown): id is string => typeof id === 'string' && id.length > 0
+              )
+            )
+          )
+          : [];
+        if (ids.length === 0) {
+          break;
+        }
+        this.pushUndoSnapshot(key, structure);
+        for (const atomId of ids) {
+          structure.removeAtom(atomId);
+        }
+        renderer.setStructure(structure);
+        renderer.deselectAtom();
+        renderer.deselectBond();
+        this.renderStructure(key, webviewPanel);
+        break;
+      }
+
       case 'selectAtom': {
         if (message.atomId) {
           if (message.add) {

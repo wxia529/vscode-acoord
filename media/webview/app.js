@@ -112,6 +112,113 @@
     ];
   }
 
+  function normalizeSliderValue(rawValue, min, max, step) {
+    let value = Number(rawValue);
+    if (!Number.isFinite(value)) {
+      return null;
+    }
+    if (Number.isFinite(min)) {
+      value = Math.max(min, value);
+    }
+    if (Number.isFinite(max)) {
+      value = Math.min(max, value);
+    }
+    if (Number.isFinite(step) && step > 0) {
+      const base = Number.isFinite(min) ? min : 0;
+      value = base + Math.round((value - base) / step) * step;
+      if (Number.isFinite(min)) {
+        value = Math.max(min, value);
+      }
+      if (Number.isFinite(max)) {
+        value = Math.min(max, value);
+      }
+      const stepText = String(step);
+      const dot = stepText.indexOf('.');
+      if (dot >= 0) {
+        const digits = stepText.length - dot - 1;
+        value = Number(value.toFixed(Math.min(6, digits)));
+      }
+    }
+    return value;
+  }
+
+  function startInlineSliderEdit(valueElement, slider) {
+    if (!valueElement || !slider || valueElement.dataset.inlineEditing === 'true' || slider.disabled) {
+      return;
+    }
+    const originalText = valueElement.textContent || '';
+    const input = document.createElement('input');
+    input.type = 'number';
+    input.className = 'inline-slider-editor';
+    input.value = slider.value;
+    if (slider.min !== '') input.min = slider.min;
+    if (slider.max !== '') input.max = slider.max;
+    if (slider.step !== '') input.step = slider.step;
+
+    valueElement.dataset.inlineEditing = 'true';
+    valueElement.textContent = '';
+    valueElement.appendChild(input);
+    input.focus();
+    input.select();
+
+    const finishEdit = (apply) => {
+      if (valueElement.dataset.inlineEditing !== 'true') {
+        return;
+      }
+      delete valueElement.dataset.inlineEditing;
+      valueElement.textContent = originalText;
+      if (!apply) {
+        return;
+      }
+      const min = Number.parseFloat(slider.min);
+      const max = Number.parseFloat(slider.max);
+      const step = Number.parseFloat(slider.step);
+      const nextValue = normalizeSliderValue(
+        input.value,
+        Number.isFinite(min) ? min : undefined,
+        Number.isFinite(max) ? max : undefined,
+        Number.isFinite(step) ? step : undefined
+      );
+      if (!Number.isFinite(nextValue)) {
+        return;
+      }
+      slider.value = String(nextValue);
+      slider.dispatchEvent(new Event('input', { bubbles: true }));
+      slider.dispatchEvent(new Event('change', { bubbles: true }));
+    };
+
+    input.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        finishEdit(true);
+      } else if (event.key === 'Escape') {
+        event.preventDefault();
+        finishEdit(false);
+      }
+    });
+    input.addEventListener('blur', () => finishEdit(true));
+  }
+
+  function setupInlineSliderValueEditing() {
+    const valueElements = Array.from(document.querySelectorAll('span[id$="-value"]'));
+    for (const valueElement of valueElements) {
+      if (!valueElement.id || valueElement.dataset.inlineSliderBound === 'true') {
+        continue;
+      }
+      const sliderId = valueElement.id.replace(/-value$/, '-slider');
+      const slider = document.getElementById(sliderId);
+      if (!slider || slider.tagName.toLowerCase() !== 'input' || slider.type !== 'range') {
+        continue;
+      }
+      valueElement.dataset.inlineSliderBound = 'true';
+      valueElement.classList.add('inline-slider-value');
+      valueElement.addEventListener('dblclick', (event) => {
+        event.preventDefault();
+        startInlineSliderEdit(valueElement, slider);
+      });
+    }
+  }
+
   function updateCounts(atomCount, bondCount) {
     document.getElementById('atom-count').textContent = atomCount;
     document.getElementById('bond-count').textContent = bondCount;
@@ -1246,10 +1353,25 @@
       }
     };
 
-    document.getElementById('btn-delete-atom').onclick = () => {
-      if (state.currentStructure && state.currentStructure.selectedAtomId) {
-        vscode.postMessage({ command: 'deleteAtom', atomId: state.currentStructure.selectedAtomId });
+    const deleteSelectedAtoms = () => {
+      const selectedAtomIds = Array.isArray(state.selectedAtomIds)
+        ? state.selectedAtomIds.filter((atomId) => typeof atomId === 'string' && atomId.length > 0)
+        : [];
+      if (selectedAtomIds.length > 1) {
+        vscode.postMessage({ command: 'deleteAtoms', atomIds: selectedAtomIds });
+        return true;
       }
+      const fallbackId = state.currentStructure && state.currentStructure.selectedAtomId;
+      const atomId = selectedAtomIds.length === 1 ? selectedAtomIds[0] : fallbackId;
+      if (!atomId) {
+        return false;
+      }
+      vscode.postMessage({ command: 'deleteAtom', atomId });
+      return true;
+    };
+
+    document.getElementById('btn-delete-atom').onclick = () => {
+      deleteSelectedAtoms();
     };
 
     document.getElementById('btn-copy-atom').onclick = () => {
@@ -1524,6 +1646,25 @@
       if (editable) {
         return;
       }
+      const withModifier = event.ctrlKey || event.metaKey;
+      if (withModifier && !event.altKey) {
+        const key = String(event.key || '').toLowerCase();
+        if (key === 'z' && !event.shiftKey) {
+          vscode.postMessage({ command: 'undo' });
+          event.preventDefault();
+          return;
+        }
+        if (key === 's' && event.shiftKey) {
+          vscode.postMessage({ command: 'saveStructureAs' });
+          event.preventDefault();
+          return;
+        }
+        if (key === 's') {
+          vscode.postMessage({ command: 'saveStructure' });
+          event.preventDefault();
+          return;
+        }
+      }
       if (event.key !== 'Delete' && event.key !== 'Backspace') {
         return;
       }
@@ -1533,8 +1674,7 @@
         event.preventDefault();
         return;
       }
-      if (state.currentStructure && state.currentStructure.selectedAtomId) {
-        vscode.postMessage({ command: 'deleteAtom', atomId: state.currentStructure.selectedAtomId });
+      if (deleteSelectedAtoms()) {
         event.preventDefault();
       }
     });
@@ -1691,6 +1831,7 @@
       onClearSelection: () => applySelectionFromIds([], 'replace'),
       onBoxSelect: (atomIds, mode) => applySelectionFromIds(atomIds, mode),
       onBoxSelectBonds: (bondKeys, mode) => applyBondSelectionFromKeys(bondKeys, mode),
+      onSetStatus: (message) => setStatus(message),
       onBeginDrag: (atomId) => vscode.postMessage({ command: 'beginDrag', atomId }),
       onDragAtom: (atomId, intersection) => {
         const scale = renderer.getScale();
@@ -1753,6 +1894,7 @@
     renderer.init(canvas, { setError, setStatus });
     setupUI();
     setupInteraction();
+    setupInlineSliderValueEditing();
     vscode.postMessage({ command: 'getState' });
     document.addEventListener('selectionchange', () => {
       syncStatusSelectionLock();

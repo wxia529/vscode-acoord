@@ -8,11 +8,110 @@
     const selectionBox = document.getElementById('selection-box');
     let pendingDrag = null;
     let boxSelect = null;
+    let activeLightPicker = null;
+    let lightPickerDragging = false;
     canvas.tabIndex = 0;
     canvas.style.outline = 'none';
 
+    function getLightObject(prefix) {
+      if (prefix === 'key') {
+        return state.keyLight;
+      }
+      if (prefix === 'fill') {
+        return state.fillLight;
+      }
+      if (prefix === 'rim') {
+        return state.rimLight;
+      }
+      return null;
+    }
+
+    function getLightLabel(prefix) {
+      if (prefix === 'key') {
+        return 'Key';
+      }
+      if (prefix === 'fill') {
+        return 'Fill';
+      }
+      if (prefix === 'rim') {
+        return 'Rim';
+      }
+      return '';
+    }
+
+    function updateLightPickerButtons() {
+      const pickers = ['key', 'fill', 'rim'];
+      for (const prefix of pickers) {
+        const button = document.getElementById(`btn-pick-${prefix}-light`);
+        if (!button) {
+          continue;
+        }
+        const isActive = activeLightPicker === prefix;
+        button.classList.toggle('active', isActive);
+        button.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+        button.textContent = isActive ? 'Picking in Canvas...' : 'Pick in Canvas';
+      }
+      canvas.style.cursor = activeLightPicker ? 'crosshair' : '';
+    }
+
+    function setActiveLightPicker(prefix) {
+      activeLightPicker = prefix;
+      lightPickerDragging = false;
+      renderer.setControlsEnabled(!prefix);
+      updateLightPickerButtons();
+      if (typeof handlers.onSetStatus === 'function') {
+        handlers.onSetStatus(
+          prefix
+            ? `${getLightLabel(prefix)} light picker active: drag in canvas (Esc to exit).`
+            : 'Ready.'
+        );
+      }
+    }
+
+    function applyLightPickerFromEvent(event) {
+      if (!activeLightPicker) {
+        return;
+      }
+      const lightObj = getLightObject(activeLightPicker);
+      if (!lightObj) {
+        return;
+      }
+      const rect = canvas.getBoundingClientRect();
+      if (!rect.width || !rect.height) {
+        return;
+      }
+      const ndcX = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+      const ndcY = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+      const xNorm = Math.max(-0.98, Math.min(0.98, ndcX));
+      const yNorm = Math.max(-0.98, Math.min(0.98, ndcY));
+      const xy = xNorm * xNorm + yNorm * yNorm;
+      const zNorm = Math.sqrt(Math.max(0, 1 - Math.min(0.99, xy)));
+      const length = Math.max(
+        5,
+        Math.min(
+          50,
+          Math.sqrt(lightObj.x * lightObj.x + lightObj.y * lightObj.y + lightObj.z * lightObj.z) || 17
+        )
+      );
+      const zSign = lightObj.z < 0 ? -1 : 1;
+      lightObj.x = Math.round(xNorm * length);
+      lightObj.y = Math.round(yNorm * length);
+      lightObj.z = Math.round(zSign * zNorm * length);
+      updateLightSliderUI(activeLightPicker, lightObj);
+      if (window.ACoordRenderer && window.ACoordRenderer.updateLighting) {
+        window.ACoordRenderer.updateLighting();
+      }
+    }
+
     canvas.addEventListener('pointerdown', (event) => {
       canvas.focus();
+      if (activeLightPicker) {
+        lightPickerDragging = true;
+        renderer.setControlsEnabled(false);
+        applyLightPickerFromEvent(event);
+        event.preventDefault();
+        return;
+      }
       const raycaster = renderer.getRaycaster();
       const mouse = renderer.getMouse();
       const camera = renderer.getCamera();
@@ -114,6 +213,10 @@
     });
 
     canvas.addEventListener('pointermove', (event) => {
+      if (activeLightPicker && lightPickerDragging) {
+        applyLightPickerFromEvent(event);
+        return;
+      }
       const raycaster = renderer.getRaycaster();
       const mouse = renderer.getMouse();
       const camera = renderer.getCamera();
@@ -196,6 +299,11 @@
     });
 
     const endDrag = (event) => {
+      if (lightPickerDragging) {
+        lightPickerDragging = false;
+        renderer.setControlsEnabled(!activeLightPicker);
+        return;
+      }
       if (state.isDragging) {
         state.isDragging = false;
         if (handlers.onEndDrag && state.dragAtomId) {
@@ -269,6 +377,13 @@
 
     canvas.addEventListener('pointerup', endDrag);
     canvas.addEventListener('pointerleave', endDrag);
+    canvas.addEventListener('pointercancel', endDrag);
+    canvas.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape' && activeLightPicker) {
+        setActiveLightPicker(null);
+        event.preventDefault();
+      }
+    });
 
     // Lighting panel event handlers
     function initLightingPanel() {
@@ -303,11 +418,22 @@
       // Rim Light
       setupLightSliders('rim', state.rimLight);
 
+      for (const prefix of ['key', 'fill', 'rim']) {
+        const button = document.getElementById(`btn-pick-${prefix}-light`);
+        if (!button) {
+          continue;
+        }
+        button.addEventListener('click', () => {
+          setActiveLightPicker(activeLightPicker === prefix ? null : prefix);
+        });
+      }
+      updateLightPickerButtons();
+
       // Reset lighting button
       const btnResetLighting = document.getElementById('btn-reset-lighting');
       if (btnResetLighting) {
         btnResetLighting.addEventListener('click', () => {
-          state.keyLight = { intensity: 0.8, x: 10, y: 10, z: 10 };
+          state.keyLight = { intensity: 0.8, x: 0, y: 0, z: 10 };
           state.fillLight = { intensity: 0, x: -10, y: -5, z: 5 };
           state.rimLight = { intensity: 0, x: 0, y: 5, z: -10 };
           state.ambientIntensity = 0.5;
@@ -318,13 +444,14 @@
           if (ambientSlider) ambientSlider.value = '0.5';
           if (ambientValue) ambientValue.textContent = '0.5';
 
-          updateLightSliderUI('key', { intensity: 0.8, x: 10, y: 10, z: 10 });
+          updateLightSliderUI('key', { intensity: 0.8, x: 0, y: 0, z: 10 });
           updateLightSliderUI('fill', { intensity: 0, x: -10, y: -5, z: 5 });
           updateLightSliderUI('rim', { intensity: 0, x: 0, y: 5, z: -10 });
 
           if (window.ACoordRenderer && window.ACoordRenderer.updateLighting) {
             window.ACoordRenderer.updateLighting();
           }
+          setActiveLightPicker(null);
         });
       }
     }
