@@ -43,7 +43,12 @@
     "onCommand:acoord.createNewCrystal",
     "onCommand:acoord.exportStructure",
     "onCommand:acoord.addAtom",
-    "onCommand:acoord.deleteAtom"
+    "onCommand:acoord.deleteAtom",
+    "onCommand:acoord.selectDisplayConfig",
+    "onCommand:acoord.saveDisplayConfig",
+    "onCommand:acoord.exportDisplayConfigs",
+    "onCommand:acoord.importDisplayConfigs",
+    "onCommand:acoord.deleteDisplayConfig"
   ],
   "contributes": {
     "customEditors": [
@@ -167,6 +172,31 @@
       {
         "command": "acoord.deleteAtom",
         "title": "ACoord: Delete Selected Atom",
+        "category": "ACoord"
+      },
+      {
+        "command": "acoord.selectDisplayConfig",
+        "title": "ACoord: Select Display Configuration",
+        "category": "ACoord"
+      },
+      {
+        "command": "acoord.saveDisplayConfig",
+        "title": "ACoord: Save Current Display Settings",
+        "category": "ACoord"
+      },
+      {
+        "command": "acoord.exportDisplayConfigs",
+        "title": "ACoord: Export Display Configurations",
+        "category": "ACoord"
+      },
+      {
+        "command": "acoord.importDisplayConfigs",
+        "title": "ACoord: Import Display Configurations",
+        "category": "ACoord"
+      },
+      {
+        "command": "acoord.deleteDisplayConfig",
+        "title": "ACoord: Delete Display Configuration",
         "category": "ACoord"
       }
     ]

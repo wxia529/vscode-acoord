@@ -1926,6 +1926,15 @@
         ? state.selectedBondKeys[state.selectedBondKeys.length - 1]
         : null;
       state.supercell = event.data.data.supercell || [1, 1, 1];
+      
+      // Apply display settings if provided
+      if (event.data.displaySettings) {
+        state.applyDisplaySettings(event.data.displaySettings);
+        if (window.ACoordConfigHandler) {
+          window.ACoordConfigHandler.updateUI();
+        }
+      }
+      
       updateTrajectoryUI(
         event.data.data.trajectoryFrameIndex || 0,
         event.data.data.trajectoryFrameCount || 1
@@ -2001,6 +2010,12 @@
     if (event.data.command === 'imageSaveFailed') {
       const reason = event.data?.data?.reason || 'Failed to save image.';
       setError(reason);
+      return;
+    }
+    
+    // Handle display configuration messages
+    if (window.ACoordConfigHandler) {
+      window.ACoordConfigHandler.handleMessage(event.data);
     }
   });
 

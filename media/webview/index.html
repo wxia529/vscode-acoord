@@ -168,6 +168,26 @@
 
         <div class="tab-pane" id="tab-display">
           <div class="panel">
+            <div class="panel-title">Configuration</div>
+            <div class="input-group">
+              <label>Current Config</label>
+              <div class="config-selector-row" style="display:flex;gap:6px;align-items:center;">
+                <select id="config-select" style="flex:1;">
+                  <option value="">Loading...</option>
+                </select>
+                <button id="btn-refresh-configs" type="button" title="Refresh list">↻</button>
+              </div>
+            </div>
+            <div class="input-group config-actions" style="display:flex;gap:6px;flex-wrap:wrap;">
+              <button id="btn-save-config" type="button">Save As...</button>
+              <button id="btn-export-config" type="button">Export</button>
+              <button id="btn-import-config" type="button">Import</button>
+              <button id="btn-delete-config" type="button" class="danger">Delete</button>
+            </div>
+            <div id="config-info" style="font-size:11px;color:#888;margin-top:6px;"></div>
+          </div>
+
+          <div class="panel">
             <div class="panel-title">Display Options</div>
             <div class="input-group">
               <label class="checkbox-row">
@@ -463,6 +483,7 @@
   <script src="{{threeUri}}"></script>
   <script src="{{orbitControlsUri}}"></script>
   <script src="{{stateUri}}"></script>
+  <script src="{{configHandlerUri}}"></script>
   <script src="{{rendererUri}}"></script>
   <script src="{{interactionUri}}"></script>
   <script src="{{appUri}}"></script>

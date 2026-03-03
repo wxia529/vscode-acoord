@@ -7,6 +7,7 @@ import { ELEMENT_DATA, parseElement } from '../utils/elementData';
 export interface WebviewMessage {
   command: string;
   data?: any;
+  displaySettings?: any;
 }
 
 /**

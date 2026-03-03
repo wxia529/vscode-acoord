@@ -7,6 +7,8 @@ import { FileManager } from '../io/fileManager';
 import { ThreeJSRenderer } from '../renderers/threejsRenderer';
 import { Atom } from '../models/atom';
 import { parseElement } from '../utils/elementData';
+import { ConfigManager } from '../config/configManager';
+import { DisplayConfig, DisplaySettings } from '../config/types';
 
 /**
  * Custom editor provider for structure files
@@ -23,9 +25,13 @@ export class StructureEditorProvider implements vscode.CustomEditorProvider {
   private trajectories = new Map<string, Structure[]>();
   private trajectoryFrameIndices = new Map<string, number>();
   private undoStacks = new Map<string, Structure[]>();
+  private displaySettings = new Map<string, DisplaySettings>();
   private readonly maxUndoDepth = 100;
 
-  constructor(private context: vscode.ExtensionContext) {}
+  constructor(
+    private context: vscode.ExtensionContext,
+    private configManager: ConfigManager
+  ) {}
 
   async openCustomDocument(
     uri: vscode.Uri,
@@ -41,6 +47,9 @@ export class StructureEditorProvider implements vscode.CustomEditorProvider {
     _token: vscode.CancellationToken
   ): Promise<void> {
     const uri = document.uri.fsPath;
+
+    // Initialize config manager if needed
+    await this.configManager.initialize();
 
     // Try to load structure from file
     let frames: Structure[];
@@ -70,6 +79,12 @@ export class StructureEditorProvider implements vscode.CustomEditorProvider {
     const renderer = new ThreeJSRenderer(structure);
     renderer.setTrajectoryFrameInfo(initialFrameIndex, frames.length);
     this.renderers.set(key, renderer);
+
+    // Load default display config
+    const defaultConfig = this.configManager.getCurrentConfig();
+    if (defaultConfig) {
+      this.displaySettings.set(key, defaultConfig.settings);
+    }
 
     // Setup webview
     webviewPanel.webview.options = {
@@ -124,6 +139,7 @@ export class StructureEditorProvider implements vscode.CustomEditorProvider {
       this.trajectories.delete(key);
       this.trajectoryFrameIndices.delete(key);
       this.undoStacks.delete(key);
+      this.displaySettings.delete(key);
       saveListener.dispose();
     });
   }
@@ -816,6 +832,31 @@ export class StructureEditorProvider implements vscode.CustomEditorProvider {
         }
         break;
       }
+
+      case 'getDisplayConfigs': {
+        await this.handleGetDisplayConfigs(webviewPanel);
+        break;
+      }
+
+      case 'loadDisplayConfig': {
+        await this.handleLoadDisplayConfig(message.configId, webviewPanel, key);
+        break;
+      }
+
+      case 'saveDisplayConfig': {
+        await this.handleSaveDisplayConfig(message, webviewPanel, key);
+        break;
+      }
+
+      case 'getCurrentDisplaySettings': {
+        await this.handleGetCurrentDisplaySettings(webviewPanel, key);
+        break;
+      }
+
+      case 'updateDisplaySettings': {
+        this.handleUpdateDisplaySettings(message.settings, key);
+        break;
+      }
     }
   }
 
@@ -921,6 +962,13 @@ export class StructureEditorProvider implements vscode.CustomEditorProvider {
       const frameIndex = this.trajectoryFrameIndices.get(key) ?? 0;
       renderer.setTrajectoryFrameInfo(frameIndex, frameCount);
       const message = renderer.getRenderMessage();
+      
+      // Include current display settings in render message
+      const displaySettings = this.displaySettings.get(key);
+      if (displaySettings) {
+        message.displaySettings = displaySettings;
+      }
+      
       webviewPanel.webview.postMessage(message);
     }
   }
@@ -981,6 +1029,9 @@ export class StructureEditorProvider implements vscode.CustomEditorProvider {
     const stateUri = webview.asWebviewUri(
       vscode.Uri.joinPath(this.context.extensionUri, 'media', 'webview', 'state.js')
     );
+    const configHandlerUri = webview.asWebviewUri(
+      vscode.Uri.joinPath(this.context.extensionUri, 'media', 'webview', 'configHandler.js')
+    );
     const rendererUri = webview.asWebviewUri(
       vscode.Uri.joinPath(this.context.extensionUri, 'media', 'webview', 'renderer.js')
     );
@@ -998,6 +1049,7 @@ export class StructureEditorProvider implements vscode.CustomEditorProvider {
     html = html.replace(/\{\{threeUri\}\}/g, threeUri.toString());
     html = html.replace(/\{\{orbitControlsUri\}\}/g, orbitControlsUri.toString());
     html = html.replace(/\{\{stateUri\}\}/g, stateUri.toString());
+    html = html.replace(/\{\{configHandlerUri\}\}/g, configHandlerUri.toString());
     html = html.replace(/\{\{rendererUri\}\}/g, rendererUri.toString());
     html = html.replace(/\{\{interactionUri\}\}/g, interactionUri.toString());
     html = html.replace(/\{\{appUri\}\}/g, appUri.toString());
@@ -1077,5 +1129,102 @@ export class StructureEditorProvider implements vscode.CustomEditorProvider {
         }
       },
     });
+  }
+
+  // === Display Configuration Methods ===
+
+  async notifyConfigChange(config: DisplayConfig): Promise<void> {
+    // Notify all webviews about the config change
+    for (const [key, webviewPanel] of this.webviewPanels) {
+      webviewPanel.webview.postMessage({
+        command: 'displayConfigChanged',
+        config: config
+      });
+    }
+  }
+
+  async getCurrentDisplaySettings(): Promise<DisplaySettings | null> {
+    // Get settings from the first available webview
+    for (const [key, settings] of this.displaySettings) {
+      return settings;
+    }
+    return null;
+  }
+
+  private async handleGetDisplayConfigs(webviewPanel: vscode.WebviewPanel): Promise<void> {
+    try {
+      const configs = await this.configManager.listConfigs();
+      webviewPanel.webview.postMessage({
+        command: 'displayConfigsLoaded',
+        presets: configs.presets,
+        user: configs.user
+      });
+    } catch (error) {
+      webviewPanel.webview.postMessage({
+        command: 'displayConfigError',
+        error: String(error)
+      });
+    }
+  }
+
+  private async handleLoadDisplayConfig(
+    configId: string,
+    webviewPanel: vscode.WebviewPanel,
+    key: string
+  ): Promise<void> {
+    try {
+      const config = await this.configManager.loadConfig(configId);
+      this.displaySettings.set(key, config.settings);
+      webviewPanel.webview.postMessage({
+        command: 'displayConfigLoaded',
+        config: config
+      });
+    } catch (error) {
+      webviewPanel.webview.postMessage({
+        command: 'displayConfigError',
+        error: String(error)
+      });
+    }
+  }
+
+  private async handleSaveDisplayConfig(
+    message: any,
+    webviewPanel: vscode.WebviewPanel,
+    key: string
+  ): Promise<void> {
+    try {
+      const config = await this.configManager.saveUserConfig(
+        message.name,
+        message.settings,
+        message.description,
+        message.existingId
+      );
+      webviewPanel.webview.postMessage({
+        command: 'displayConfigSaved',
+        config: config
+      });
+    } catch (error) {
+      webviewPanel.webview.postMessage({
+        command: 'displayConfigError',
+        error: String(error)
+      });
+    }
+  }
+
+  private async handleGetCurrentDisplaySettings(
+    webviewPanel: vscode.WebviewPanel,
+    key: string
+  ): Promise<void> {
+    const settings = this.displaySettings.get(key);
+    if (settings) {
+      webviewPanel.webview.postMessage({
+        command: 'currentDisplaySettings',
+        settings: settings
+      });
+    }
+  }
+
+  private handleUpdateDisplaySettings(settings: DisplaySettings, key: string): void {
+    this.displaySettings.set(key, settings);
   }
 }

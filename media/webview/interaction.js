@@ -577,6 +577,9 @@
 
     // Initialize display settings panel
     initDisplaySettingsPanel();
+    
+    // Initialize config panel
+    initConfigPanel();
   }
 
   function initDisplaySettingsPanel() {
@@ -603,6 +606,9 @@
         if (window.ACoordRenderer && window.ACoordRenderer.updateDisplaySettings) {
           window.ACoordRenderer.updateDisplaySettings();
         }
+        if (window.ACoordConfigHandler) {
+          window.ACoordConfigHandler.updateSettings();
+        }
       });
     }
 
@@ -614,6 +620,9 @@
         if (window.ACoordRenderer && window.ACoordRenderer.updateDisplaySettings) {
           window.ACoordRenderer.updateDisplaySettings();
         }
+        if (window.ACoordConfigHandler) {
+          window.ACoordConfigHandler.updateSettings();
+        }
       });
 
       bgColorText.addEventListener('change', () => {
@@ -623,6 +632,9 @@
           bgColorPicker.value = color;
           if (window.ACoordRenderer && window.ACoordRenderer.updateDisplaySettings) {
             window.ACoordRenderer.updateDisplaySettings();
+          }
+          if (window.ACoordConfigHandler) {
+            window.ACoordConfigHandler.updateSettings();
           }
         }
       });
@@ -675,6 +687,154 @@
         rerenderStructure();
       });
     }
+  }
+
+  function initConfigPanel() {
+    const configSelect = document.getElementById('config-select');
+    const btnRefreshConfigs = document.getElementById('btn-refresh-configs');
+    const btnSaveConfig = document.getElementById('btn-save-config');
+    const btnExportConfig = document.getElementById('btn-export-config');
+    const btnImportConfig = document.getElementById('btn-import-config');
+    const btnDeleteConfig = document.getElementById('btn-delete-config');
+    const configInfo = document.getElementById('config-info');
+
+    // Update config selector UI
+    window.updateConfigSelector = function() {
+      if (!configSelect) return;
+      
+      const currentValue = configSelect.value;
+      configSelect.innerHTML = '';
+      
+      // Add presets group
+      const presets = state.availableConfigs.presets || [];
+      if (presets.length > 0) {
+        const presetGroup = document.createElement('optgroup');
+        presetGroup.label = 'Presets';
+        presets.forEach(function(preset) {
+          const option = document.createElement('option');
+          option.value = preset.id;
+          option.textContent = preset.name;
+          if (preset.id === state.currentConfigId) {
+            option.selected = true;
+          }
+          presetGroup.appendChild(option);
+        });
+        configSelect.appendChild(presetGroup);
+      }
+      
+      // Add user configs group
+      const userConfigs = state.availableConfigs.user || [];
+      if (userConfigs.length > 0) {
+        const userGroup = document.createElement('optgroup');
+        userGroup.label = 'Your Configs';
+        userConfigs.forEach(function(config) {
+          const option = document.createElement('option');
+          option.value = config.id;
+          option.textContent = config.name;
+          if (config.id === state.currentConfigId) {
+            option.selected = true;
+          }
+          userGroup.appendChild(option);
+        });
+        configSelect.appendChild(userGroup);
+      }
+      
+      // Update config info
+      if (configInfo) {
+        const currentConfig = [...presets, ...userConfigs].find(function(c) {
+          return c.id === state.currentConfigId;
+        });
+        if (currentConfig && currentConfig.description) {
+          configInfo.textContent = currentConfig.description;
+        } else {
+          configInfo.textContent = '';
+        }
+      }
+    };
+
+    // Config selection change
+    if (configSelect) {
+      configSelect.addEventListener('change', function() {
+        const configId = configSelect.value;
+        if (configId && window.ACoordConfigHandler) {
+          window.ACoordConfigHandler.loadConfig(configId);
+        }
+      });
+    }
+
+    // Refresh configs
+    if (btnRefreshConfigs) {
+      btnRefreshConfigs.addEventListener('click', function() {
+        if (window.ACoordConfigHandler) {
+          window.ACoordConfigHandler.requestConfigList();
+        }
+      });
+    }
+
+    // Save config
+    if (btnSaveConfig) {
+      btnSaveConfig.addEventListener('click', async function() {
+        const name = prompt('Enter configuration name:', 'My Config');
+        if (!name) return;
+        
+        const description = prompt('Enter description (optional):', '');
+        
+        if (window.ACoordConfigHandler) {
+          window.ACoordConfigHandler.saveAsUserConfig(name, description || undefined);
+        }
+      });
+    }
+
+    // Export config
+    if (btnExportConfig) {
+      btnExportConfig.addEventListener('click', function() {
+        if (window.vscode) {
+          window.vscode.postMessage({ command: 'exportDisplayConfigs' });
+        }
+      });
+    }
+
+    // Import config
+    if (btnImportConfig) {
+      btnImportConfig.addEventListener('click', function() {
+        if (window.vscode) {
+          window.vscode.postMessage({ command: 'importDisplayConfigs' });
+        }
+      });
+    }
+
+    // Delete config
+    if (btnDeleteConfig) {
+      btnDeleteConfig.addEventListener('click', function() {
+        const configId = configSelect ? configSelect.value : null;
+        if (!configId) {
+          alert('Please select a configuration to delete');
+          return;
+        }
+        
+        // Check if it's a user config (not preset)
+        const isUserConfig = state.availableConfigs.user.some(function(c) {
+          return c.id === configId;
+        });
+        
+        if (!isUserConfig) {
+          alert('Cannot delete preset configurations');
+          return;
+        }
+        
+        if (confirm('Are you sure you want to delete this configuration?')) {
+          if (window.vscode) {
+            window.vscode.postMessage({ 
+              command: 'deleteDisplayConfig',
+              configId: configId
+            });
+          }
+        }
+      });
+    }
+
+    // Initial update
+    window.updateConfigSelector();
   }
 
   window.ACoordInteraction = { init };
