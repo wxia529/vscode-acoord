@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## 0.2.0
+
+- Major code refactoring for improved maintainability.
+- Added user configuration for Display settings.
+
 ## 0.1.11
 
 - Added keyboard shortcuts in the structure editor: Delete/Backspace (delete selected atom(s)), Ctrl/Cmd+Z (undo), Ctrl/Cmd+S (save), Ctrl/Cmd+Shift+S (save as).

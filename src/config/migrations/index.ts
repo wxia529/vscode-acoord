@@ -67,10 +67,14 @@ export class MigrationManager {
     }
 
     // Apply migrations in order
-    for (const migration of this.migrations) {
-      if (currentConfig.schemaVersion === migration.fromVersion) {
-        currentConfig = await migration.migrate(currentConfig);
+    while (currentConfig.schemaVersion < this.currentSchemaVersion) {
+      const migration = this.migrations.find(m => m.fromVersion === currentConfig.schemaVersion);
+      if (!migration) {
+        throw new Error(
+          `Missing migration from version ${currentConfig.schemaVersion}`
+        );
       }
+      currentConfig = await migration.migrate(currentConfig);
     }
 
     if (currentConfig.schemaVersion !== this.currentSchemaVersion) {

@@ -85,8 +85,19 @@ export class ConfigManager {
     // Check if migration is needed
     if (this.migrationManager.needsMigration(config)) {
       await this.storage.createBackup(configId);
-      config = await this.migrationManager.migrate(config);
-      await this.storage.saveConfig(config);
+      try {
+        config = await this.migrationManager.migrate(config);
+        await this.storage.saveConfig(config);
+      } catch (error) {
+        const backups = await this.storage.listBackups(configId);
+        if (backups.length > 0) {
+          const latestBackup = backups.sort().reverse()[0].replace('.json', '');
+          await this.storage.restoreBackup(latestBackup);
+        }
+        throw new Error(`Migration failed, restored from backup: ${error instanceof Error ? error.message : String(error)}`);
+      } finally {
+        await this.storage.cleanOldBackups();
+      }
     }
 
     const normalized = this.validator.normalizeConfig(config);
@@ -247,8 +258,22 @@ export class ConfigManager {
     const content = await vscode.workspace.fs.readFile(uris[0]);
     const packageData = JSON.parse(content.toString());
     
-    const importedResult = await this.storage.importConfigs(packageData, (config) => {
-      const normalized = this.validator.normalizeConfig(config);
+    const importedResult = await this.storage.importConfigs(packageData, async (config) => {
+      let processedConfig = config;
+      
+      if (this.migrationManager.needsMigration(config)) {
+        try {
+          processedConfig = await this.migrationManager.migrate(config);
+        } catch {
+          return {
+            valid: false,
+            errors: ['Migration failed for imported config'],
+            config: undefined
+          };
+        }
+      }
+      
+      const normalized = this.validator.normalizeConfig(processedConfig);
       const validation = this.validator.validate(normalized.config);
       return {
         valid: validation.valid,

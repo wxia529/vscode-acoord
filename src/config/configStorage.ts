@@ -165,7 +165,7 @@ export class ConfigStorage {
    */
   async importConfigs(
     packageData: ConfigExportPackage,
-    validate?: (config: DisplayConfig) => { valid: boolean; errors: string[]; config?: DisplayConfig }
+    validate?: (config: DisplayConfig) => Promise<{ valid: boolean; errors: string[]; config?: DisplayConfig }> | { valid: boolean; errors: string[]; config?: DisplayConfig }
   ): Promise<{ imported: DisplayConfig[]; cleanup: () => Promise<void> }> {
     const imported: DisplayConfig[] = [];
     const savedIds: string[] = [];
@@ -184,7 +184,7 @@ export class ConfigStorage {
 
       let configToSave = importedConfig;
       if (validate) {
-        const result = validate(importedConfig);
+        const result = await validate(importedConfig);
         if (!result.valid) {
           continue;
         }
@@ -247,6 +247,18 @@ export class ConfigStorage {
   }
 
   /**
+   * Restore a config from backup
+   */
+  async restoreBackup(backupId: string): Promise<DisplayConfig> {
+    const backupPath = path.join(this.backupDir, `${backupId}.json`);
+    const content = await fs.readFile(backupPath, 'utf-8');
+    const config: DisplayConfig = JSON.parse(content);
+    
+    await this.saveConfig(config);
+    return config;
+  }
+
+  /**
    * List available backups
    */
   async listBackups(configId?: string): Promise<string[]> {
@@ -255,5 +267,36 @@ export class ConfigStorage {
       return files.filter(f => f.startsWith(configId));
     }
     return files;
+  }
+
+  /**
+   * Clean old backups, keep only recent N backups per config
+   */
+  async cleanOldBackups(keepCount: number = 5): Promise<number> {
+    const files = await fs.readdir(this.backupDir);
+    const backupMap = new Map<string, string[]>();
+    
+    for (const file of files) {
+      const match = file.match(/^(.+)-\d+\.json$/);
+      if (match) {
+        const configId = match[1];
+        if (!backupMap.has(configId)) {
+          backupMap.set(configId, []);
+        }
+        backupMap.get(configId)!.push(file);
+      }
+    }
+    
+    let deleted = 0;
+    for (const [configId, backups] of backupMap) {
+      backups.sort().reverse();
+      const toDelete = backups.slice(keepCount);
+      for (const file of toDelete) {
+        await fs.unlink(path.join(this.backupDir, file));
+        deleted++;
+      }
+    }
+    
+    return deleted;
   }
 }
