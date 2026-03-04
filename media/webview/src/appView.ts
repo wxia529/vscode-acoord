@@ -21,7 +21,7 @@ export function setup(): void {
   };
 
   if (projSelect) {
-    projSelect.onchange = (event: Event) => { setProjection((event.target as HTMLSelectElement).value); };
+    projSelect.addEventListener('change', (event: Event) => { setProjection((event.target as HTMLSelectElement).value); });
   }
   setProjection(displayStore.projectionMode || 'perspective');
 

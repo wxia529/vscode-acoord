@@ -211,7 +211,7 @@ Currently both are commented out (line 15: `// "noUnusedParameters": true`). `no
 
 DEVELOPMENT.md Section 9.1 states: `module "commonjs"`. Current config uses `"Node16"`.
 
-**Note:** `Node16` is actually the modern recommended setting for Node.js projects and produces CommonJS output when `package.json` lacks `"type": "module"`. This may be an intentional and correct deviation from the spec. Verify that the build output works correctly.
+**Resolution:** Accepted deviation. `Node16` is the modern recommended setting for Node.js projects; when `package.json` has no `"type": "module"` field (as is the case here), TypeScript with `module: "Node16"` emits CommonJS output — functionally identical to `"commonjs"` for the VS Code extension host, with the added benefit of correct ESM interop for dual-mode packages. Changing to `"commonjs"` would offer no practical benefit and could regress import resolution. The DEVELOPMENT.md spec is considered outdated on this point.
 
 ---
 
@@ -237,6 +237,8 @@ DEVELOPMENT.md Section 6.4 states: "Input bindings should use `addEventListener`
 
 **Fix:** Replace all `.onclick =` with `.addEventListener('click', ...)`. If cleanup is needed, pass `{ signal }` from an `AbortController`.
 
+**FIXED** — All 35 `.onclick =` (and `.onchange =`) assignments replaced with `addEventListener` across all 7 files. TypeScript compiles clean.
+
 ---
 
 #### 21. Non-Null Assertions on DOM Elements (Section 6.4 / 13.2)
@@ -252,6 +254,8 @@ Section 13.2 states: "Non-null assertions (`!`) on message data are forbidden. A
 const container = document.getElementById('container');
 if (!container) throw new Error('Container element not found');
 ```
+
+**FIXED** — All three `document.getElementById('container')!` non-null assertions replaced with null-guard early returns (or `setError` call in `init`). TypeScript compiles clean.
 
 ---
 
@@ -346,16 +350,16 @@ The current implementation delegates unknown commands to `configHandler.handleMe
 | ~~9~~ | ~~P1~~ | ~~`animate()` loop not cancellable~~ | ~~18.1~~ | **FIXED** |
 | ~~10~~ | ~~P1~~ | ~~Event listeners missing cleanup (canvas)~~ | ~~18.2~~ | **FIXED** |
 | ~~11~~ | ~~P1~~ | ~~Services reference `vscode.WebviewPanel` directly~~ | ~~2.1~~ | **FIXED** |
-| 12 | P2 | Periodic bond cross-image is still O(n^2) | 19.1 | `structure.ts:439-469` |
-| 13 | P2 | Display sliders not debounced | 19.4 | `appLattice.ts`, `appTools.ts`, `interactionLighting.ts` |
-| 14 | P2 | PDB column alignment incorrect | 20.3 | `pdbParser.ts:58-101` |
-| 15 | P2 | Ambiguous extension fallback is dead code | 20.6 | `fileManager.ts:82-111` |
-| 16 | P2 | `UnitCell.getLatticeVectors()` missing sin(gamma)=0 guard | 20.5 | `unitCell.ts:80` |
-| 17 | P2 | ESLint `no-explicit-any`/`no-non-null-assertion` not configured | 10.4 | `eslint.config.mjs` |
-| 18 | P2 | `noUnusedLocals`/`noUnusedParameters` not enabled | 10.1 | `tsconfig.json` |
-| 19 | P2 | `module: "Node16"` vs spec's `"commonjs"` | 9.1 | `tsconfig.json:3` |
-| 20 | P2 | 35 instances of `.onclick =` instead of `addEventListener` | 6.4 | Multiple webview files |
-| 21 | P2 | 3 non-null assertions on DOM elements | 6.4, 13.2 | `renderer.ts:204,322,818` |
+| ~~12~~ | ~~P2~~ | ~~Periodic bond cross-image is still O(n^2)~~ | ~~19.1~~ | **FIXED** |
+| ~~13~~ | ~~P2~~ | ~~Display sliders not debounced~~ | ~~19.4~~ | **FIXED** |
+| ~~14~~ | ~~P2~~ | ~~PDB column alignment incorrect~~ | ~~20.3~~ | **FIXED** |
+| ~~15~~ | ~~P2~~ | ~~Ambiguous extension fallback is dead code~~ | ~~20.6~~ | **FIXED** |
+| ~~16~~ | ~~P2~~ | ~~`UnitCell.getLatticeVectors()` missing sin(gamma)=0 guard~~ | ~~20.5~~ | **FIXED** |
+| ~~17~~ | ~~P2~~ | ~~ESLint `no-explicit-any`/`no-non-null-assertion` not configured~~ | ~~10.4~~ | **FIXED** |
+| ~~18~~ | ~~P2~~ | ~~`noUnusedLocals`/`noUnusedParameters` not enabled~~ | ~~10.1~~ | **FIXED** |
+| ~~19~~ | ~~P2~~ | ~~`module: "Node16"` vs spec's `"commonjs"`~~ | ~~9.1~~ | **ACCEPTED DEVIATION** |
+| ~~20~~ | ~~P2~~ | ~~35 instances of `.onclick =` instead of `addEventListener`~~ | ~~6.4~~ | **FIXED** |
+| ~~21~~ | ~~P2~~ | ~~3 non-null assertions on DOM elements~~ | ~~6.4, 13.2~~ | **FIXED** |
 | 22 | P3 | `test:unit` runs fake test runner, not mocha | 21.1 | `run-tests.mjs`, `package.json:203` |
 | 23 | P3 | Parser round-trip tests missing for 9/10 parsers | 21.2 | `src/test/unit/parsers/` |
 | 24 | P3 | No service tests | 21.4 | N/A |

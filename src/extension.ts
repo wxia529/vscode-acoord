@@ -10,7 +10,6 @@ import { Atom } from './models/atom';
 import { UnitCell } from './models/unitCell';
 import { FileManager } from './io/fileManager';
 import { ConfigManager } from './config/configManager';
-import { DisplaySettings } from './config/types';
 
 /**
  * Extension activation

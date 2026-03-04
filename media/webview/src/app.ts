@@ -141,17 +141,17 @@ function setupUI(): void {
     reload: document.getElementById('btn-reload') as HTMLButtonElement | null,
   };
 
-  if (buttons.unitCell) buttons.unitCell.onclick = () => vscode.postMessage({ command: 'toggleUnitCell' });
-  if (buttons.reset) buttons.reset.onclick = () => renderer.fitCamera();
-  if (buttons.undo) buttons.undo.onclick = () => vscode.postMessage({ command: 'undo' });
-  if (buttons.redo) buttons.redo.onclick = () => vscode.postMessage({ command: 'redo' });
-  if (buttons.save) buttons.save.onclick = () => vscode.postMessage({ command: 'saveStructure' });
-  if (buttons.saveAs) buttons.saveAs.onclick = () => vscode.postMessage({ command: 'saveStructureAs' });
-  if (buttons.openSource) buttons.openSource.onclick = () => vscode.postMessage({ command: 'openSource' });
-  if (buttons.reload) buttons.reload.onclick = () => vscode.postMessage({ command: 'reloadStructure' });
+  if (buttons.unitCell) buttons.unitCell.addEventListener('click', () => vscode.postMessage({ command: 'toggleUnitCell' }));
+  if (buttons.reset) buttons.reset.addEventListener('click', () => renderer.fitCamera());
+  if (buttons.undo) buttons.undo.addEventListener('click', () => vscode.postMessage({ command: 'undo' }));
+  if (buttons.redo) buttons.redo.addEventListener('click', () => vscode.postMessage({ command: 'redo' }));
+  if (buttons.save) buttons.save.addEventListener('click', () => vscode.postMessage({ command: 'saveStructure' }));
+  if (buttons.saveAs) buttons.saveAs.addEventListener('click', () => vscode.postMessage({ command: 'saveStructureAs' }));
+  if (buttons.openSource) buttons.openSource.addEventListener('click', () => vscode.postMessage({ command: 'openSource' }));
+  if (buttons.reload) buttons.reload.addEventListener('click', () => vscode.postMessage({ command: 'reloadStructure' }));
 
   if (buttons.exportImage) {
-    buttons.exportImage.onclick = () => {
+    buttons.exportImage.addEventListener('click', () => {
       if (!renderer.exportHighResolutionImage) {
         setError('HD image export is unavailable.');
         return;
@@ -170,7 +170,7 @@ function setupUI(): void {
       });
       setError('');
       setStatus(`HD image generated: ${result.width}x${result.height}`);
-    };
+    });
   }
 
   // Module setup callbacks

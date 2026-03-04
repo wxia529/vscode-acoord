@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs/promises';
-import { DisplayConfig, ConfigManifest, ConfigExportPackage, ConfigMeta } from './types';
+import { DisplayConfig, ConfigManifest, ConfigExportPackage } from './types';
 
 /**
  * Storage layer for display configurations
@@ -14,7 +14,7 @@ export class ConfigStorage {
   private readonly backupDir: string;
   private readonly manifestFile: string;
 
-  constructor(private context: vscode.ExtensionContext) {
+  constructor(context: vscode.ExtensionContext) {
     // VS Code standard globalStorage location
     this.storageDir = path.join(context.globalStorageUri.fsPath, 'configs');
     this.presetsDir = path.join(this.storageDir, 'presets');
@@ -288,7 +288,7 @@ export class ConfigStorage {
     }
     
     let deleted = 0;
-    for (const [configId, backups] of backupMap) {
+    for (const [_configId, backups] of backupMap) {
       backups.sort().reverse();
       const toDelete = backups.slice(keepCount);
       for (const file of toDelete) {

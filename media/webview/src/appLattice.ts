@@ -9,6 +9,7 @@
  */
 import { displayStore, structureStore, selectionStore } from './state';
 import { getElementById } from './utils/domCache';
+import { debounce } from './utils/performance';
 import type {
   UnitCellParams,
   Atom,
@@ -22,6 +23,11 @@ import type {
 type AppLatticeContext = VscodeContext & ErrorContext & RendererContext & AtomSizeContext;
 
 let _cb: AppLatticeContext | null = null;
+
+// Module-level debounced rerender for dynamic sliders (element size rows)
+const debouncedRerenderFromPanel = debounce((): void => {
+  _cb?.rerenderCurrentStructure();
+}, 16);
 
 // ── Lattice UI sync ────────────────────────────────────────────────────────────
 
@@ -150,11 +156,11 @@ export function updateAtomSizePanel(): void {
       resetButton.className = 'atom-size-element-reset';
       resetButton.textContent = '↺';
       resetButton.disabled = !manualEnabled || !hasOverride;
-      resetButton.onclick = () => {
+      resetButton.addEventListener('click', () => {
         delete displayStore.atomSizeByElement[element];
         updateAtomSizePanel();
         rerenderCurrentStructure();
-      };
+      });
 
       header.appendChild(title);
       header.appendChild(resetButton);
@@ -171,7 +177,7 @@ export function updateAtomSizePanel(): void {
         const nextSize = clampAtomSize(target.value, size);
         displayStore.atomSizeByElement[element] = nextSize;
         updateAtomSizePanel();
-        rerenderCurrentStructure();
+        debouncedRerenderFromPanel();
       };
 
       row.appendChild(header);
@@ -187,6 +193,16 @@ export function setup(callbacks: AppLatticeContext): void {
   _cb = callbacks;
   const { vscode, renderer, setError, rerenderCurrentStructure, updateCounts, updateAtomList,
     clampAtomSize, getBaseAtomId, ATOM_SIZE_MIN, ATOM_SIZE_MAX } = callbacks;
+
+  // Debounced renders to avoid excessive GPU work during slider drag (16ms = 60fps)
+  const debouncedRenderStructure = debounce((): void => {
+    if (structureStore.currentStructure) {
+      renderer.renderStructure(structureStore.currentStructure, { updateCounts, updateAtomList });
+    }
+  }, 16);
+  const debouncedRerenderCurrentStructure = debounce((): void => {
+    rerenderCurrentStructure();
+  }, 16);
 
   // ── Lattice params ────────────────────────────────────────────────────────
 
@@ -211,7 +227,7 @@ export function setup(callbacks: AppLatticeContext): void {
   }
 
   if (latticeApply) {
-    latticeApply.onclick = () => {
+    latticeApply.addEventListener('click', () => {
       const a = parseFloat(getElementById<HTMLInputElement>('lattice-a')?.value ?? '');
       const b = parseFloat(getElementById<HTMLInputElement>('lattice-b')?.value ?? '');
       const c = parseFloat(getElementById<HTMLInputElement>('lattice-c')?.value ?? '');
@@ -228,17 +244,17 @@ export function setup(callbacks: AppLatticeContext): void {
         scaleAtoms: !!displayStore.scaleAtomsWithLattice,
       });
       setError('');
-    };
+    });
   }
 
-  if (latticeRemove) { latticeRemove.onclick = () => { vscode.postMessage({ command: 'clearUnitCell' }); }; }
-  if (latticeCenter) { latticeCenter.onclick = () => { vscode.postMessage({ command: 'centerToUnitCell' }); }; }
+  if (latticeRemove) { latticeRemove.addEventListener('click', () => { vscode.postMessage({ command: 'clearUnitCell' }); }); }
+  if (latticeCenter) { latticeCenter.addEventListener('click', () => { vscode.postMessage({ command: 'centerToUnitCell' }); }); }
 
   // ── Supercell ─────────────────────────────────────────────────────────────
 
   const supercellApply = getElementById<HTMLButtonElement>('btn-supercell-apply');
   if (supercellApply) {
-    supercellApply.onclick = () => {
+    supercellApply.addEventListener('click', () => {
       const nx = parseInt(getElementById<HTMLInputElement>('supercell-x')?.value ?? '', 10);
       const ny = parseInt(getElementById<HTMLInputElement>('supercell-y')?.value ?? '', 10);
       const nz = parseInt(getElementById<HTMLInputElement>('supercell-z')?.value ?? '', 10);
@@ -248,7 +264,7 @@ export function setup(callbacks: AppLatticeContext): void {
       }
       vscode.postMessage({ command: 'setSupercell', supercell: [nx, ny, nz] });
       setError('');
-    };
+    });
   }
 
   // ── Scale / size sliders ───────────────────────────────────────────────────
@@ -264,7 +280,7 @@ export function setup(callbacks: AppLatticeContext): void {
       const scaleValue = getElementById<HTMLElement>('scale-value');
       if (scaleValue) scaleValue.textContent = displayStore.manualScale.toFixed(1);
       if (!displayStore.autoScaleEnabled && structureStore.currentStructure) {
-        renderer.renderStructure(structureStore.currentStructure, { updateCounts, updateAtomList });
+        debouncedRenderStructure();
       }
     });
   }
@@ -275,7 +291,7 @@ export function setup(callbacks: AppLatticeContext): void {
       const sizeValue = getElementById<HTMLElement>('size-value');
       if (sizeValue) sizeValue.textContent = displayStore.atomSizeScale.toFixed(2);
       if (structureStore.currentStructure) {
-        renderer.renderStructure(structureStore.currentStructure, { updateCounts, updateAtomList });
+        debouncedRenderStructure();
       }
     });
   }
@@ -286,7 +302,7 @@ export function setup(callbacks: AppLatticeContext): void {
       const bondSizeValue = getElementById<HTMLElement>('bond-size-value');
       if (bondSizeValue) bondSizeValue.textContent = displayStore.bondThicknessScale.toFixed(1);
       if (structureStore.currentStructure) {
-        renderer.renderStructure(structureStore.currentStructure, { updateCounts, updateAtomList });
+        debouncedRenderStructure();
       }
     });
   }
@@ -312,7 +328,7 @@ export function setup(callbacks: AppLatticeContext): void {
     globalSlider.addEventListener('input', (event: Event) => {
       displayStore.atomSizeGlobal = clampAtomSize((event.target as HTMLInputElement).value, displayStore.atomSizeGlobal || 0.3);
       updateAtomSizePanel();
-      rerenderCurrentStructure();
+      debouncedRerenderCurrentStructure();
     });
 
     useDefaultCheckbox.addEventListener('change', (event: Event) => {
@@ -333,7 +349,7 @@ export function setup(callbacks: AppLatticeContext): void {
         if (baseId) { displayStore.atomSizeByAtom[baseId] = nextSize; }
       }
       updateAtomSizePanel();
-      rerenderCurrentStructure();
+      debouncedRerenderCurrentStructure();
     });
 
     resetSelectedButton.addEventListener('click', () => {

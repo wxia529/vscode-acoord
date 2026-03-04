@@ -9,6 +9,7 @@
  * setup(callbacks) must be called once during app initialisation.
  */
 import { selectionStore, interactionStore } from './state';
+import { debounce } from './utils/performance';
 import type { VscodeContext, SelectionContext, TransformContext } from './types';
 
 /** Combined context for appTools module */
@@ -32,7 +33,7 @@ export function setup(callbacks: AppToolsContext): void {
   const btnApplyAngle = document.getElementById('btn-apply-angle') as HTMLButtonElement | null;
 
   if (btnApplyBond) {
-    btnApplyBond.onclick = () => {
+    btnApplyBond.addEventListener('click', () => {
       const value = parseFloat((document.getElementById('bond-length-input') as HTMLInputElement | null)?.value ?? '');
       if (!Number.isFinite(value)) { return; }
       if (selectionStore.selectedAtomIds.length < 2) { return; }
@@ -41,15 +42,15 @@ export function setup(callbacks: AppToolsContext): void {
         atomIds: selectionStore.selectedAtomIds.slice(0, 2),
         length: value,
       });
-    };
+    });
   }
 
   if (btnApplyAngle) {
-    btnApplyAngle.onclick = () => {
+    btnApplyAngle.addEventListener('click', () => {
       const value = parseFloat((document.getElementById('bond-angle-input') as HTMLInputElement | null)?.value ?? '');
       if (!Number.isFinite(value)) { return; }
       applyBondAngle(value);
-    };
+    });
   }
 
   // ── Bond Tools ─────────────────────────────────────────────────────────────
@@ -59,14 +60,14 @@ export function setup(callbacks: AppToolsContext): void {
   const btnRecalculateBonds = document.getElementById('btn-recalculate-bonds') as HTMLButtonElement | null;
 
   if (btnCreateBond) {
-    btnCreateBond.onclick = () => {
+    btnCreateBond.addEventListener('click', () => {
       if (!selectionStore.selectedAtomIds || selectionStore.selectedAtomIds.length < 2) { return; }
       vscode.postMessage({ command: 'createBond', atomIds: selectionStore.selectedAtomIds.slice(-2) });
-    };
+    });
   }
 
   if (btnDeleteBond) {
-    btnDeleteBond.onclick = () => {
+    btnDeleteBond.addEventListener('click', () => {
       const selectedBondKeys = getSelectedBondKeys();
       if (selectedBondKeys.length > 0) {
         vscode.postMessage({ command: 'deleteBond', bondKeys: selectedBondKeys });
@@ -75,13 +76,13 @@ export function setup(callbacks: AppToolsContext): void {
       if (selectionStore.selectedAtomIds && selectionStore.selectedAtomIds.length >= 2) {
         vscode.postMessage({ command: 'deleteBond', atomIds: selectionStore.selectedAtomIds.slice(-2) });
       }
-    };
+    });
   }
 
   if (btnRecalculateBonds) {
-    btnRecalculateBonds.onclick = () => {
+    btnRecalculateBonds.addEventListener('click', () => {
       vscode.postMessage({ command: 'recalculateBonds' });
-    };
+    });
   }
 
   // ── Rotate Selection ───────────────────────────────────────────────────────
@@ -101,17 +102,21 @@ export function setup(callbacks: AppToolsContext): void {
     callbacks.resetRotationBase?.();
   };
 
-  if (rotX) rotX.onclick = () => { setAxis('x'); };
-  if (rotY) rotY.onclick = () => { setAxis('y'); };
-  if (rotZ) rotZ.onclick = () => { setAxis('z'); };
+  if (rotX) rotX.addEventListener('click', () => { setAxis('x'); });
+  if (rotY) rotY.addEventListener('click', () => { setAxis('y'); });
+  if (rotZ) rotZ.addEventListener('click', () => { setAxis('z'); });
   setAxis(interactionStore.rotationAxis || 'z');
 
   if (rotSlider) {
+    const debouncedApplyRotationPreview = debounce((value: number) => {
+      applyRotation(value, true);
+    }, 16);
+
     rotSlider.addEventListener('input', (event: Event) => {
       const value = parseFloat((event.target as HTMLInputElement).value);
       if (!Number.isFinite(value)) { return; }
       if (rotInput) rotInput.value = value.toFixed(0);
-      applyRotation(value, true);
+      debouncedApplyRotationPreview(value);
     });
 
     rotSlider.addEventListener('change', (event: Event) => {
@@ -140,10 +145,14 @@ export function setup(callbacks: AppToolsContext): void {
   const adsorptionInput = document.getElementById('adsorption-input') as HTMLInputElement | null;
 
   if (adsorptionSlider) {
+    const debouncedApplyAdsorptionPreview = debounce((value: number) => {
+      applyAdsorptionDistance(value, true);
+    }, 16);
+
     adsorptionSlider.addEventListener('input', (event: Event) => {
       const value = parseFloat((event.target as HTMLInputElement).value);
       if (!Number.isFinite(value)) { return; }
-      applyAdsorptionDistance(value, true);
+      debouncedApplyAdsorptionPreview(value);
     });
 
     adsorptionSlider.addEventListener('change', (event: Event) => {

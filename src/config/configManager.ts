@@ -6,7 +6,6 @@ import { BUILTIN_PRESETS } from './presets';
 import {
   DisplayConfig,
   DisplaySettings,
-  ConfigManifest,
   ConfigMeta,
   ConfigChangeEvent
 } from './types';

@@ -26,9 +26,7 @@ const PARSER_MAP: Record<string, BaseStructureParser> = {
   inp: new ORCAParser(),
   in: new QEParser(),
   pwi: new QEParser(),
-  out: new QEParser(),
   pwo: new QEParser(),
-  log: new QEParser(),
   xdatcar: new XDATCARParser(),
   outcar: new OUTCARParser(),
   pdb: new PDBParser(),
@@ -88,13 +86,13 @@ export class FileManager {
     }
 
     if (ext === 'out' || ext === 'log') {
-      const parsersToTry = [
-        { name: 'Quantum ESPRESSO', parser: PARSER_MAP['out'] },
+      const parsersToTry: Array<{ name: string; parser: BaseStructureParser }> = [
+        { name: 'Quantum ESPRESSO', parser: PARSER_MAP['in'] },
         { name: 'ORCA', parser: PARSER_MAP['inp'] },
         { name: 'Gaussian', parser: PARSER_MAP['gjf'] },
       ];
 
-      for (const { name, parser } of parsersToTry) {
+      for (const { parser } of parsersToTry) {
         if (!parser) {continue;}
         try {
           const result = parser.parseTrajectory(content);
@@ -140,7 +138,7 @@ export class FileManager {
     return parser.serializeTrajectory(structures);
   }
 
-  static ensureStructureName(structure: Structure, filePath?: string) {
+  static ensureStructureName(structure: Structure, _filePath?: string) {
     const current = (structure.name || '').trim();
     if (current) {
       return;

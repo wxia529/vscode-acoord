@@ -437,34 +437,56 @@ export class Structure {
             }
           }
         } else if (isHalfSpace(ox, oy, oz)) {
-          // Different cell - check all atoms in this image
-          // Apply periodic offset to atom positions
+          // Different cell - use spatial hash of image atoms for O(n*k) performance
           const offsetX = ox * vectors[0][0] + oy * vectors[1][0] + oz * vectors[2][0];
           const offsetY = ox * vectors[0][1] + oy * vectors[1][1] + oz * vectors[2][1];
           const offsetZ = ox * vectors[0][2] + oy * vectors[1][2] + oz * vectors[2][2];
 
-          for (const atom2 of this.atoms) {
-            const data2 = atomData.get(atom2.id)!;
-            const radius2 = data2.radius;
-            const bondLength = (radius1 + radius2) * tolerance;
+          // Build spatial hash for this image (atoms shifted by periodic offset)
+          const imageGrid = new Map<string, Atom[]>();
+          for (const atom of this.atoms) {
+            const ix = Math.floor((atom.x + offsetX) / cellSize);
+            const iy = Math.floor((atom.y + offsetY) / cellSize);
+            const iz = Math.floor((atom.z + offsetZ) / cellSize);
+            const ck = `${ix},${iy},${iz}`;
+            const bucket = imageGrid.get(ck);
+            if (bucket) { bucket.push(atom); } else { imageGrid.set(ck, [atom]); }
+          }
 
-            // Calculate distance to periodic image
-            const dx = (atom2.x + offsetX) - atom1.x;
-            const dy = (atom2.y + offsetY) - atom1.y;
-            const dz = (atom2.z + offsetZ) - atom1.z;
-            const distanceSq = dx * dx + dy * dy + dz * dz;
+          // Query neighbors of atom1 from image hash
+          const cx1 = Math.floor(atom1.x / cellSize);
+          const cy1 = Math.floor(atom1.y / cellSize);
+          const cz1 = Math.floor(atom1.z / cellSize);
+          const range = Math.ceil(maxBondLength / cellSize);
+          for (let ddx = -range; ddx <= range; ddx++) {
+            for (let ddy = -range; ddy <= range; ddy++) {
+              for (let ddz = -range; ddz <= range; ddz++) {
+                const bucket = imageGrid.get(`${cx1 + ddx},${cy1 + ddy},${cz1 + ddz}`);
+                if (!bucket) {continue;}
+                for (const atom2 of bucket) {
+                  const data2 = atomData.get(atom2.id)!;
+                  const radius2 = data2.radius;
+                  const bondLength = (radius1 + radius2) * tolerance;
 
-            if (distanceSq < bondLength * bondLength) {
-              const key = Structure.bondKey(atom1.id, atom2.id);
-              if (suppressed.has(key) || seen.has(key)) {continue;}
-              bonds.push({
-                atomId1: atom1.id,
-                atomId2: atom2.id,
-                distance: Math.sqrt(distanceSq),
-                manual: false,
-                image: [ox, oy, oz],
-              });
-              seen.add(key);
+                  const dx = (atom2.x + offsetX) - atom1.x;
+                  const dy = (atom2.y + offsetY) - atom1.y;
+                  const dz = (atom2.z + offsetZ) - atom1.z;
+                  const distanceSq = dx * dx + dy * dy + dz * dz;
+
+                  if (distanceSq < bondLength * bondLength) {
+                    const key = Structure.bondKey(atom1.id, atom2.id);
+                    if (suppressed.has(key) || seen.has(key)) {continue;}
+                    bonds.push({
+                      atomId1: atom1.id,
+                      atomId2: atom2.id,
+                      distance: Math.sqrt(distanceSq),
+                      manual: false,
+                      image: [ox, oy, oz],
+                    });
+                    seen.add(key);
+                  }
+                }
+              }
             }
           }
         }

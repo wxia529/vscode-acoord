@@ -132,8 +132,8 @@ export function updateAtomList(
         + (hasSizeOverride ? ' size-override' : '');
       item.textContent = atom.element + ' #' + (index + 1);
       item.title = atom.id;
-      item.onclick = (event: MouseEvent) =>
-        handleSelect(atom.id, (event.ctrlKey || event.metaKey), false, vscode, callbacks);
+      item.addEventListener('click', (event: MouseEvent) =>
+        handleSelect(atom.id, (event.ctrlKey || event.metaKey), false, vscode, callbacks));
       atomList.appendChild(item);
     });
   }

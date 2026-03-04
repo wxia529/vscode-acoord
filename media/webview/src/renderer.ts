@@ -204,7 +204,8 @@ function init(canvas: HTMLCanvasElement, handlers: { setError: (m: string) => vo
   rendererState.setError = handlers.setError;
   rendererState.setStatus = handlers.setStatus;
 
-  const container = document.getElementById('container')!;
+  const container = document.getElementById('container');
+  if (!container) { handlers.setError('Container element not found.'); return; }
   const rect = container.getBoundingClientRect();
   const width = Math.max(1, rect.width - 250);
   const height = Math.max(1, rect.height);
@@ -322,7 +323,8 @@ function updateLightsForCamera(): void {
 
 function onResize(): void {
   if (!rendererState.renderer || !rendererState.camera) return;
-  const container = document.getElementById('container')!;
+  const container = document.getElementById('container');
+  if (!container) return;
   const rect = container.getBoundingClientRect();
   const width = Math.max(1, rect.width - 250);
   const height = Math.max(1, rect.height);
@@ -818,11 +820,11 @@ function setProjectionMode(mode: string): void {
   if (rendererState.projectionMode === nextMode) return;
   if (!rendererState.renderer || !rendererState.camera) return;
 
-  const container = document.getElementById('container')!;
+  const container = document.getElementById('container');
+  if (!container) return;
   const rect = container.getBoundingClientRect();
   const width = Math.max(1, rect.width - 250);
   const height = Math.max(1, rect.height);
-
   const oldCamera = rendererState.camera;
   const ctrl = rendererState.controls as TrackballControls | null;
   const previousTarget = ctrl && ctrl.target ? ctrl.target.clone() : null;

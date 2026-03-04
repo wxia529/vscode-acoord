@@ -1,5 +1,4 @@
 import * as vscode from 'vscode';
-import * as path from 'path';
 import { Structure } from '../models/structure';
 import { RenderMessageBuilder } from '../renderers/renderMessageBuilder';
 import { ConfigManager } from '../config/configManager';
@@ -15,7 +14,7 @@ import { UnitCellService } from '../services/unitCellService';
 import { MessageRouter } from '../services/messageRouter';
 import { DisplayConfigService } from '../services/displayConfigService';
 import { DocumentService } from '../services/documentService';
-import type { WebviewToExtensionMessage, ImageSavedMessage, ImageSaveFailedMessage, WireDisplaySettings } from '../shared/protocol';
+import type { WebviewToExtensionMessage, WireDisplaySettings } from '../shared/protocol';
 
 export class StructureDocument implements vscode.CustomDocument {
   /** Frames restored from a hot-exit backup, if one was present at open time. */
@@ -90,8 +89,6 @@ export class StructureEditorProvider implements vscode.CustomEditorProvider<Stru
     webviewPanel: vscode.WebviewPanel,
     _token: vscode.CancellationToken
   ): Promise<void> {
-    const uri = document.uri.fsPath;
-
     await this.configManager.initialize();
 
     let frames: Structure[];
@@ -162,7 +159,6 @@ export class StructureEditorProvider implements vscode.CustomEditorProvider<Stru
       webviewPanel,
       () => this.renderStructure(session),
       () => selectionService.clearSelection(),
-      displaySettings
     );
 
     // Set messageRouter in session (hacky but necessary)

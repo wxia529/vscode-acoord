@@ -9,7 +9,6 @@ import { UnitCellService } from './unitCellService';
 import { DocumentService } from './documentService';
 import { DisplayConfigService } from './displayConfigService';
 import type { WebviewToExtensionMessage, MessageByCommand } from '../shared/protocol';
-import type { DisplaySettings } from '../config/types';
 
 type AnyHandler = (message: unknown) => Promise<boolean> | boolean;
 
@@ -37,7 +36,6 @@ export class MessageRouter {
     private webviewPanel: vscode.WebviewPanel,
     private onRenderRequired: () => void,
     private onSelectionClearRequired: () => void,
-    private sessionDisplaySettings?: DisplaySettings
   ) {
     this.registerCoreCommands();
     this.registerSelectionCommands();

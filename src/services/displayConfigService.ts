@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import { ConfigManager } from '../config/configManager';
-import { DisplaySettings, DisplayConfig } from '../config/types';
+import { DisplaySettings } from '../config/types';
 import type { WireDisplaySettings } from '../shared/protocol';
 
 export type PostMessageCallback = (message: any) => void;

@@ -190,14 +190,6 @@ export class QEParser extends BaseStructureParser {
     return structure;
   }
 
-  private parseOutput(lines: string[]): Structure {
-    const frames = this.parseOutputTrajectory(lines);
-    if (frames.length === 0) {
-      throw new Error('Invalid QE output log: no atom positions found');
-    }
-    return frames[frames.length - 1];
-  }
-
   private parseOutputTrajectory(lines: string[]): Structure[] {
     const nat = this.extractNat(lines);
     let alat = this.extractAlat(lines);

@@ -3,10 +3,8 @@ import { ELEMENT_DATA, parseElement } from '../utils/elementData';
 import type {
   WireAtom,
   WireBond,
-  WireRenderData,
   WireUnitCell,
   WireUnitCellParams,
-  WireDisplaySettings,
   RenderMessage,
 } from '../shared/protocol';
 

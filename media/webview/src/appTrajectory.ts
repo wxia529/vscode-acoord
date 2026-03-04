@@ -142,19 +142,19 @@ export function setup(vscode: VsCodeApi): void {
   const speedSlider = document.getElementById('traj-speed-slider') as HTMLInputElement | null;
 
   if (firstFrameBtn) {
-    firstFrameBtn.onclick = () => { jumpToFrame(0); };
+    firstFrameBtn.addEventListener('click', () => { jumpToFrame(0); });
   }
   if (prevFrameBtn) {
-    prevFrameBtn.onclick = () => { jumpToFrame(trajectoryStore.trajectoryFrameIndex - 1); };
+    prevFrameBtn.addEventListener('click', () => { jumpToFrame(trajectoryStore.trajectoryFrameIndex - 1); });
   }
   if (nextFrameBtn) {
-    nextFrameBtn.onclick = () => { jumpToFrame(trajectoryStore.trajectoryFrameIndex + 1); };
+    nextFrameBtn.addEventListener('click', () => { jumpToFrame(trajectoryStore.trajectoryFrameIndex + 1); });
   }
   if (lastFrameBtn) {
-    lastFrameBtn.onclick = () => { jumpToFrame(trajectoryStore.trajectoryFrameCount - 1); };
+    lastFrameBtn.addEventListener('click', () => { jumpToFrame(trajectoryStore.trajectoryFrameCount - 1); });
   }
   if (playTrajectoryBtn) {
-    playTrajectoryBtn.onclick = () => { setPlaying(!trajectoryStore.trajectoryPlaying); };
+    playTrajectoryBtn.addEventListener('click', () => { setPlaying(!trajectoryStore.trajectoryPlaying); });
   }
   if (frameInput) {
     // Debounced frame input commit (prevents flooding during typing)

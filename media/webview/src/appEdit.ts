@@ -22,11 +22,11 @@ export function setup(callbacks: AppEditContext): void {
   const btnAddAtomForm = document.getElementById('btn-add-atom-form') as HTMLButtonElement | null;
 
   if (btnAddAtom && elementInput) {
-    btnAddAtom.onclick = () => { elementInput.focus(); };
+    btnAddAtom.addEventListener('click', () => { elementInput.focus(); });
   }
 
   if (btnAddAtomForm) {
-    btnAddAtomForm.onclick = () => {
+    btnAddAtomForm.addEventListener('click', () => {
       const element = (document.getElementById('element-input') as HTMLInputElement | null)?.value.trim() ?? '';
       const x = parseFloat((document.getElementById('pos-x') as HTMLInputElement | null)?.value ?? '') || 0;
       const y = parseFloat((document.getElementById('pos-y') as HTMLInputElement | null)?.value ?? '') || 0;
@@ -42,7 +42,7 @@ export function setup(callbacks: AppEditContext): void {
         if (pyInput) pyInput.value = '';
         if (pzInput) pzInput.value = '';
       }
-    };
+    });
   }
 
   // ── Delete / Copy toolbar buttons ──────────────────────────────────────────
@@ -69,18 +69,18 @@ export function setup(callbacks: AppEditContext): void {
   const btnCopyAtom = document.getElementById('btn-copy-atom') as HTMLButtonElement | null;
 
   if (btnDeleteAtom) {
-    btnDeleteAtom.onclick = () => { deleteSelectedAtoms(); };
+    btnDeleteAtom.addEventListener('click', () => { deleteSelectedAtoms(); });
   }
 
   if (btnCopyAtom) {
-    btnCopyAtom.onclick = () => {
+    btnCopyAtom.addEventListener('click', () => {
       if (!selectionStore.selectedAtomIds || selectionStore.selectedAtomIds.length === 0) { return; }
       vscode.postMessage({
         command: 'copyAtoms',
         atomIds: selectionStore.selectedAtomIds,
         offset: { x: 0.5, y: 0.5, z: 0.5 },
       });
-    };
+    });
   }
 
   // ── Selected Atom panel ────────────────────────────────────────────────────
@@ -91,7 +91,7 @@ export function setup(callbacks: AppEditContext): void {
   const selY = document.getElementById('sel-y') as HTMLInputElement | null;
   const selZ = document.getElementById('sel-z') as HTMLInputElement | null;
 
-  if (btnApplyAtom) btnApplyAtom.onclick = applySelectedAtomChanges;
+  if (btnApplyAtom) btnApplyAtom.addEventListener('click', applySelectedAtomChanges);
   if (selElement) selElement.addEventListener('change', applySelectedAtomChanges);
   if (selX) selX.addEventListener('change', applySelectedAtomChanges);
   if (selY) selY.addEventListener('change', applySelectedAtomChanges);
@@ -101,11 +101,11 @@ export function setup(callbacks: AppEditContext): void {
 
   const btnChangeAtom = document.getElementById('btn-change-atom') as HTMLButtonElement | null;
   if (btnChangeAtom) {
-    btnChangeAtom.onclick = () => {
+    btnChangeAtom.addEventListener('click', () => {
       const element = (document.getElementById('change-element') as HTMLInputElement | null)?.value.trim() ?? '';
       if (!element || !selectionStore.selectedAtomIds || selectionStore.selectedAtomIds.length === 0) { return; }
       vscode.postMessage({ command: 'changeAtoms', atomIds: selectionStore.selectedAtomIds, element });
-    };
+    });
   }
 
   // ── Atom Color ─────────────────────────────────────────────────────────────
@@ -138,13 +138,13 @@ export function setup(callbacks: AppEditContext): void {
   }
 
   if (btnApplyAtomColor) {
-    btnApplyAtomColor.onclick = () => {
+    btnApplyAtomColor.addEventListener('click', () => {
       const color = syncColorInputs(
         (atomColorText?.value ?? '') || (atomColorPicker?.value ?? '')
       );
       if (!color || !selectionStore.selectedAtomIds || selectionStore.selectedAtomIds.length === 0) { return; }
       vscode.postMessage({ command: 'setAtomColor', atomIds: selectionStore.selectedAtomIds, color });
-    };
+    });
   }
 
   // ── Keyboard shortcuts (global — delete, undo, save) ──────────────────────

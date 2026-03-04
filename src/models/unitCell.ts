@@ -61,14 +61,19 @@ export class UnitCell {
     const betaRad = (this.beta * Math.PI) / 180;
     const gammaRad = (this.gamma * Math.PI) / 180;
 
-    const ca = Math.cos(alphaRad);
-    const cb = Math.cos(betaRad);
-    const cg = Math.cos(gammaRad);
+    const sinGamma = Math.sin(gammaRad);
+
+    if (Math.abs(sinGamma) < 1e-10) {
+      throw new Error(
+        `Invalid unit cell parameters: sin(gamma)=0 (gamma=${this.gamma}°). ` +
+        `Gamma must be strictly between 0° and 180°.`
+      );
+    }
 
     const a_vec = [this.a, 0, 0];
     const b_vec = [
       this.b * Math.cos(gammaRad),
-      this.b * Math.sin(gammaRad),
+      this.b * sinGamma,
       0,
     ];
 
@@ -77,7 +82,7 @@ export class UnitCell {
     const c_y =
       (this.c *
         (Math.cos(alphaRad) - Math.cos(betaRad) * Math.cos(gammaRad))) /
-      Math.sin(gammaRad);
+      sinGamma;
     const c_z_sq = this.c * this.c - c_x * c_x - c_y * c_y;
 
     if (c_z_sq < 0 || c_z_sq !== c_z_sq) {

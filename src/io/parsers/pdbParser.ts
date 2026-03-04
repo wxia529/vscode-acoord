@@ -73,10 +73,15 @@ export class PDBParser extends BaseStructureParser {
 
     let atomIndex = 1;
     for (const atom of structure.atoms) {
-      const serial = String(atomIndex).padStart(6, ' ');
-      const name = atom.element.length === 2
-        ? atom.element
-        : atom.element.padEnd(2, ' ');
+      // PDB cols 7-11: serial number (5 chars, right-justified)
+      const serial = String(atomIndex).padStart(5, ' ');
+      // PDB cols 13-16: atom name (4 chars). 1-char elements: " C  "; 2-char elements: "FE  "
+      const rawName = atom.element.length >= 2
+        ? atom.element.substring(0, 2).toUpperCase()
+        : atom.element.toUpperCase();
+      const name = rawName.length === 2
+        ? rawName.padEnd(4, ' ')
+        : (' ' + rawName).padEnd(4, ' ');
       const resName = 'MOL';
       const chainID = ' ';
       const resSeq = '   1';

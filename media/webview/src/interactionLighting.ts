@@ -1,6 +1,12 @@
 import { lightingStore, displayStore } from './state';
 import { renderer } from './renderer';
 import { updateSettings } from './configHandler';
+import { debounce } from './utils/performance';
+
+// Debounced lighting update to avoid excessive GPU work during slider drag (16ms = 60fps)
+const debouncedUpdateLighting = debounce((): void => {
+  renderer.updateLighting();
+}, 16);
 
 export interface LightPickerState {
   activeLightPicker: string | null;
@@ -98,7 +104,7 @@ function setupLightSliders(prefix: string): void {
       if (!lightObj) return;
       lightObj.intensity = parseFloat(intensitySlider.value);
       if (intensityValue) intensityValue.textContent = lightObj.intensity.toFixed(1);
-      renderer.updateLighting();
+      debouncedUpdateLighting();
       updateSettings();
     });
   }
@@ -108,7 +114,7 @@ function setupLightSliders(prefix: string): void {
       if (!lightObj) return;
       lightObj.x = parseInt(xSlider.value);
       if (xValue) xValue.textContent = String(lightObj.x);
-      renderer.updateLighting();
+      debouncedUpdateLighting();
       updateSettings();
     });
   }
@@ -118,7 +124,7 @@ function setupLightSliders(prefix: string): void {
       if (!lightObj) return;
       lightObj.y = parseInt(ySlider.value);
       if (yValue) yValue.textContent = String(lightObj.y);
-      renderer.updateLighting();
+      debouncedUpdateLighting();
       updateSettings();
     });
   }
@@ -128,7 +134,7 @@ function setupLightSliders(prefix: string): void {
       if (!lightObj) return;
       lightObj.z = parseInt(zSlider.value);
       if (zValue) zValue.textContent = String(lightObj.z);
-      renderer.updateLighting();
+      debouncedUpdateLighting();
       updateSettings();
     });
   }
@@ -185,7 +191,7 @@ export function init(canvas: HTMLCanvasElement, onSetStatus: (msg: string) => vo
     ambientSlider.addEventListener('input', () => {
       lightingStore.ambientIntensity = parseFloat(ambientSlider.value);
       if (ambientValue) ambientValue.textContent = lightingStore.ambientIntensity.toFixed(1);
-      renderer.updateLighting();
+      debouncedUpdateLighting();
       updateSettings();
     });
   }
@@ -199,7 +205,7 @@ export function init(canvas: HTMLCanvasElement, onSetStatus: (msg: string) => vo
     shininessSlider.addEventListener('input', () => {
       displayStore.shininess = Math.max(0, Math.min(200, Number(shininessSlider.value) || 50));
       if (shininessValue) shininessValue.textContent = String(Math.round(displayStore.shininess));
-      renderer.updateLighting();
+      debouncedUpdateLighting();
       updateSettings();
     });
   }
