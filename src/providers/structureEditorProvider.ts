@@ -27,6 +27,8 @@ export class StructureDocument implements vscode.CustomDocument {
 }
 
 class EditorSession {
+  messageRouter!: MessageRouter;
+  
   constructor(
     readonly key: string,
     readonly document: StructureDocument,
@@ -38,7 +40,8 @@ class EditorSession {
     readonly bondService: BondService,
     readonly atomEditService: AtomEditService,
     readonly unitCellService: UnitCellService,
-    readonly messageRouter: MessageRouter,
+    readonly documentService: DocumentService,
+    readonly displayConfigService: DisplayConfigService,
     displaySettings?: DisplaySettings
   ) {
     this.displaySettings = displaySettings;
@@ -103,17 +106,12 @@ export class StructureEditorProvider implements vscode.CustomEditorProvider<Stru
     const bondService = new BondService(renderer, traj, undoManager, selectionService);
     const atomEditService = new AtomEditService(renderer, traj, undoManager);
     const unitCellService = new UnitCellService(renderer, traj, undoManager);
-    const messageRouter = new MessageRouter(
-      renderer,
-      traj,
-      undoManager,
-      selectionService,
-      bondService,
-      atomEditService,
-      unitCellService
-    );
-
+    const documentService = new DocumentService();
+    const displayConfigService = new DisplayConfigService(this.configManager);
     const defaultConfig = this.configManager.getCurrentConfig();
+    const displaySettings = defaultConfig?.settings;
+
+    // Create session without messageRouter first to avoid circular dependency
     const session = new EditorSession(
       key,
       document,
@@ -125,9 +123,38 @@ export class StructureEditorProvider implements vscode.CustomEditorProvider<Stru
       bondService,
       atomEditService,
       unitCellService,
-      messageRouter,
-      defaultConfig?.settings
+      documentService,
+      displayConfigService,
+      displaySettings
     );
+
+    // Set up displayConfigService callbacks
+    displayConfigService.setCallbacks(
+      (message) => webviewPanel.webview.postMessage(message),
+      session
+    );
+
+    // Create messageRouter with all required dependencies
+    const messageRouter = new MessageRouter(
+      renderer,
+      traj,
+      undoManager,
+      selectionService,
+      bondService,
+      atomEditService,
+      unitCellService,
+      documentService,
+      displayConfigService,
+      key,
+      webviewPanel,
+      () => this.renderStructure(session),
+      () => selectionService.clearSelection(),
+      displaySettings
+    );
+
+    // Set messageRouter in session (hacky but necessary)
+    (session as any).messageRouter = messageRouter;
+
     this.sessions.set(key, session);
 
     webviewPanel.webview.options = {
@@ -181,7 +208,7 @@ export class StructureEditorProvider implements vscode.CustomEditorProvider<Stru
     message: WebviewToExtensionMessage,
     session: EditorSession
   ) {
-    const { renderer, trajectoryManager: traj, undoManager: undo, messageRouter } = session;
+    const { messageRouter } = session;
 
     if (message.command === 'undo') {
       const hadContent = !session.undoManager.isEmpty;
@@ -213,96 +240,6 @@ export class StructureEditorProvider implements vscode.CustomEditorProvider<Stru
         this.renderStructure(session);
       }
       return;
-    }
-
-    if (await this.handleDocumentCommands(message, session)) {
-      return;
-    }
-    await this.handleDisplayConfigCommands(message, session);
-  }
-
-  private async handleDocumentCommands(message: WebviewToExtensionMessage, session: EditorSession): Promise<boolean> {
-    const { renderer, trajectoryManager: traj, undoManager: undo, webviewPanel } = session;
-    const documentService = new DocumentService();
-
-    switch (message.command) {
-      case 'saveStructure':
-        await documentService.saveStructure(session.key, traj.activeStructure, traj.frames);
-        return true;
-
-      case 'saveStructureAs':
-        await documentService.saveStructureAs(session.key, traj.activeStructure, traj.frames, traj);
-        return true;
-
-      case 'saveRenderedImage': {
-        const dataUrl = typeof message.dataUrl === 'string' ? message.dataUrl : '';
-        const suggestedName = message.suggestedName || '';
-        await documentService.saveRenderedImage(dataUrl, suggestedName, webviewPanel);
-        return true;
-      }
-
-      case 'openSource':
-        await documentService.openSource(session.key);
-        return true;
-
-      case 'reloadStructure': {
-        await documentService.reloadStructure(session.key, traj, undo, renderer);
-        session.selectionService.clearSelection();
-        this.renderStructure(session);
-        return true;
-      }
-
-      default:
-        return false;
-    }
-  }
-
-  private async handleDisplayConfigCommands(message: WebviewToExtensionMessage, session: EditorSession): Promise<boolean> {
-    const displayConfigService = new DisplayConfigService(this.configManager);
-
-    switch (message.command) {
-      case 'getDisplayConfigs':
-        await this.handleGetDisplayConfigs(session.webviewPanel);
-        return true;
-
-      case 'loadDisplayConfig':
-        await this.handleLoadDisplayConfig(message.configId, session);
-        return true;
-
-      case 'promptSaveDisplayConfig':
-        await this.handlePromptSaveDisplayConfig(message, session);
-        return true;
-
-      case 'saveDisplayConfig':
-        await this.handleSaveDisplayConfig(message, session.webviewPanel, session.key);
-        return true;
-
-      case 'getCurrentDisplaySettings':
-        await this.handleGetCurrentDisplaySettings(session.webviewPanel, session.key);
-        return true;
-
-      case 'updateDisplaySettings':
-        displayConfigService.updateDisplaySettings(message.settings, session);
-        return true;
-
-      case 'exportDisplayConfigs':
-        await this.handleExportDisplayConfigs(session.webviewPanel);
-        return true;
-
-      case 'importDisplayConfigs':
-        await this.handleImportDisplayConfigs(session.webviewPanel);
-        return true;
-
-      case 'confirmDeleteDisplayConfig':
-        await this.handleConfirmDeleteDisplayConfig(message.configId as string, session.webviewPanel);
-        return true;
-
-      case 'deleteDisplayConfig':
-        await this.handleDeleteDisplayConfig(message.configId as string, session.webviewPanel);
-        return true;
-
-      default:
-        return false;
     }
   }
 
@@ -494,19 +431,8 @@ export class StructureEditorProvider implements vscode.CustomEditorProvider<Stru
   }
 
   async notifyConfigChange(config: DisplayConfig): Promise<void> {
+    // Notify ALL sessions, not just the first active one
     for (const session of this.sessions.values()) {
-      if (session.webviewPanel.active) {
-        session.displaySettings = config.settings;
-        session.webviewPanel.webview.postMessage({
-          command: 'displayConfigChanged',
-          config: config
-        });
-        return;
-      }
-    }
-    const sessions = Array.from(this.sessions.values());
-    if (sessions.length > 0) {
-      const session = sessions[sessions.length - 1];
       session.displaySettings = config.settings;
       session.webviewPanel.webview.postMessage({
         command: 'displayConfigChanged',
@@ -522,195 +448,5 @@ export class StructureEditorProvider implements vscode.CustomEditorProvider<Stru
       }
     }
     return null;
-  }
-
-  private async handleGetDisplayConfigs(webviewPanel: vscode.WebviewPanel): Promise<void> {
-    try {
-      const configs = await this.configManager.listConfigs();
-      webviewPanel.webview.postMessage({
-        command: 'displayConfigsLoaded',
-        presets: configs.presets,
-        user: configs.user
-      });
-    } catch (error) {
-      webviewPanel.webview.postMessage({
-        command: 'displayConfigError',
-        error: String(error)
-      });
-    }
-  }
-
-  private async handleLoadDisplayConfig(configId: string, session: EditorSession): Promise<void> {
-    try {
-      const config = await this.configManager.loadConfig(configId);
-      session.displaySettings = config.settings;
-      session.webviewPanel.webview.postMessage({
-        command: 'displayConfigLoaded',
-        config: config
-      });
-    } catch (error) {
-      session.webviewPanel.webview.postMessage({
-        command: 'displayConfigError',
-        error: String(error)
-      });
-    }
-  }
-
-  private async handleSaveDisplayConfig(
-    message: any,
-    webviewPanel: vscode.WebviewPanel,
-    _key: string
-  ): Promise<void> {
-    try {
-      const config = await this.configManager.saveUserConfig(
-        message.name,
-        message.settings,
-        message.description,
-        message.existingId
-      );
-      webviewPanel.webview.postMessage({
-        command: 'displayConfigSaved',
-        config: config
-      });
-    } catch (error) {
-      webviewPanel.webview.postMessage({
-        command: 'displayConfigError',
-        error: String(error)
-      });
-    }
-  }
-
-  private async handlePromptSaveDisplayConfig(
-    message: any,
-    session: EditorSession
-  ): Promise<void> {
-    const messageSettings = message.settings as DisplaySettings | undefined;
-    const settings = messageSettings || session.displaySettings;
-    if (!settings) {
-      session.webviewPanel.webview.postMessage({
-        command: 'displayConfigError',
-        error: 'No display settings available to save'
-      });
-      return;
-    }
-
-    const name = await vscode.window.showInputBox({
-      prompt: 'Enter configuration name',
-      placeHolder: 'My Display Config'
-    });
-    if (!name) { return; }
-
-    const description = await vscode.window.showInputBox({
-      prompt: 'Enter description (optional)',
-      placeHolder: 'Description of this configuration'
-    });
-
-    try {
-      const config = await this.configManager.saveUserConfig(
-        name,
-        settings,
-        description || undefined
-      );
-      session.webviewPanel.webview.postMessage({
-        command: 'displayConfigSaved',
-        config: config
-      });
-      await this.handleGetDisplayConfigs(session.webviewPanel);
-    } catch (error) {
-      session.webviewPanel.webview.postMessage({
-        command: 'displayConfigError',
-        error: String(error)
-      });
-    }
-  }
-
-  private async handleGetCurrentDisplaySettings(
-    webviewPanel: vscode.WebviewPanel,
-    key: string
-  ): Promise<void> {
-    const session = this.sessions.get(key);
-    if (session && session.displaySettings) {
-      webviewPanel.webview.postMessage({
-        command: 'currentDisplaySettings',
-        settings: session.displaySettings
-      });
-    }
-  }
-
-  private async handleExportDisplayConfigs(webviewPanel: vscode.WebviewPanel): Promise<void> {
-    try {
-      const configs = await this.configManager.listConfigs();
-      const allConfigs = [...configs.presets, ...configs.user];
-      const items = allConfigs.map(c => ({
-        label: c.name,
-        description: c.isPreset ? 'Preset' : 'User Config',
-        picked: false,
-        id: c.id
-      }));
-
-      const selected = await vscode.window.showQuickPick(items, {
-        canPickMany: true,
-        placeHolder: 'Select configurations to export'
-      });
-
-      if (!selected || selected.length === 0) { return; }
-      await this.configManager.exportConfigs(selected.map(s => s.id!));
-    } catch (error) {
-      webviewPanel.webview.postMessage({
-        command: 'displayConfigError',
-        error: String(error)
-      });
-    }
-  }
-
-  private async handleImportDisplayConfigs(webviewPanel: vscode.WebviewPanel): Promise<void> {
-    try {
-      await this.configManager.importConfigs();
-      await this.handleGetDisplayConfigs(webviewPanel);
-    } catch (error) {
-      webviewPanel.webview.postMessage({
-        command: 'displayConfigError',
-        error: String(error)
-      });
-    }
-  }
-
-  private async handleConfirmDeleteDisplayConfig(configId: string, webviewPanel: vscode.WebviewPanel): Promise<void> {
-    if (!configId) { return; }
-    try {
-      const configs = await this.configManager.listConfigs();
-      const target = configs.user.find((c) => c.id === configId);
-      if (!target) {
-        vscode.window.showErrorMessage('Only user configurations can be deleted');
-        return;
-      }
-
-      const confirm = await vscode.window.showWarningMessage(
-        `Are you sure you want to delete "${target.name}"?`,
-        { modal: true },
-        'Delete'
-      );
-      if (confirm !== 'Delete') { return; }
-
-      await this.handleDeleteDisplayConfig(configId, webviewPanel);
-    } catch (error) {
-      webviewPanel.webview.postMessage({
-        command: 'displayConfigError',
-        error: String(error)
-      });
-    }
-  }
-
-  private async handleDeleteDisplayConfig(configId: string, webviewPanel: vscode.WebviewPanel): Promise<void> {
-    if (!configId) { return; }
-    try {
-      await this.configManager.deleteConfig(configId);
-      await this.handleGetDisplayConfigs(webviewPanel);
-    } catch (error) {
-      webviewPanel.webview.postMessage({
-        command: 'displayConfigError',
-        error: String(error)
-      });
-    }
   }
 }

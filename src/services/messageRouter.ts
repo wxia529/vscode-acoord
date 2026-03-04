@@ -6,7 +6,10 @@ import { SelectionService } from './selectionService';
 import { BondService } from './bondService';
 import { AtomEditService } from './atomEditService';
 import { UnitCellService } from './unitCellService';
+import { DocumentService } from './documentService';
+import { DisplayConfigService } from './displayConfigService';
 import type { WebviewToExtensionMessage } from '../types/messages';
+import type { DisplaySettings } from '../config/types';
 
 export interface MessageHandler {
   command: string;
@@ -23,13 +26,22 @@ export class MessageRouter {
     private selectionService: SelectionService,
     private bondService: BondService,
     private atomEditService: AtomEditService,
-    private unitCellService: UnitCellService
+    private unitCellService: UnitCellService,
+    private documentService: DocumentService,
+    private displayConfigService: DisplayConfigService,
+    private sessionKey: string,
+    private webviewPanel: vscode.WebviewPanel,
+    private onRenderRequired: () => void,
+    private onSelectionClearRequired: () => void,
+    private sessionDisplaySettings?: DisplaySettings
   ) {
     this.registerCoreCommands();
     this.registerSelectionCommands();
     this.registerAtomEditCommands();
     this.registerBondCommands();
     this.registerUnitCellCommands();
+    this.registerDocumentCommands();
+    this.registerDisplayConfigCommands();
   }
 
   register(handler: MessageHandler): void {
@@ -291,6 +303,99 @@ export class MessageRouter {
       const nz = Math.max(1, Math.floor(Number(sc[2]) || 1));
       this.unitCellService.setSupercell([nx, ny, nz]);
       return true;
+    });
+  }
+
+  private registerDocumentCommands(): void {
+    this.handlers.set('saveStructure', async () => {
+      await this.documentService.saveStructure(
+        this.sessionKey,
+        this.trajectoryManager.activeStructure,
+        this.trajectoryManager.frames
+      );
+      return true;
+    });
+
+    this.handlers.set('saveStructureAs', async () => {
+      await this.documentService.saveStructureAs(
+        this.sessionKey,
+        this.trajectoryManager.activeStructure,
+        this.trajectoryManager.frames,
+        this.trajectoryManager
+      );
+      return true;
+    });
+
+    this.handlers.set('saveRenderedImage', async (message) => {
+      const dataUrl = typeof message.dataUrl === 'string' ? message.dataUrl : '';
+      const suggestedName = message.suggestedName || '';
+      await this.documentService.saveRenderedImage(dataUrl, suggestedName, this.webviewPanel);
+      return true;
+    });
+
+    this.handlers.set('openSource', async () => {
+      await this.documentService.openSource(this.sessionKey);
+      return true;
+    });
+
+    this.handlers.set('reloadStructure', async () => {
+      await this.documentService.reloadStructure(
+        this.sessionKey,
+        this.trajectoryManager,
+        this.undoManager,
+        this.renderer
+      );
+      this.onSelectionClearRequired();
+      this.onRenderRequired();
+      return true;
+    });
+  }
+
+  private registerDisplayConfigCommands(): void {
+    this.handlers.set('getDisplayConfigs', async () => {
+      return await this.displayConfigService.handleGetDisplayConfigs();
+    });
+
+    this.handlers.set('loadDisplayConfig', async (message) => {
+      return await this.displayConfigService.handleLoadDisplayConfig(message.configId);
+    });
+
+    this.handlers.set('promptSaveDisplayConfig', async (message) => {
+      return await this.displayConfigService.handlePromptSaveDisplayConfig(message.settings);
+    });
+
+    this.handlers.set('saveDisplayConfig', async (message) => {
+      return await this.displayConfigService.handleSaveDisplayConfig(
+        message.name,
+        message.settings,
+        message.description,
+        message.existingId
+      );
+    });
+
+    this.handlers.set('getCurrentDisplaySettings', async () => {
+      return await this.displayConfigService.handleGetCurrentDisplaySettings();
+    });
+
+    this.handlers.set('updateDisplaySettings', (message) => {
+      this.displayConfigService.updateDisplaySettings(message.settings);
+      return true;
+    });
+
+    this.handlers.set('exportDisplayConfigs', async () => {
+      return await this.displayConfigService.handleExportDisplayConfigs();
+    });
+
+    this.handlers.set('importDisplayConfigs', async () => {
+      return await this.displayConfigService.handleImportDisplayConfigs();
+    });
+
+    this.handlers.set('confirmDeleteDisplayConfig', async (message) => {
+      return await this.displayConfigService.handleConfirmDeleteDisplayConfig(message.configId);
+    });
+
+    this.handlers.set('deleteDisplayConfig', async (message) => {
+      return await this.displayConfigService.handleDeleteDisplayConfig(message.configId);
     });
   }
 }

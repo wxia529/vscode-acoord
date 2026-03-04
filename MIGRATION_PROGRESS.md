@@ -1,7 +1,7 @@
 # ACoord Migration Progress
 
 **Started:** 2026-03-04  
-**Current Phase:** Phase 2 - Type Safety & Error Handling  
+**Current Phase:** Phase 3 - Architecture — Extension Host  
 **Status:** ✅ COMPLETED
 
 ---
@@ -326,3 +326,158 @@ All Phase 2 type safety improvements have been implemented:
 
 **Estimated Total Effort:** 15-25 development days  
 **Completed:** ~4-6 days (Phase 1 + Phase 2)
+
+---
+
+## Phase 3: Architecture — Extension Host
+
+### 3.1 Extract Display Config Handling ✅
+
+**Status:** COMPLETED  
+**Files Modified:**
+- `src/services/displayConfigService.ts` - 扩展以处理所有显示配置命令
+- `src/providers/structureEditorProvider.ts` - 简化，移除私有方法
+- `src/services/messageRouter.ts` - 添加显示配置命令处理器
+
+**Changes Made:**
+- 将 `handleGetDisplayConfigs`、`handleLoadDisplayConfig` 等方法移到 `DisplayConfigService`
+- `DisplayConfigService` 现在使用回调模式（`PostMessageCallback`、`SessionRef`）来与 webview 和 session 交互
+- 每个显示配置命令处理器现在返回 `Promise<boolean>`，与 MessageRouter 集成
+- 添加了 `setCallbacks()` 方法来设置 webview 和 session 引用
+- 移除了 `StructureEditorProvider` 中 ~200 行重复的显示配置处理代码
+
+**Implementation Details:**
+```typescript
+// DisplayConfigService now handles all display config commands
+async handleGetDisplayConfigs(): Promise<boolean> {
+  if (!this.postMessageCallback) { return false; }
+  try {
+    const configs = await this.configManager.listConfigs();
+    this.postMessageCallback({ command: 'displayConfigsLoaded', ... });
+    return true;
+  } catch (error) {
+    this.postMessageCallback({ command: 'displayConfigError', error: String(error) });
+    return true;
+  }
+}
+```
+
+---
+
+### 3.2 Extract Document Commands ✅
+
+**Status:** COMPLETED  
+**Files Modified:**
+- `src/services/messageRouter.ts` - 添加文档命令处理器
+- `src/providers/structureEditorProvider.ts` - 移除 `handleDocumentCommands` 方法
+
+**Changes Made:**
+- 扩展 `MessageRouter` 构造函数，添加 `DocumentService`、`DisplayConfigService` 依赖
+- 添加了文档命令注册方法：
+  - `registerDocumentCommands()` - 处理 `saveStructure`、`saveStructureAs`、`saveRenderedImage`、`openSource`、`reloadStructure`
+  - `registerDisplayConfigCommands()` - 处理所有显示配置命令
+- `StructureEditorProvider` 的 `handleWebviewMessage` 现在直接委托给 `MessageRouter`
+- 移除了 `handleDocumentCommands` 方法（~35行）
+- 使用回调函数（`onRenderRequired`、`onSelectionClearRequired`）来处理副作用
+
+**Implementation Details:**
+```typescript
+// MessageRouter now handles all commands
+private registerDocumentCommands(): void {
+  this.handlers.set('saveStructure', async () => {
+    await this.documentService.saveStructure(...);
+    return true;
+  });
+  // ... other document commands
+}
+
+// handleWebviewMessage is now simplified
+private async handleWebviewMessage(message: WebviewToExtensionMessage, session: EditorSession) {
+  const handled = await session.messageRouter.route(message);
+  if (handled) {
+    if (message.command !== 'beginDrag' && message.command !== 'endDrag') {
+      this.renderStructure(session);
+    }
+  }
+}
+```
+
+---
+
+### 3.3 Fix notifyConfigChange to Notify All Sessions ✅
+
+**Status:** COMPLETED  
+**Files Modified:** `src/providers/structureEditorProvider.ts`
+
+**Problem:** 原来的实现只通知第一个活跃会话，或者在没有活跃会话时通知最后一个会话。这导致当多个面板打开时，只有一个能收到配置更改通知。
+
+**Changes Made:**
+- 修改 `notifyConfigChange` 方法，循环遍历所有会话并发送通知
+- 每个会话都会收到 `displayConfigChanged` 消息
+
+**Implementation Details:**
+```typescript
+// Before: Only notified first active session or last session
+async notifyConfigChange(config: DisplayConfig): Promise<void> {
+  for (const session of this.sessions.values()) {
+    if (session.webviewPanel.active) {
+      // ... notify and return (only first active session)
+      return;
+    }
+  }
+  // Fallback to last session
+}
+
+// After: Notify ALL sessions
+async notifyConfigChange(config: DisplayConfig): Promise<void> {
+  for (const session of this.sessions.values()) {
+    session.displaySettings = config.settings;
+    session.webviewPanel.webview.postMessage({
+      command: 'displayConfigChanged',
+      config: config
+    });
+  }
+}
+```
+
+---
+
+### 3.4 Architecture Improvements Summary ✅
+
+**Key Changes:**
+- `StructureEditorProvider` 从 ~716 行减少到 ~452 行（减少 36%）
+- 显示配置处理完全迁移到 `DisplayConfigService`
+- 文档命令处理完全迁移到 `MessageRouter`
+- 实现了真正的关注点分离：
+  - `StructureEditorProvider`：生命周期协调（CustomEditorProvider 实现）
+  - `MessageRouter`：消息路由和命令处理
+  - `DisplayConfigService`：显示配置业务逻辑
+  - `DocumentService`：文档 I/O 操作
+
+**Code Quality Improvements:**
+- 消除了 `StructureEditorProvider` 中的重复代码
+- 更好的依赖注入模式
+- 回调函数用于处理副作用，而不是直接操作
+- 所有命令现在都通过 `MessageRouter` 路由
+
+**Known Issues:**
+- `EditorSession` 中的 `messageRouter` 需要使用类型断言设置（由于循环依赖）
+- 这是暂时的解决方案，将在 Phase 8 中重构为更干净的工厂模式
+
+**Next Steps:** Proceed to Phase 4 - Architecture (Webview)
+
+---
+
+## Migration Roadmap
+
+- [x] **Phase 1:** Critical Bug Fixes
+- [x] **Phase 2:** Type Safety & Error Handling
+- [x] **Phase 3:** Architecture — Extension Host
+- [ ] **Phase 4:** Architecture — Webview
+- [ ] **Phase 5:** Performance
+- [ ] **Phase 6:** Parser Correctness
+- [ ] **Phase 7:** Testing & CI
+- [ ] **Phase 8:** Cleanup & Polish
+
+**Estimated Total Effort:** 15-25 development days  
+**Completed:** ~7-9 days (Phase 1 + Phase 2 + Phase 3)
