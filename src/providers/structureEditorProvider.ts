@@ -158,7 +158,7 @@ export class StructureEditorProvider implements vscode.CustomEditorProvider<Stru
       unitCellService,
       documentService,
       displayConfigService,
-      key,
+      document.uri.fsPath,
       webviewPanel,
       () => this.renderStructure(session),
       () => selectionService.clearSelection(),
@@ -188,7 +188,7 @@ export class StructureEditorProvider implements vscode.CustomEditorProvider<Stru
         }
         try {
           const content = savedDoc.getText();
-          const updatedFrames = FileManager.loadStructures(key, content);
+          const updatedFrames = FileManager.loadStructures(session.document.uri.fsPath, content);
           if (!updatedFrames || updatedFrames.length === 0) {
             return;
           }
@@ -348,7 +348,7 @@ export class StructureEditorProvider implements vscode.CustomEditorProvider<Stru
   ): Thenable<void> {
     const session = this.findSessionByDocument(document);
     if (session) {
-      return session.documentService.saveStructure(session.key, session.trajectoryManager.activeStructure, session.trajectoryManager.frames);
+      return session.documentService.saveStructure(session.document.uri.fsPath, session.trajectoryManager.activeStructure, session.trajectoryManager.frames);
     }
     return Promise.resolve();
   }
