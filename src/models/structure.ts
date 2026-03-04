@@ -490,4 +490,31 @@ export class Structure {
       metadata: Array.from(this.metadata.entries()),
     };
   }
+
+  /**
+   * Reconstruct a Structure from the plain-object representation produced by
+   * `toJSON()`.  Used to restore hot-exit backups.
+   */
+  static fromJSON(data: ReturnType<Structure['toJSON']>): Structure {
+    const s = new Structure(data.name, data.isCrystal);
+    // Preserve the original id so references (e.g. undo entries) stay valid.
+    s.id = data.id;
+    for (const a of data.atoms) {
+      const atom = new Atom(a.element, a.x, a.y, a.z, a.id, a.color);
+      atom.fixed = a.fixed ?? false;
+      if (a.selectiveDynamics) {
+        atom.selectiveDynamics = a.selectiveDynamics;
+      }
+      s.addAtom(atom);
+    }
+    s.manualBonds = data.manualBonds ?? [];
+    s.suppressedAutoBonds = data.suppressedAutoBonds ?? [];
+    if (data.unitCell) {
+      const uc = data.unitCell;
+      s.unitCell = new UnitCell(uc.a, uc.b, uc.c, uc.alpha, uc.beta, uc.gamma);
+    }
+    s.supercell = data.supercell ?? [1, 1, 1];
+    s.metadata = new Map(data.metadata ?? []);
+    return s;
+  }
 }

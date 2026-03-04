@@ -94,13 +94,14 @@ export class DisplayConfigService {
 
   async handleSaveDisplayConfig(
     name: string,
-    settings: DisplaySettings,
+    settings: WireDisplaySettings,
     description?: string,
     existingId?: string
   ): Promise<boolean> {
     if (!this.postMessageCallback) { return false; }
     try {
-      const config = await this.configManager.saveUserConfig(name, settings, description, existingId);
+      // TODO: Phase 8 - properly consolidate DisplaySettings and WireDisplaySettings types
+      const config = await this.configManager.saveUserConfig(name, settings as unknown as DisplaySettings, description, existingId);
       this.postMessageCallback({
         command: 'displayConfigSaved',
         config: config
@@ -115,7 +116,7 @@ export class DisplayConfigService {
     }
   }
 
-  async handlePromptSaveDisplayConfig(settings?: DisplaySettings): Promise<boolean> {
+  async handlePromptSaveDisplayConfig(settings?: WireDisplaySettings): Promise<boolean> {
     if (!this.postMessageCallback || !this.sessionRef) { return false; }
     
     const displaySettings = settings || this.sessionRef.displaySettings;
@@ -141,7 +142,8 @@ export class DisplayConfigService {
     try {
       const config = await this.configManager.saveUserConfig(
         name,
-        displaySettings,
+        // TODO: Phase 8 - properly consolidate DisplaySettings and WireDisplaySettings types
+        displaySettings as unknown as DisplaySettings,
         description || undefined
       );
       this.postMessageCallback({

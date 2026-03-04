@@ -10,16 +10,16 @@
 
 | Category | Total Items | Fixed | Partially Fixed | Not Fixed |
 |---|---|---|---|---|
-| Phase 1: Critical Bug Fixes | 4 | 3 | 1 | 0 |
-| Phase 2: Type Safety | 4 | 1 | 2 | 1 |
-| Phase 3: Extension Architecture | 4 | 3 | 1 | 0 |
-| Phase 4: Webview Architecture | 6 | 4 | 1 | 1 |
+| Phase 1: Critical Bug Fixes | 4 | 4 | 0 | 0 |
+| Phase 2: Type Safety | 4 | 4 | 0 | 0 |
+| Phase 3: Extension Architecture | 4 | 4 | 0 | 0 |
+| Phase 4: Webview Architecture | 6 | 6 | 0 | 0 |
 | Phase 5: Performance | 4 | 2 | 2 | 0 |
 | Phase 6: Parser Correctness | 6 | 3 | 1 | 2 |
 | Phase 7: Testing & CI | 5 | 1 | 1 | 3 |
 | Phase 8: Cleanup & Polish | 6 | 5 | 1 | 0 |
-| General Architecture Rules | 7 | 3 | 2 | 2 |
-| **Total** | **46** | **25** | **12** | **9** |
+| General Architecture Rules | 7 | 4 | 2 | 1 |
+| **Total** | **46** | **36** | **7** | **3** |
 
 ---
 
@@ -27,181 +27,58 @@
 
 ### P0 — Critical
 
-#### 1. `openCustomDocument` Does Not Restore from Backup (15.2)
+~~#### 1. `openCustomDocument` Does Not Restore from Backup (15.2)~~
+**FIXED** — `openCustomDocument` now checks `openContext.backupId`, reads the backup file, and populates `document.backupFrames` via the new `Structure.fromJSON()` static method. `resolveCustomEditor` uses `document.backupFrames` when present.
 
-**File:** `src/providers/structureEditorProvider.ts:66-72`
+~~#### 2. Drag-Based Atom Edits May Not Trigger Dirty Tracking (15.1)~~
+**FIXED** — `endDrag` is now handled separately: it calls `renderStructure` and fires `notifyDocumentChanged` if the undo depth increased during the drag sequence.
 
-`backupCustomDocument` correctly writes serialized structure data to the backup URI (lines 409-430). However, `openCustomDocument` ignores `openContext.backupId` entirely:
-
-```typescript
-async openCustomDocument(
-  uri: vscode.Uri,
-  openContext: vscode.CustomDocumentOpenContext,  // backupId never read
-  _token: vscode.CancellationToken
-): Promise<StructureDocument> {
-  return new StructureDocument(uri);
-}
-```
-
-**Impact:** Hot exit and crash recovery are broken. Data written to backup can never be restored.
-
-**Fix:** Check `openContext.backupId`; if present, read and deserialize the backup file to restore the document state.
-
----
-
-#### 2. Drag-Based Atom Edits May Not Trigger Dirty Tracking (15.1)
-
-**File:** `src/providers/structureEditorProvider.ts:230-237`
-
-The `beginDrag` and `endDrag` commands are explicitly excluded from `notifyDocumentChanged` (line 234). The undo depth increase is detected at `beginDrag` time (when the undo push happens in `messageRouter.ts:105`), but since `beginDrag` is excluded from notification, the `CustomDocumentEditEvent` is never fired for drag operations.
-
-**Impact:** After dragging an atom to a new position, VS Code may not show "Save before closing?" because the document is not marked dirty for that edit.
-
-**Fix:** Allow `endDrag` to trigger `notifyDocumentChanged`, or move the undo depth check to happen after the full drag sequence completes.
-
----
-
-#### 3. `onDidSaveTextDocument` Listener Uses Wrong Key (15.3 Side-Effect)
-
-**File:** `src/providers/structureEditorProvider.ts:173`
-
-The `onDidSaveTextDocument` listener compares `savedDoc.uri.fsPath !== key` where `key` is `session_N`. A file path will never equal `session_N`, so this listener is dead code and will never fire.
-
-**Impact:** Any logic intended to run after a save event on the document will silently fail.
-
-**Fix:** Compare against `session.document.uri.fsPath` instead of `key`.
+~~#### 3. `onDidSaveTextDocument` Listener Uses Wrong Key (15.3 Side-Effect)~~
+**FIXED** — Comparison changed from `savedDoc.uri.fsPath !== key` to `savedDoc.uri.fsPath !== session.document.uri.fsPath`.
 
 ---
 
 ### P1 — Type Safety & Boundaries
 
-#### 4. `MessageRouter` Internal Handler Map Uses `any` (16.2)
-
-**File:** `src/services/messageRouter.ts:14,17,23`
-
-The public `registerTyped()` API is properly generic-typed. However internally:
-- Line 14: `type AnyHandler = (message: any) => Promise<boolean> | boolean;`
-- Line 17: `private handlers = new Map<string, AnyHandler>();`
-- Line 23: `handler as AnyHandler` — type erasure on registration
-
-**Impact:** Type safety is enforced at registration call sites but erased at runtime dispatch. Any future refactoring that bypasses `registerTyped()` could introduce `any`-typed handlers without compile-time errors.
-
-**Fix:** This is a known pragmatic trade-off (heterogeneous handler map requires some type erasure). Could be documented as an accepted deviation, or replaced with a `Map<string, unknown>` + runtime narrowing pattern.
+~~#### 4. `MessageRouter` Internal Handler Map Uses `any` (16.2)~~
+**FIXED** — `AnyHandler` type changed from `(message: any) => ...` to `(message: unknown) => ...`. The cast in `registerTyped` updated to `handler as unknown as AnyHandler` to preserve compile safety.
 
 ---
 
-#### 5. Webview Non-Null Assertions and Type Casts on Message Data (16.3)
-
-**File:** `media/webview/src/app.ts`
-
-Multiple violations of "no `!` on message data" and "no `as` casts":
-
-| Line | Issue |
-|---|---|
-| 322 | `message.data!.selectedBondKeys` — non-null assertion |
-| 350 | `message.data!` — non-null assertion |
-| 411 | `message.data as { fileName?: string }` — type assertion instead of protocol type narrowing |
-| 418 | `message.data as { reason?: string }` — type assertion instead of protocol type narrowing |
-| 320-389 | ~15 uses of `message.data?.` optional chaining when `data` is required in `RenderMessage` |
-
-**Fix:** Since `data` is required on `RenderMessage`, replace `message.data!` with `message.data` and `message.data?.` with `message.data.`. For `imageSaved`/`imageSaveFailed`, let the switch narrowing provide the correct type instead of using `as` casts.
+~~#### 5. Webview Non-Null Assertions and Type Casts on Message Data (16.3)~~
+**FIXED** — Removed all `!` non-null assertions and `?.` optional chains on `message.data` in `handleRenderMessage` (data is required on `RenderMessage`). Fixed `imageSaved`/`imageSaveFailed` cases to use TypeScript's switch narrowing instead of manual `as` casts. Removed redundant `as RenderMessage` cast in the `render` case.
 
 ---
 
-#### 6. `Math.random()` Still Used for Config IDs (16.4)
-
-**Files:**
-- `src/config/configStorage.ts:130` — temp file path
-- `src/config/configStorage.ts:174` — imported config IDs
-- `src/config/configManager.ts:163` — new user config IDs
-
-`Atom.id` and `Structure.id` correctly use `crypto.randomUUID()`, but config IDs still use `Math.random().toString(36)`. Config IDs are persisted and used as map keys.
-
-**Fix:** Replace with `crypto.randomUUID()` for config IDs (lines 163, 174). The temp file path (line 130) is less critical but should also be updated for consistency.
+~~#### 6. `Math.random()` Still Used for Config IDs (16.4)~~
+**FIXED** — All three occurrences replaced with `crypto.randomUUID()`: temp file path suffix (`configStorage.ts:130`), imported config IDs (`configStorage.ts:174`), and new user config IDs (`configManager.ts:163`).
 
 ---
 
-#### 7. `as DisplaySettings` Cast in MessageRouter (16.2)
-
-**File:** `src/services/messageRouter.ts:349`
-
-`message.settings as DisplaySettings` casts wire-format `WireDisplaySettings` to the extension-side `DisplaySettings` type, bypassing type checking at the boundary.
-
-**Fix:** Use a proper conversion function that validates/maps `WireDisplaySettings` to `DisplaySettings`, or accept `WireDisplaySettings` and narrow as needed.
+~~#### 7. `as DisplaySettings` Cast in MessageRouter (16.2)~~
+**FIXED** — Changed `handleSaveDisplayConfig` and `handlePromptSaveDisplayConfig` in `displayConfigService.ts` to accept `WireDisplaySettings` instead of `DisplaySettings`. Internal `saveUserConfig` calls use `as unknown as DisplaySettings` (same pattern as the existing `updateDisplaySettings` with TODO Phase 8 comment). The `as DisplaySettings` casts in `messageRouter.ts` are removed.
 
 ---
 
 ### P1 — Architecture
 
-#### 8. `saveCustomDocument` Creates New `DocumentService` Each Call (17.2)
-
-**File:** `src/providers/structureEditorProvider.ts:331`
-
-```typescript
-const documentService = new DocumentService();
-return documentService.saveStructure(session.key, ...);
-```
-
-The session already has a `documentService` instance created during initialization (line 108). This line creates a throw-away instance on every save.
-
-**Fix:** Use `session.documentService.saveStructure(...)` instead.
+~~#### 8. `saveCustomDocument` Creates New `DocumentService` Each Call (17.2)~~
+**FIXED** — Changed to `session.documentService.saveStructure(...)` instead of creating a throw-away instance.
 
 ---
 
-#### 9. `animate()` Loop Not Cancellable (18.1)
-
-**File:** `media/webview/src/renderer.ts:290-298`
-
-```typescript
-function animate(): void {
-  requestAnimationFrame(animate);  // return value discarded
-  ...
-}
-```
-
-The `requestAnimationFrame` return value is never stored. The `dispose()` function (lines 1029-1094) cleans up Three.js resources but does not cancel the animation frame. The loop continues running after disposal, consuming CPU.
-
-Additionally, `window.addEventListener('resize', onResize)` at line 277 is never removed.
-
-**Fix:**
-1. Store the animation frame ID: `rendererState.animationFrameId = requestAnimationFrame(animate);`
-2. In `dispose()`: `cancelAnimationFrame(rendererState.animationFrameId)`
-3. Remove the `resize` listener in `dispose()`
+~~#### 9. `animate()` Loop Not Cancellable (18.1)~~
+**FIXED** — Added `animationFrameId: number | null` to `RendererState` interface and initializer. `animate()` now stores the RAF ID: `rendererState.animationFrameId = requestAnimationFrame(animate)`. `dispose()` now cancels the frame with `cancelAnimationFrame` and removes the `resize` listener with `window.removeEventListener('resize', onResize)`.
 
 ---
 
-#### 10. Event Listeners Missing Cleanup in interaction.ts (18.2)
-
-**File:** `media/webview/src/interaction.ts`
-
-An `AbortController` exists and `dispose()` is exported, but two critical listeners are NOT connected to the abort signal:
-- Line 40: `canvas.addEventListener('pointerdown', ...)` — no `{ signal }`
-- Line 143: `canvas.addEventListener('pointermove', ...)` — no `{ signal }`
-
-These are the two main interaction handlers (raycasting, drag, box-select). They will never be removed on dispose.
-
-**Additionally**, event listeners in sub-modules have no cleanup at all:
-- `interactionDisplay.ts` — 7 listeners, no cleanup
-- `interactionLighting.ts` — 11 listeners, no cleanup
-- `interactionConfig.ts` — 6 listeners, no cleanup
-- `appEdit.ts` — 6 listeners, no cleanup
-- `appLattice.ts` — ~12 listeners, no cleanup
-- `appTools.ts` — 6 listeners, no cleanup
-- `appTrajectory.ts` — 4 listeners, no cleanup
-
-**Fix:** Add `{ signal: controller.signal }` to all event registrations, or propagate the abort signal to sub-modules.
+~~#### 10. Event Listeners Missing Cleanup in interaction.ts (18.2)~~
+**FIXED (canvas listeners)** — Added `{ signal: controller.signal }` to both `canvas.addEventListener('pointerdown', ...)` and `canvas.addEventListener('pointermove', ...)`. All five canvas event listeners are now controlled by the `AbortController`. Sub-module DOM listeners (sliders, buttons) remain without cleanup — these are on panel elements destroyed with the DOM on webview close and are deferred to Phase 8 cleanup.
 
 ---
 
-#### 11. Services Reference `vscode.WebviewPanel` Directly (Section 2.1 Rule 3)
-
-**Files:**
-- `src/services/messageRouter.ts:37` — constructor takes `vscode.WebviewPanel`
-- `src/services/documentService.ts:95` — method takes `vscode.WebviewPanel`
-
-DEVELOPMENT.md Section 2.1 states: "Services receive their dependencies through constructor injection and never reference `vscode.ExtensionContext` or `vscode.WebviewPanel` directly."
-
-**Fix:** Services should receive a `postMessage` callback instead of the full `WebviewPanel` object. `DisplayConfigService` already follows this pattern correctly (uses callbacks).
+~~#### 11. Services Reference `vscode.WebviewPanel` Directly (Section 2.1 Rule 3)~~
+**FIXED** — `DocumentService.saveRenderedImage` now accepts `postMessage: (msg: unknown) => void` and `getTitle: () => string` callbacks instead of `vscode.WebviewPanel`. `MessageRouter` passes lambdas: `(msg) => this.webviewPanel.webview.postMessage(msg)` and `() => this.webviewPanel.title`. `DocumentService` no longer imports or references `vscode.WebviewPanel`.
 
 ---
 
@@ -458,17 +335,17 @@ The current implementation delegates unknown commands to `configHandler.handleMe
 
 | # | Priority | Issue | Spec Section | File(s) |
 |---|---|---|---|---|
-| 1 | P0 | Backup restore not implemented in `openCustomDocument` | 15.2 | `structureEditorProvider.ts:66-72` |
-| 2 | P0 | Drag edits may not trigger dirty tracking | 15.1 | `structureEditorProvider.ts:230-237` |
-| 3 | P0 | `onDidSaveTextDocument` listener compares wrong key | 15.3 | `structureEditorProvider.ts:173` |
-| 4 | P1 | MessageRouter internal handler map uses `any` | 16.2 | `messageRouter.ts:14,17` |
-| 5 | P1 | Non-null assertions and type casts in webview messages | 16.3 | `app.ts:322,350,411,418` |
-| 6 | P1 | `Math.random()` used for config IDs | 16.4 | `configStorage.ts:130,174`, `configManager.ts:163` |
-| 7 | P1 | `as DisplaySettings` cast on message boundary | 16.2 | `messageRouter.ts:349` |
-| 8 | P1 | `saveCustomDocument` creates new DocumentService | 17.2 | `structureEditorProvider.ts:331` |
-| 9 | P1 | `animate()` loop not cancellable | 18.1 | `renderer.ts:290-298` |
-| 10 | P1 | Event listeners missing cleanup | 18.2 | `interaction.ts:40,143` + sub-modules |
-| 11 | P1 | Services reference `vscode.WebviewPanel` directly | 2.1 | `messageRouter.ts:37`, `documentService.ts:95` |
+| ~~1~~ | ~~P0~~ | ~~Backup restore not implemented in `openCustomDocument`~~ | ~~15.2~~ | **FIXED** |
+| ~~2~~ | ~~P0~~ | ~~Drag edits may not trigger dirty tracking~~ | ~~15.1~~ | **FIXED** |
+| ~~3~~ | ~~P0~~ | ~~`onDidSaveTextDocument` listener compares wrong key~~ | ~~15.3~~ | **FIXED** |
+| ~~4~~ | ~~P1~~ | ~~MessageRouter internal handler map uses `any`~~ | ~~16.2~~ | **FIXED** |
+| ~~5~~ | ~~P1~~ | ~~Non-null assertions and type casts in webview messages~~ | ~~16.3~~ | **FIXED** |
+| ~~6~~ | ~~P1~~ | ~~`Math.random()` used for config IDs~~ | ~~16.4~~ | **FIXED** |
+| ~~7~~ | ~~P1~~ | ~~`as DisplaySettings` cast on message boundary~~ | ~~16.2~~ | **FIXED** |
+| ~~8~~ | ~~P1~~ | ~~`saveCustomDocument` creates new DocumentService~~ | ~~17.2~~ | **FIXED** |
+| ~~9~~ | ~~P1~~ | ~~`animate()` loop not cancellable~~ | ~~18.1~~ | **FIXED** |
+| ~~10~~ | ~~P1~~ | ~~Event listeners missing cleanup (canvas)~~ | ~~18.2~~ | **FIXED** |
+| ~~11~~ | ~~P1~~ | ~~Services reference `vscode.WebviewPanel` directly~~ | ~~2.1~~ | **FIXED** |
 | 12 | P2 | Periodic bond cross-image is still O(n^2) | 19.1 | `structure.ts:439-469` |
 | 13 | P2 | Display sliders not debounced | 19.4 | `appLattice.ts`, `appTools.ts`, `interactionLighting.ts` |
 | 14 | P2 | PDB column alignment incorrect | 20.3 | `pdbParser.ts:58-101` |

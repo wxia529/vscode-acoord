@@ -314,17 +314,16 @@ function start(): void {
 // Message handlers
 function handleRenderMessage(message: RenderMessage): void {
   appTrajectory.clearPending();
-  structureStore.currentStructure = message.data ?? null;
-  cleanupAtomSizeOverrides();
+  structureStore.currentStructure = message.data;
 
-  selectionStore.selectedAtomIds = message.data?.selectedAtomIds || [];
-  selectionStore.selectedBondKeys = Array.isArray(message.data?.selectedBondKeys)
-    ? message.data!.selectedBondKeys
-    : message.data?.selectedBondKey
+  selectionStore.selectedAtomIds = message.data.selectedAtomIds;
+  selectionStore.selectedBondKeys = Array.isArray(message.data.selectedBondKeys)
+    ? message.data.selectedBondKeys
+    : message.data.selectedBondKey
       ? [message.data.selectedBondKey]
       : [];
   structureStore.currentSelectedBondKey = selectionStore.selectedBondKeys.at(-1) ?? null;
-  displayStore.supercell = message.data?.supercell || [1, 1, 1];
+  displayStore.supercell = message.data.supercell || [1, 1, 1];
 
   // Apply display settings
   if (message.displaySettings) {
@@ -333,8 +332,8 @@ function handleRenderMessage(message: RenderMessage): void {
   }
 
   appTrajectory.updateUI(
-    message.data?.trajectoryFrameIndex || 0,
-    message.data?.trajectoryFrameCount || 1
+    message.data.trajectoryFrameIndex,
+    message.data.trajectoryFrameCount
   );
 
   // Update adsorption state
@@ -347,7 +346,7 @@ function handleRenderMessage(message: RenderMessage): void {
   }
 
   renderer.renderStructure(
-    message.data!,
+    message.data,
     {
       updateCounts,
       updateAtomList: (atoms, _selectedIds, selectedId) =>
@@ -404,18 +403,18 @@ window.addEventListener('message', (event: MessageEvent<ExtensionToWebviewMessag
 
   switch (message.command) {
     case 'render':
-      handleRenderMessage(message as RenderMessage);
+      handleRenderMessage(message);
       break;
 
     case 'imageSaved': {
-      const fileName = (message.data as { fileName?: string } | undefined)?.fileName || 'image.png';
+      const fileName = message.data.fileName;
       setStatus(`HD image saved: ${fileName}`);
       setError('');
       break;
     }
 
     case 'imageSaveFailed': {
-      const reason = (message.data as { reason?: string } | undefined)?.reason || 'Failed to save image.';
+      const reason = message.data.reason;
       setError(reason);
       break;
     }

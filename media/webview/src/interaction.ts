@@ -138,7 +138,7 @@ export function init(canvas: HTMLCanvasElement, handlers: InteractionHandlers): 
     } else if (handlers.onSelectBond) {
       handlers.onSelectBond(null, false);
     }
-  });
+  }, { signal: controller.signal });
 
   canvas.addEventListener('pointermove', (event: PointerEvent) => {
     if (pickerState.activeLightPicker && pickerState.lightPickerDragging) {
@@ -227,7 +227,7 @@ export function init(canvas: HTMLCanvasElement, handlers: InteractionHandlers): 
       selectionBox.style.width = width + 'px';
       selectionBox.style.height = height + 'px';
     }
-  });
+  }, { signal: controller.signal });
 
   const endDrag = (event: PointerEvent) => {
     if (pickerState.lightPickerDragging) {

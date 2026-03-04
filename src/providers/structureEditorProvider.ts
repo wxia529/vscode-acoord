@@ -18,6 +18,9 @@ import { DocumentService } from '../services/documentService';
 import type { WebviewToExtensionMessage, ImageSavedMessage, ImageSaveFailedMessage, WireDisplaySettings } from '../shared/protocol';
 
 export class StructureDocument implements vscode.CustomDocument {
+  /** Frames restored from a hot-exit backup, if one was present at open time. */
+  backupFrames?: Structure[];
+
   constructor(readonly uri: vscode.Uri) {}
 
   dispose(): void {
@@ -68,7 +71,18 @@ export class StructureEditorProvider implements vscode.CustomEditorProvider<Stru
     openContext: vscode.CustomDocumentOpenContext,
     _token: vscode.CancellationToken
   ): Promise<StructureDocument> {
-    return new StructureDocument(uri);
+    const document = new StructureDocument(uri);
+    if (openContext.backupId) {
+      try {
+        const backupUri = vscode.Uri.parse(openContext.backupId);
+        const raw = await vscode.workspace.fs.readFile(backupUri);
+        const jsonData = JSON.parse(new TextDecoder().decode(raw)) as ReturnType<Structure['toJSON']>[];
+        document.backupFrames = jsonData.map(f => Structure.fromJSON(f));
+      } catch {
+        // If backup cannot be read, fall through to normal file load.
+      }
+    }
+    return document;
   }
 
   async resolveCustomEditor(
@@ -82,7 +96,7 @@ export class StructureEditorProvider implements vscode.CustomEditorProvider<Stru
 
     let frames: Structure[];
     try {
-      frames = await StructureDocumentManager.load(document.uri);
+      frames = document.backupFrames ?? await StructureDocumentManager.load(document.uri);
     } catch (error) {
       vscode.window.showErrorMessage(
         `Failed to load structure: ${error instanceof Error ? error.message : String(error)}`
@@ -170,7 +184,7 @@ export class StructureEditorProvider implements vscode.CustomEditorProvider<Stru
 
     const saveListener = vscode.workspace.onDidSaveTextDocument(
       async (savedDoc) => {
-        if (savedDoc.uri.fsPath !== key) {
+        if (savedDoc.uri.fsPath !== session.document.uri.fsPath) {
           return;
         }
         try {
@@ -231,7 +245,14 @@ export class StructureEditorProvider implements vscode.CustomEditorProvider<Stru
     const handled = await messageRouter.route(message);
 
     if (handled) {
-      if (message.command !== 'beginDrag' && message.command !== 'endDrag') {
+      if (message.command === 'endDrag') {
+        // A drag sequence is complete: re-render and notify dirty if an undo
+        // entry was pushed during beginDrag.
+        this.renderStructure(session);
+        if (session.undoManager.depth > undoDepthBefore) {
+          this.notifyDocumentChanged(session, 'Drag');
+        }
+      } else if (message.command !== 'beginDrag') {
         // Check if a structural change occurred by comparing undo stack depth
         if (session.undoManager.depth > undoDepthBefore) {
           this.notifyDocumentChanged(session, `Command: ${message.command}`);
@@ -328,8 +349,7 @@ export class StructureEditorProvider implements vscode.CustomEditorProvider<Stru
   ): Thenable<void> {
     const session = this.findSessionByDocument(document);
     if (session) {
-      const documentService = new DocumentService();
-      return documentService.saveStructure(session.key, session.trajectoryManager.activeStructure, session.trajectoryManager.frames);
+      return session.documentService.saveStructure(session.key, session.trajectoryManager.activeStructure, session.trajectoryManager.frames);
     }
     return Promise.resolve();
   }

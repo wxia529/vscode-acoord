@@ -127,7 +127,7 @@ export class ConfigStorage {
   }
 
   private async writeJsonAtomic(filePath: string, data: unknown): Promise<void> {
-    const tempPath = `${filePath}.tmp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const tempPath = `${filePath}.tmp-${crypto.randomUUID()}`;
     try {
       await fs.writeFile(tempPath, JSON.stringify(data, null, 2));
       await fs.rename(tempPath, filePath);
@@ -171,7 +171,7 @@ export class ConfigStorage {
     const savedIds: string[] = [];
     
     for (const config of packageData.configs) {
-      const newId = `imported-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      const newId = `imported-${crypto.randomUUID()}`;
       const importedConfig: DisplayConfig = {
         ...config,
         id: newId,

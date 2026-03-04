@@ -160,7 +160,7 @@ export class ConfigManager {
       }
     } else {
       config = {
-        id: `user-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        id: `user-${crypto.randomUUID()}`,
         name,
         description,
         isPreset: false,

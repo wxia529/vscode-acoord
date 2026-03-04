@@ -11,7 +11,7 @@ import { DisplayConfigService } from './displayConfigService';
 import type { WebviewToExtensionMessage, MessageByCommand } from '../shared/protocol';
 import type { DisplaySettings } from '../config/types';
 
-type AnyHandler = (message: any) => Promise<boolean> | boolean;
+type AnyHandler = (message: unknown) => Promise<boolean> | boolean;
 
 export class MessageRouter {
   private handlers = new Map<string, AnyHandler>();
@@ -20,7 +20,7 @@ export class MessageRouter {
     command: C,
     handler: (message: MessageByCommand<C>) => Promise<boolean> | boolean
   ): void {
-    this.handlers.set(command, handler as AnyHandler);
+    this.handlers.set(command, handler as unknown as AnyHandler);
   }
 
   constructor(
@@ -314,7 +314,12 @@ export class MessageRouter {
     });
 
     this.registerTyped('saveRenderedImage', async (message) => {
-      await this.documentService.saveRenderedImage(message.dataUrl, message.suggestedName ?? '', this.webviewPanel);
+      await this.documentService.saveRenderedImage(
+        message.dataUrl,
+        message.suggestedName ?? '',
+        (msg) => this.webviewPanel.webview.postMessage(msg),
+        () => this.webviewPanel.title
+      );
       return true;
     });
 
@@ -346,13 +351,13 @@ export class MessageRouter {
     });
 
     this.registerTyped('promptSaveDisplayConfig', async (message) => {
-      return await this.displayConfigService.handlePromptSaveDisplayConfig(message.settings as DisplaySettings | undefined);
+      return await this.displayConfigService.handlePromptSaveDisplayConfig(message.settings);
     });
 
     this.registerTyped('saveDisplayConfig', async (message) => {
       return await this.displayConfigService.handleSaveDisplayConfig(
         message.name,
-        message.settings as DisplaySettings,
+        message.settings,
         message.description,
         message.existingId
       );

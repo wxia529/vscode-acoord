@@ -92,13 +92,14 @@ export class DocumentService {
   async saveRenderedImage(
     dataUrl: string,
     suggestedName: string,
-    webviewPanel: vscode.WebviewPanel
+    postMessage: (msg: unknown) => void,
+    getTitle: () => string
   ): Promise<void> {
     const imageMatch = dataUrl.match(/^data:image\/png;base64,(.+)$/);
     if (!imageMatch || !imageMatch[1]) {
       const reason = 'Failed to export image: invalid PNG data.';
       vscode.window.showErrorMessage(reason);
-      webviewPanel.webview.postMessage({ command: 'imageSaveFailed', data: { reason } });
+      postMessage({ command: 'imageSaveFailed', data: { reason } });
       return;
     }
 
@@ -110,7 +111,7 @@ export class DocumentService {
 
     const saveUri = await vscode.window.showSaveDialog({
       saveLabel: 'Save HD Image',
-      defaultUri: vscode.Uri.joinPath(vscode.Uri.file(path.dirname(webviewPanel.title)), fileName),
+      defaultUri: vscode.Uri.joinPath(vscode.Uri.file(path.dirname(getTitle())), fileName),
       filters: {
         'PNG Image': ['png'],
       },
@@ -125,14 +126,14 @@ export class DocumentService {
       await vscode.workspace.fs.writeFile(saveUri, bytes);
       const savedName = path.basename(saveUri.fsPath);
       vscode.window.showInformationMessage(`Image exported to ${savedName}`);
-      webviewPanel.webview.postMessage({
+      postMessage({
         command: 'imageSaved',
         data: { fileName: savedName },
       });
     } catch (error) {
       const reason = `Failed to export image: ${error instanceof Error ? error.message : String(error)}`;
       vscode.window.showErrorMessage(reason);
-      webviewPanel.webview.postMessage({ command: 'imageSaveFailed', data: { reason } });
+      postMessage({ command: 'imageSaveFailed', data: { reason } });
     }
   }
 

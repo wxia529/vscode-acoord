@@ -76,6 +76,8 @@ interface RendererState {
   needsRender: boolean;
   /** Status update interval handle for cleanup. */
   statusInterval: ReturnType<typeof setInterval> | null;
+  /** requestAnimationFrame handle for cancellation on dispose. */
+  animationFrameId: number | null;
 }
 
 const rendererState: RendererState = {
@@ -107,6 +109,7 @@ const rendererState: RendererState = {
   axesHelper: null,
   needsRender: true,
   statusInterval: null,
+  animationFrameId: null,
 };
 
 /** Mark the scene dirty so animate() will issue a render on the next frame. */
@@ -288,7 +291,7 @@ function init(canvas: HTMLCanvasElement, handlers: { setError: (m: string) => vo
 }
 
 function animate(): void {
-  requestAnimationFrame(animate);
+  rendererState.animationFrameId = requestAnimationFrame(animate);
   if (!rendererState.renderer || !rendererState.controls) return;
   rendererState.controls.update();
   if (!rendererState.needsRender) return;
@@ -1027,6 +1030,11 @@ export const renderer: RendererApi = {
 };
 
 function dispose(): void {
+  if (rendererState.animationFrameId !== null) {
+    cancelAnimationFrame(rendererState.animationFrameId);
+    rendererState.animationFrameId = null;
+  }
+  window.removeEventListener('resize', onResize);
   if (rendererState.statusInterval) {
     clearInterval(rendererState.statusInterval);
     rendererState.statusInterval = null;
