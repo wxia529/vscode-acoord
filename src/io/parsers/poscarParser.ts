@@ -60,7 +60,13 @@ export class POSCARParser extends BaseStructureParser {
       const atom = new Atom(element, x, y, z);
       if (header.hasSelectiveDynamics && parts.length >= 6) {
         const flags = parts.slice(3, 6).map((value) => value.toUpperCase());
-        atom.fixed = flags.every((flag) => flag.startsWith('F'));
+        const selectiveDynamics: [boolean, boolean, boolean] = [
+          flags[0] !== 'F',
+          flags[1] !== 'F',
+          flags[2] !== 'F'
+        ];
+        atom.selectiveDynamics = selectiveDynamics;
+        atom.fixed = selectiveDynamics.every((flag) => !flag);
       }
       structure.addAtom(atom);
       atomIndex++;
@@ -97,8 +103,8 @@ export class POSCARParser extends BaseStructureParser {
     lines.push(elements.join(' '));
     lines.push(elements.map((element) => grouped.get(element)!.length).join(' '));
 
-    const hasFixed = orderedAtoms.some((atom) => atom.fixed);
-    if (hasFixed) {
+    const hasSelectiveDynamics = orderedAtoms.some((atom) => atom.selectiveDynamics);
+    if (hasSelectiveDynamics) {
       lines.push('Selective dynamics');
     }
     lines.push('Direct');
@@ -115,8 +121,9 @@ export class POSCARParser extends BaseStructureParser {
       }
 
       let row = `${fx.toFixed(10)}  ${fy.toFixed(10)}  ${fz.toFixed(10)}`;
-      if (hasFixed) {
-        row += atom.fixed ? '  F  F  F' : '  T  T  T';
+      if (hasSelectiveDynamics && atom.selectiveDynamics) {
+        const flags = atom.selectiveDynamics.map(f => f ? 'T' : 'F').join('  ');
+        row += `  ${flags}`;
       }
       lines.push(row);
     }

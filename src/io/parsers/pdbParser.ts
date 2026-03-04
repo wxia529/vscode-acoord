@@ -60,22 +60,39 @@ export class PDBParser extends BaseStructureParser {
 
     if (structure.unitCell) {
       const uc = structure.unitCell;
+      const aStr = uc.a.toFixed(3).padStart(9);
+      const bStr = uc.b.toFixed(3).padStart(9);
+      const cStr = uc.c.toFixed(3).padStart(9);
+      const alphaStr = uc.alpha.toFixed(2).padStart(7);
+      const betaStr = uc.beta.toFixed(2).padStart(7);
+      const gammaStr = uc.gamma.toFixed(2).padStart(7);
       lines.push(
-        `CRYST1${uc.a.toFixed(3).padStart(9)}${uc.b.toFixed(3).padStart(9)}${uc.c.toFixed(3).padStart(9)}` +
-          `${uc.alpha.toFixed(2).padStart(7)}${uc.beta.toFixed(2).padStart(7)}${uc.gamma.toFixed(2).padStart(7)} P 1`
+        `CRYST1${aStr}${bStr}${cStr}${alphaStr}${betaStr}${gammaStr} P 1`
       );
     }
 
     let atomIndex = 1;
     for (const atom of structure.atoms) {
-      const name = atom.element.padEnd(2, ' ');
-      const element = atom.element.padStart(2, ' ');
+      const serial = String(atomIndex).padStart(6, ' ');
+      const name = atom.element.length === 2
+        ? atom.element
+        : atom.element.padEnd(2, ' ');
+      const resName = 'MOL';
+      const chainID = ' ';
+      const resSeq = '   1';
+      const iCode = ' ';
       const x = atom.x.toFixed(3).padStart(8, ' ');
       const y = atom.y.toFixed(3).padStart(8, ' ');
       const z = atom.z.toFixed(3).padStart(8, ' ');
-      const serial = String(atomIndex).padStart(5, ' ');
+      const occupancy = '1.00';
+      const tempFactor = '0.00';
+      const element = atom.element.length === 2
+        ? atom.element
+        : atom.element.padStart(2, ' ');
+      const charge = '  ';
+
       lines.push(
-        `ATOM  ${serial}  ${name} MOL     1    ${x}${y}${z}  1.00  0.00          ${element}`
+        `ATOM  ${serial} ${name}${resName}${chainID}${resSeq}${iCode}   ${x}${y}${z}${occupancy.padStart(6)}${tempFactor.padStart(6)}          ${element}${charge}`
       );
       atomIndex++;
     }

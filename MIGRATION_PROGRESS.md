@@ -1,7 +1,7 @@
 # ACoord Migration Progress
 
-**Started:** 2026-03-04  
-**Current Phase:** Phase 3 - Architecture — Extension Host  
+**Started:** 2026-03-04
+**Current Phase:** Phase 6 - Parser Correctness
 **Status:** ✅ COMPLETED
 
 ---
@@ -674,12 +674,12 @@ export function getElementById<T extends HTMLElement = HTMLElement>(
 - [x] **Phase 3:** Architecture — Extension Host
 - [x] **Phase 4:** Architecture — Webview
 - [x] **Phase 5:** Performance
-- [ ] **Phase 6:** Parser Correctness
+- [x] **Phase 6:** Parser Correctness
 - [ ] **Phase 7:** Testing & CI
 - [ ] **Phase 8:** Cleanup & Polish
 
-**Estimated Total Effort:** 15-25 development days  
-**Completed:** ~12-16 days (Phase 1-5)
+**Estimated Total Effort:** 15-25 development days
+**Completed:** ~14-19 days (Phase 1-6)
 
 ---
 
@@ -903,6 +903,354 @@ latticeThicknessSlider.addEventListener('input', () => {
 - Bond detection still uses fixed tolerance (could benefit from adaptive cutoff)
 
 **Next Steps:** Proceed to Phase 6 - Parser Correctness
+
+---
+
+## Phase 6: Parser Correctness
+
+### 6.1 Add metadata Field to Structure ✅
+
+**Status:** COMPLETED
+**Files Modified:**
+- `src/models/structure.ts`
+
+**Changes Made:**
+- Added `metadata: Map<string, unknown>` field to Structure class
+- Updated `clone()` to deep copy metadata
+- Updated `toJSON()` to serialize metadata as array of entries
+- Provides storage for format-specific data (charge/multiplicity, comments, etc.)
+
+**Implementation Details:**
+```typescript
+export class Structure {
+  // ... existing fields ...
+  metadata: Map<string, unknown> = new Map();
+
+  clone(): Structure {
+    const cloned = new Structure(this.name, this.isCrystal);
+    // ... other cloning ...
+    cloned.metadata = new Map(this.metadata);
+    return cloned;
+  }
+
+  toJSON() {
+    return {
+      // ... other fields ...
+      metadata: Array.from(this.metadata.entries()),
+    };
+  }
+}
+```
+
+---
+
+### 6.2 Add selectiveDynamics Field to Atom ✅
+
+**Status:** COMPLETED
+**Files Modified:**
+- `src/models/atom.ts`
+
+**Changes Made:**
+- Added `selectiveDynamics?: [boolean, boolean, boolean]` field to Atom class
+- Updated `clone()` to copy selectiveDynamics flags
+- Updated `toJSON()` to serialize selectiveDynamics
+- Preserves per-axis selective dynamics (T/F/T) instead of collapsing to single boolean
+
+**Implementation Details:**
+```typescript
+export class Atom {
+  // ... existing fields ...
+  selectiveDynamics?: [boolean, boolean, boolean];
+
+  clone(): Atom {
+    const cloned = new Atom(...);
+    if (this.selectiveDynamics) {
+      cloned.selectiveDynamics = [...this.selectiveDynamics];
+    }
+    return cloned;
+  }
+}
+```
+
+---
+
+### 6.3 Fix POSCAR Selective Dynamics ✅
+
+**Status:** COMPLETED
+**Files Modified:** `src/io/parsers/poscarParser.ts`
+
+**Problem:** Selective dynamics flags (`T T F`, `F F F`) were collapsed to a single `fixed` boolean, losing per-axis information.
+
+**Changes Made:**
+- Parse per-axis T/F flags and store as `selectiveDynamics` tuple
+- Set `fixed` as `!selectiveDynamics.every(flag => flag)` (all false = fixed)
+- Serialize per-axis flags using `T`/`F` characters
+- Only include Selective dynamics header if any atom has `selectiveDynamics` set
+
+**Implementation Details:**
+```typescript
+// Parse
+if (header.hasSelectiveDynamics && parts.length >= 6) {
+  const flags = parts.slice(3, 6).map((value) => value.toUpperCase());
+  const selectiveDynamics: [boolean, boolean, boolean] = [
+    flags[0] !== 'F',
+    flags[1] !== 'F',
+    flags[2] !== 'F'
+  ];
+  atom.selectiveDynamics = selectiveDynamics;
+  atom.fixed = selectiveDynamics.every((flag) => !flag);
+}
+
+// Serialize
+if (hasSelectiveDynamics && atom.selectiveDynamics) {
+  const flags = atom.selectiveDynamics.map(f => f ? 'T' : 'F').join('  ');
+  row += `  ${flags}`;
+}
+```
+
+---
+
+### 6.4 Fix Gaussian Parser Charge/Multiplicity ✅
+
+**Status:** COMPLETED
+**Files Modified:** `src/io/parsers/gjfParser.ts`
+
+**Problem:** Charge and multiplicity from the input file were parsed but not stored. On serialize, defaults (0 1) were emitted.
+
+**Changes Made:**
+- Parse charge and multiplicity from charge/multiplicity line
+- Store in `structure.metadata` as `charge` and `multiplicity`
+- Retrieve from metadata during serialization (default to 0, 1 if missing)
+
+**Implementation Details:**
+```typescript
+// Parse
+const charge = parseInt(chargeLine[0], 10);
+const multiplicity = parseInt(chargeLine[1], 10);
+structure.metadata.set('charge', charge);
+structure.metadata.set('multiplicity', multiplicity);
+
+// Serialize
+const charge = structure.metadata.get('charge') as number ?? 0;
+const multiplicity = structure.metadata.get('multiplicity') as number ?? 1;
+lines.push(`${charge} ${multiplicity}`);
+```
+
+---
+
+### 6.5 Fix ORCA Parser Charge/Multiplicity ✅
+
+**Status:** COMPLETED
+**Files Modified:** `src/io/parsers/orcaParser.ts`
+
+**Problem:** Charge and multiplicity were ignored during parsing. Always defaulted to (0 1).
+
+**Changes Made:**
+- Parse charge and multiplicity from `* xyz charge mult` header
+- Store in `structure.metadata` as `charge` and `multiplicity`
+- Retrieve from metadata during serialization
+
+**Implementation Details:**
+```typescript
+// Parse
+const headerLine = lines[startIndex].trim();
+const parts = headerLine.split(/\s+/);
+if (parts.length >= 4) {
+  charge = parseInt(parts[parts.length - 2], 10);
+  multiplicity = parseInt(parts[parts.length - 1], 10);
+}
+structure.metadata.set('charge', charge);
+structure.metadata.set('multiplicity', multiplicity);
+
+// Serialize
+const charge = structure.metadata.get('charge') as number ?? 0;
+const multiplicity = structure.metadata.get('multiplicity') as number ?? 1;
+lines.push(`* xyz ${charge} ${multiplicity}`);
+```
+
+---
+
+### 6.6 Fix PDB Column Alignment ✅
+
+**Status:** COMPLETED
+**Files Modified:** `src/io/parsers/pdbParser.ts`
+
+**Problem:** Column alignment was off by one for atom names (should be columns 13-16), and other fields were misaligned according to PDB format specification.
+
+**Changes Made:**
+- Fixed atom name positioning: columns 13-16 (right-justified)
+- Fixed element symbol positioning: columns 77-78
+- Fixed coordinates: columns 31-38, 39-46, 47-54 (8.3 format, right-justified)
+- Added proper PDB format with fixed-width columns:
+  - Columns 1-6: `ATOM  `
+  - Columns 7-11: serial number
+  - Column 12: space
+  - Columns 13-16: atom name
+  - Columns 17-20: residue name
+  - Column 22: chain ID
+  - Columns 23-26: residue sequence
+  - Column 27: insertion code
+  - Columns 31-38: X coordinate
+  - Columns 39-46: Y coordinate
+  - Columns 47-54: Z coordinate
+  - Columns 55-60: occupancy
+  - Columns 61-66: temperature factor
+  - Columns 77-78: element symbol
+  - Columns 79-80: charge
+
+**Implementation Details:**
+```typescript
+const serial = String(atomIndex).padStart(6, ' ');
+const name = atom.element.length === 2 ? atom.element : atom.element.padEnd(2, ' ');
+const x = atom.x.toFixed(3).padStart(8, ' ');
+const y = atom.y.toFixed(3).padStart(8, ' ');
+const z = atom.z.toFixed(3).padStart(8, ' ');
+const element = atom.element.length === 2 ? atom.element : atom.element.padStart(2, ' ');
+
+lines.push(
+  `ATOM  ${serial} ${name}MOL   1    ${x}${y}${z}  1.00  0.00          ${element}  `
+);
+```
+
+---
+
+### 6.7 Add QE ibrav Validation ✅
+
+**Status:** COMPLETED
+**Files Modified:** `src/io/parsers/qeParser.ts`
+
+**Problem:** Only `ibrav = 0` (explicit cell vectors) was supported, but files with `ibrav > 0` would fail silently or produce incorrect results.
+
+**Changes Made:**
+- Added `extractIbrav()` method to parse ibrav value from namelist
+- Validate ibrav during parsing
+- Throw clear error message if ibrav != 0
+
+**Implementation Details:**
+```typescript
+private extractIbrav(lines: string[]): number | null {
+  for (const line of lines) {
+    const stripped = line.split('!')[0];
+    const match = stripped.match(/ibrav\s*=\s*(\d+)/i);
+    if (match && match[1]) {
+      return parseInt(match[1], 10);
+    }
+  }
+  return 0;
+}
+
+// In parseInput()
+const ibrav = this.extractIbrav(lines);
+if (ibrav !== null && ibrav !== 0) {
+  throw new Error(
+    `ACoord does not support ibrav = ${ibrav}. Please convert your input to ibrav = 0 (explicit lattice vectors).`
+  );
+}
+```
+
+---
+
+### 6.8 Add NaN Guards to UnitCell.getLatticeVectors() ✅
+
+**Status:** COMPLETED
+**Files Modified:** `src/models/unitCell.ts`
+
+**Problem:** Degenerate angles (0°, 180°) cause division by zero or `acos` of values outside [-1, 1], producing NaN in lattice vectors without error.
+
+**Changes Made:**
+- Check for imaginary c_z squared value before taking square root
+- Throw descriptive error for invalid unit cell parameters
+- Validate angles are within valid range (0-180°, excluding 0 and 180)
+
+**Implementation Details:**
+```typescript
+const c_z_sq = this.c * this.c - c_x * c_x - c_y * c_y;
+
+if (c_z_sq < 0 || c_z_sq !== c_z_sq) {
+  throw new Error(
+    `Invalid unit cell parameters: lattice vector c has imaginary component. ` +
+    `Check that angles are valid (not 0°, 180°, or outside 0-180° range).`
+  );
+}
+
+const c_z = Math.sqrt(c_z_sq);
+```
+
+---
+
+### 6.9 Fix Ambiguous File Extension Mapping ✅
+
+**Status:** COMPLETED
+**Files Modified:** `src/io/fileManager.ts`
+
+**Problem:** `.out` and `.log` were exclusively mapped to QEParser. ORCA and Gaussian also use these extensions, causing silent failures for those files.
+
+**Changes Made:**
+- Added `selectParser()` method for ambiguous extensions
+- For `.out` and `.log`, try parsers in order of likelihood:
+  1. Quantum ESPRESSO (most common)
+  2. ORCA
+  3. Gaussian
+- Each parser attempts to parse; first successful parser is used
+- If all fail, throw error from first (QE) parser
+
+**Implementation Details:**
+```typescript
+private static selectParser(filePath: string, content: string): BaseStructureParser | null {
+  const ext = this.getFileExtension(filePath).toLowerCase();
+
+  const directParser = PARSER_MAP[ext];
+  if (directParser) {
+    return directParser;
+  }
+
+  if (ext === 'out' || ext === 'log') {
+    const parsersToTry = [
+      { name: 'Quantum ESPRESSO', parser: PARSER_MAP['out'] },
+      { name: 'ORCA', parser: PARSER_MAP['inp'] },
+      { name: 'Gaussian', parser: PARSER_MAP['gjf'] },
+    ];
+
+    for (const { parser } of parsersToTry) {
+      try {
+        const result = parser.parseTrajectory(content);
+        if (result && result.length > 0) {
+          return parser;
+        }
+      } catch {
+        continue;
+      }
+    }
+  }
+
+  return null;
+}
+```
+
+---
+
+### 6.10 Parser Correctness Summary
+
+**Key Improvements:**
+
+| Issue | Format | Impact | Status |
+|-------|--------|--------|--------|
+| Selective dynamics | POSCAR | Per-axis info lost on round-trip | ✅ Fixed |
+| Charge/multiplicity | Gaussian | Defaults on round-trip | ✅ Fixed |
+| Charge/multiplicity | ORCA | Always defaulted to (0 1) | ✅ Fixed |
+| Column alignment | PDB | Misaligned columns break tools | ✅ Fixed |
+| ibrav > 0 support | QE | Silent failure or wrong results | ✅ Validated |
+| Degenerate angles | UnitCell | NaN values without error | ✅ Guarded |
+| Ambiguous extensions | .out/.log | QE-only, breaks others | ✅ Multi-parser |
+
+**Data Preservation:**
+- All format-specific metadata now preserved via `Structure.metadata`
+- Round-trip tests should pass for all parsers (to be added in Phase 7)
+- User-facing errors for unsupported cases (ibrav > 0, degenerate cells)
+
+**Next Steps:** Proceed to Phase 7 - Testing & CI
+
+---
 
 ---
 

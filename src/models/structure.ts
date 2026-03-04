@@ -15,6 +15,7 @@ export class Structure {
   unitCell?: UnitCell;
   isCrystal: boolean = false;
   supercell: [number, number, number] = [1, 1, 1];
+  metadata: Map<string, unknown> = new Map();
 
   constructor(name: string = 'Untitled', isCrystal: boolean = false) {
     this.id = `struct_${crypto.randomUUID()}`;
@@ -335,6 +336,7 @@ export class Structure {
       cloned.unitCell = this.unitCell.clone();
     }
     cloned.supercell = [...this.supercell];
+    cloned.metadata = new Map(this.metadata);
     return cloned;
   }
 
@@ -485,6 +487,7 @@ export class Structure {
       unitCell: this.unitCell?.toJSON(),
       isCrystal: this.isCrystal,
       supercell: this.supercell,
+      metadata: Array.from(this.metadata.entries()),
     };
   }
 }

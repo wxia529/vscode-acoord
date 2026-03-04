@@ -61,6 +61,10 @@ export class UnitCell {
     const betaRad = (this.beta * Math.PI) / 180;
     const gammaRad = (this.gamma * Math.PI) / 180;
 
+    const ca = Math.cos(alphaRad);
+    const cb = Math.cos(betaRad);
+    const cg = Math.cos(gammaRad);
+
     const a_vec = [this.a, 0, 0];
     const b_vec = [
       this.b * Math.cos(gammaRad),
@@ -74,7 +78,16 @@ export class UnitCell {
       (this.c *
         (Math.cos(alphaRad) - Math.cos(betaRad) * Math.cos(gammaRad))) /
       Math.sin(gammaRad);
-    const c_z = Math.sqrt(this.c * this.c - c_x * c_x - c_y * c_y);
+    const c_z_sq = this.c * this.c - c_x * c_x - c_y * c_y;
+
+    if (c_z_sq < 0 || c_z_sq !== c_z_sq) {
+      throw new Error(
+        `Invalid unit cell parameters: lattice vector c has imaginary component. ` +
+        `Check that angles are valid (not 0°, 180°, or outside 0-180° range).`
+      );
+    }
+
+    const c_z = Math.sqrt(c_z_sq);
 
     const c_vec = [c_x, c_y, c_z];
 

@@ -10,6 +10,7 @@ export class Atom {
   color?: string;
   selected: boolean = false;
   fixed: boolean = false;
+  selectiveDynamics?: [boolean, boolean, boolean];
 
   constructor(
     element: string,
@@ -60,6 +61,9 @@ export class Atom {
     const cloned = new Atom(this.element, this.x, this.y, this.z, this.id, this.color);
     cloned.selected = this.selected;
     cloned.fixed = this.fixed;
+    if (this.selectiveDynamics) {
+      cloned.selectiveDynamics = [...this.selectiveDynamics];
+    }
     return cloned;
   }
 
@@ -75,6 +79,7 @@ export class Atom {
       z: this.z,
       color: this.color,
       fixed: this.fixed,
+      selectiveDynamics: this.selectiveDynamics,
     };
   }
 }

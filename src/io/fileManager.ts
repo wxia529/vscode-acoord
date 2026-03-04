@@ -62,7 +62,7 @@ export class FileManager {
     content: string
   ): Structure[] {
     const ext = this.getFileExtension(filePath).toLowerCase();
-    const parser = PARSER_MAP[ext];
+    const parser = this.selectParser(filePath, content);
 
     if (!parser) {
       throw new Error(`Unsupported file format: ${ext}`);
@@ -77,6 +77,37 @@ export class FileManager {
     } catch (error) {
       throw new Error(`Failed to parse ${ext} file: ${error instanceof Error ? error.message : String(error)}`);
     }
+  }
+
+  private static selectParser(filePath: string, content: string): BaseStructureParser | null {
+    const ext = this.getFileExtension(filePath).toLowerCase();
+
+    const directParser = PARSER_MAP[ext];
+    if (directParser) {
+      return directParser;
+    }
+
+    if (ext === 'out' || ext === 'log') {
+      const parsersToTry = [
+        { name: 'Quantum ESPRESSO', parser: PARSER_MAP['out'] },
+        { name: 'ORCA', parser: PARSER_MAP['inp'] },
+        { name: 'Gaussian', parser: PARSER_MAP['gjf'] },
+      ];
+
+      for (const { name, parser } of parsersToTry) {
+        if (!parser) continue;
+        try {
+          const result = parser.parseTrajectory(content);
+          if (result && result.length > 0) {
+            return parser;
+          }
+        } catch {
+          continue;
+        }
+      }
+    }
+
+    return null;
   }
 
   /**

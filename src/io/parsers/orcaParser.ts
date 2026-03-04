@@ -19,7 +19,19 @@ export class ORCAParser extends BaseStructureParser {
       throw new Error('Invalid ORCA input: missing "* xyz" block');
     }
 
+    const headerLine = lines[startIndex].trim();
+    const parts = headerLine.split(/\s+/);
+    let charge = 0;
+    let multiplicity = 1;
+
+    if (parts.length >= 4) {
+      charge = parseInt(parts[parts.length - 2], 10);
+      multiplicity = parseInt(parts[parts.length - 1], 10);
+    }
+
     const structure = new Structure('');
+    structure.metadata.set('charge', charge);
+    structure.metadata.set('multiplicity', multiplicity);
 
     for (let i = startIndex + 1; i < lines.length; i++) {
       const line = lines[i].trim();
@@ -54,7 +66,10 @@ export class ORCAParser extends BaseStructureParser {
     lines.push('! B3LYP D3 def2-SVP');
     lines.push('%maxcore     8192');
     lines.push('%pal nprocs   8 end');
-    lines.push('* xyz 0 1');
+
+    const charge = structure.metadata.get('charge') as number ?? 0;
+    const multiplicity = structure.metadata.get('multiplicity') as number ?? 1;
+    lines.push(`* xyz ${charge} ${multiplicity}`);
     for (const atom of structure.atoms) {
       lines.push(
         `${atom.element}  ${atom.x.toFixed(10)}  ${atom.y.toFixed(10)}  ${atom.z.toFixed(10)}`

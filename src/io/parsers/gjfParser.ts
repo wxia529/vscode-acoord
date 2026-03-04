@@ -46,9 +46,15 @@ export class GJFParser extends BaseStructureParser {
       throw new Error('Invalid GJF format: missing charge/multiplicity');
     }
 
+    const chargeLine = lines[chargeMultiplicityIndex].trim().split(/\s+/);
+    const charge = parseInt(chargeLine[0], 10);
+    const multiplicity = parseInt(chargeLine[1], 10);
+
     idx = chargeMultiplicityIndex + 1;
 
     const structure = new Structure(title || '');
+    structure.metadata.set('charge', charge);
+    structure.metadata.set('multiplicity', multiplicity);
     const latticeVectors: number[][] = [];
 
     // Atom and TV lines until blank line or EOF
@@ -102,7 +108,10 @@ export class GJFParser extends BaseStructureParser {
     lines.push('');
     lines.push(structure.name?.trim() ? structure.name : 'Gaussian input');
     lines.push('');
-    lines.push('0 1');
+
+    const charge = structure.metadata.get('charge') as number ?? 0;
+    const multiplicity = structure.metadata.get('multiplicity') as number ?? 1;
+    lines.push(`${charge} ${multiplicity}`);
 
     for (const atom of structure.atoms) {
       lines.push(

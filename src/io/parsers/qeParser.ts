@@ -137,6 +137,14 @@ export class QEParser extends BaseStructureParser {
     const nat = this.extractNat(lines);
     const alat = this.extractAlat(lines);
     const name = this.extractPrefix(lines) || '';
+    const ibrav = this.extractIbrav(lines);
+
+    if (ibrav !== null && ibrav !== 0) {
+      throw new Error(
+        `ACoord does not support ibrav = ${ibrav}. Please convert your input to ibrav = 0 (explicit lattice vectors).`
+      );
+    }
+
     const structure = new Structure(name);
 
     let cellVectors: number[][] | null = null;
@@ -578,6 +586,20 @@ export class QEParser extends BaseStructureParser {
       }
     }
     return null;
+  }
+
+  private extractIbrav(lines: string[]): number | null {
+    for (const line of lines) {
+      const stripped = line.split('!')[0];
+      const match = stripped.match(/ibrav\s*=\s*(\d+)/i);
+      if (match && match[1]) {
+        const value = parseInt(match[1], 10);
+        if (Number.isFinite(value)) {
+          return value;
+        }
+      }
+    }
+    return 0;
   }
 
   private parseAlatFromLine(line: string): number | null {
