@@ -79,12 +79,21 @@ export function getSelectedCentroid(): [number, number, number] | null {
   return [cx / count, cy / count, cz / count];
 }
 
-export function updateAtomPosition(atomId: string, x: number, y: number, z: number): void {
+export function updateAtomPosition(
+  atomId: string,
+  x: number,
+  y: number,
+  z: number,
+  onUpdate?: () => void
+): void {
   const atom = getAtomById(atomId);
   if (!atom) return;
   atom.position[0] = x;
   atom.position[1] = y;
   atom.position[2] = z;
+  if (onUpdate) {
+    onUpdate();
+  }
 }
 
 export function applyBondAngle(targetDeg: number): void {
