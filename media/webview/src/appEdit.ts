@@ -6,10 +6,13 @@
  *
  * setup(callbacks) must be called once during app initialisation.
  */
-import { state } from './state';
-import type { AppCallbacks } from './types';
+import { selectionStore, structureStore } from './state';
+import type { VscodeContext, SelectionContext, EditContext } from './types';
 
-export function setup(callbacks: AppCallbacks): void {
+/** Combined context for appEdit module */
+type AppEditContext = VscodeContext & SelectionContext & EditContext;
+
+export function setup(callbacks: AppEditContext): void {
   const { vscode, getSelectedBondKeys, normalizeHexColor, applySelectedAtomChanges } = callbacks;
 
   // ── Quick Add ─────────────────────────────────────────────────────────────────
@@ -45,14 +48,14 @@ export function setup(callbacks: AppCallbacks): void {
   // ── Delete / Copy toolbar buttons ──────────────────────────────────────────
 
   const deleteSelectedAtoms = (): boolean => {
-    const selectedAtomIds = Array.isArray(state.selectedAtomIds)
-      ? state.selectedAtomIds.filter((atomId) => typeof atomId === 'string' && atomId.length > 0)
+    const selectedAtomIds = Array.isArray(selectionStore.selectedAtomIds)
+      ? selectionStore.selectedAtomIds.filter((atomId) => typeof atomId === 'string' && atomId.length > 0)
       : [];
     if (selectedAtomIds.length > 1) {
       vscode.postMessage({ command: 'deleteAtoms', atomIds: selectedAtomIds });
       return true;
     }
-    const fallbackId = state.currentStructure && (state.currentStructure as { selectedAtomId?: string }).selectedAtomId;
+    const fallbackId = structureStore.currentStructure && (structureStore.currentStructure as { selectedAtomId?: string }).selectedAtomId;
     const atomId = selectedAtomIds.length === 1 ? selectedAtomIds[0] : fallbackId;
     if (!atomId) { return false; }
     vscode.postMessage({ command: 'deleteAtom', atomId });
@@ -71,10 +74,10 @@ export function setup(callbacks: AppCallbacks): void {
 
   if (btnCopyAtom) {
     btnCopyAtom.onclick = () => {
-      if (!state.selectedAtomIds || state.selectedAtomIds.length === 0) { return; }
+      if (!selectionStore.selectedAtomIds || selectionStore.selectedAtomIds.length === 0) { return; }
       vscode.postMessage({
         command: 'copyAtoms',
-        atomIds: state.selectedAtomIds,
+        atomIds: selectionStore.selectedAtomIds,
         offset: { x: 0.5, y: 0.5, z: 0.5 },
       });
     };
@@ -100,8 +103,8 @@ export function setup(callbacks: AppCallbacks): void {
   if (btnChangeAtom) {
     btnChangeAtom.onclick = () => {
       const element = (document.getElementById('change-element') as HTMLInputElement | null)?.value.trim() ?? '';
-      if (!element || !state.selectedAtomIds || state.selectedAtomIds.length === 0) { return; }
-      vscode.postMessage({ command: 'changeAtoms', atomIds: state.selectedAtomIds, element });
+      if (!element || !selectionStore.selectedAtomIds || selectionStore.selectedAtomIds.length === 0) { return; }
+      vscode.postMessage({ command: 'changeAtoms', atomIds: selectionStore.selectedAtomIds, element });
     };
   }
 
@@ -139,8 +142,8 @@ export function setup(callbacks: AppCallbacks): void {
       const color = syncColorInputs(
         (atomColorText?.value ?? '') || (atomColorPicker?.value ?? '')
       );
-      if (!color || !state.selectedAtomIds || state.selectedAtomIds.length === 0) { return; }
-      vscode.postMessage({ command: 'setAtomColor', atomIds: state.selectedAtomIds, color });
+      if (!color || !selectionStore.selectedAtomIds || selectionStore.selectedAtomIds.length === 0) { return; }
+      vscode.postMessage({ command: 'setAtomColor', atomIds: selectionStore.selectedAtomIds, color });
     };
   }
 

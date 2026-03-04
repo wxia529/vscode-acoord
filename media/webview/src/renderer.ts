@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { TrackballControls } from 'three/examples/jsm/controls/TrackballControls.js';
-import { state } from './state';
-import type { Atom, Bond, Structure, UiHooks } from './types';
+import { structureStore, displayStore, lightingStore } from './state';
+import type { Atom, Bond, Structure, UiHooks, UnitCellEdge } from './types';
 import { clampAtomSize, getBaseAtomId } from './utils/atomSize';
 
 // Camera auto-scaling constants
@@ -37,6 +37,8 @@ export interface RendererApi {
   updateAtomPosition(atomId: string, position: THREE.Vector3): void;
   /** Mark the renderer dirty so the next animate() frame will re-render. */
   markDirty(): void;
+  /** Clean up Three.js resources to prevent memory leaks when the webview closes. */
+  dispose(): void;
 }
 
 interface RendererState {
@@ -121,7 +123,7 @@ function resolveLightColor(value: unknown, fallback: string): string {
 }
 
 function getSurfaceShininess(): number {
-  const value = Number(state.shininess);
+  const value = Number(displayStore.shininess);
   if (!Number.isFinite(value)) {
     return 50;
   }
@@ -173,7 +175,7 @@ function createCamera(mode: string, width: number, height: number): THREE.Perspe
     const camera = new THREE.OrthographicCamera(
       frustum.left, frustum.right, frustum.top, frustum.bottom, 0.1, 10000
     );
-    camera.zoom = state.viewZoom || 1;
+    camera.zoom = displayStore.viewZoom || 1;
     camera.updateProjectionMatrix();
     return camera;
   }
@@ -206,10 +208,10 @@ function init(canvas: HTMLCanvasElement, handlers: { setError: (m: string) => vo
   handlers.setStatus('Canvas size: ' + Math.round(width) + 'x' + Math.round(height));
 
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color(state.backgroundColor || '#0d1015');
+  scene.background = new THREE.Color(displayStore.backgroundColor || '#0d1015');
   rendererState.scene = scene;
 
-  rendererState.projectionMode = state.projectionMode || 'perspective';
+  rendererState.projectionMode = displayStore.projectionMode || 'perspective';
   const camera = createCamera(rendererState.projectionMode, width, height);
   camera.position.z = 20;
   rendererState.camera = camera;
@@ -234,35 +236,35 @@ function init(canvas: HTMLCanvasElement, handlers: { setError: (m: string) => vo
   }
 
   rendererState.ambientLight = new THREE.AmbientLight(
-    resolveLightColor(state.ambientColor, '#ffffff'),
+    resolveLightColor(lightingStore.ambientColor, '#ffffff'),
     // Three.js r183 BRDF_Lambert divides diffuse by PI in the shader.
     // Multiply intensity by PI to compensate and match old r128 brightness.
-    (state.ambientIntensity ?? 0.5) * Math.PI
+    (lightingStore.ambientIntensity ?? 0.5) * Math.PI
   );
   scene.add(rendererState.ambientLight);
 
   rendererState.keyLight = new THREE.DirectionalLight(
-    resolveLightColor(state.keyLight?.color, '#CCCCCC'),
-    (state.keyLight?.intensity ?? 0.7) * Math.PI
+    resolveLightColor(lightingStore.keyLight?.color, '#CCCCCC'),
+    (lightingStore.keyLight?.intensity ?? 0.7) * Math.PI
   );
   scene.add(rendererState.keyLight);
 
   rendererState.fillLight = new THREE.DirectionalLight(
-    resolveLightColor(state.fillLight?.color, '#ffffff'),
-    (state.fillLight?.intensity ?? 0) * Math.PI
+    resolveLightColor(lightingStore.fillLight?.color, '#ffffff'),
+    (lightingStore.fillLight?.intensity ?? 0) * Math.PI
   );
   scene.add(rendererState.fillLight);
 
   rendererState.rimLight = new THREE.DirectionalLight(
-    resolveLightColor(state.rimLight?.color, '#ffffff'),
-    (state.rimLight?.intensity ?? 0) * Math.PI
+    resolveLightColor(lightingStore.rimLight?.color, '#ffffff'),
+    (lightingStore.rimLight?.intensity ?? 0) * Math.PI
   );
   scene.add(rendererState.rimLight);
 
   updateLightsForCamera();
 
   rendererState.axesHelper = new THREE.AxesHelper(5);
-  rendererState.axesHelper.visible = state.showAxes !== false;
+  rendererState.axesHelper.visible = displayStore.showAxes !== false;
   scene.add(rendererState.axesHelper);
 
   applyControls(camera);
@@ -301,9 +303,9 @@ function updateLightsForCamera(): void {
     return;
   }
   const camera = rendererState.camera;
-  const keyOffset = new THREE.Vector3(state.keyLight?.x ?? 0, state.keyLight?.y ?? 0, state.keyLight?.z ?? 10);
-  const fillOffset = new THREE.Vector3(state.fillLight?.x ?? -10, state.fillLight?.y ?? -5, state.fillLight?.z ?? 5);
-  const rimOffset = new THREE.Vector3(state.rimLight?.x ?? 0, state.rimLight?.y ?? 5, state.rimLight?.z ?? -10);
+  const keyOffset = new THREE.Vector3(lightingStore.keyLight?.x ?? 0, lightingStore.keyLight?.y ?? 0, lightingStore.keyLight?.z ?? 10);
+  const fillOffset = new THREE.Vector3(lightingStore.fillLight?.x ?? -10, lightingStore.fillLight?.y ?? -5, lightingStore.fillLight?.z ?? 5);
+  const rimOffset = new THREE.Vector3(lightingStore.rimLight?.x ?? 0, lightingStore.rimLight?.y ?? 5, lightingStore.rimLight?.z ?? -10);
 
   keyOffset.applyQuaternion(camera.quaternion);
   fillOffset.applyQuaternion(camera.quaternion);
@@ -327,7 +329,7 @@ function onResize(): void {
     rendererState.camera.right = frustum.right;
     rendererState.camera.top = frustum.top;
     rendererState.camera.bottom = frustum.bottom;
-    rendererState.camera.zoom = state.viewZoom || 1;
+    rendererState.camera.zoom = displayStore.viewZoom || 1;
   } else if (rendererState.camera instanceof THREE.PerspectiveCamera) {
     rendererState.camera.aspect = width / height;
   }
@@ -364,16 +366,16 @@ function getConfiguredAtomRadius(atom: Atom, baseAtomsById: Map<string, Atom>): 
     ? atom.radius
     : Number.isFinite(baseAtom?.radius) ? baseAtom!.radius : 0.1;
 
-  if (state.atomSizeUseDefaultSettings !== false) return fallbackRadius;
+  if (displayStore.atomSizeUseDefaultSettings !== false) return fallbackRadius;
 
-  const atomOverride = (state.atomSizeByAtom || {})[baseId];
+  const atomOverride = (displayStore.atomSizeByAtom || {})[baseId];
   if (Number.isFinite(atomOverride)) return clampAtomSize(atomOverride, fallbackRadius);
 
   const element = atom.element || baseAtom?.element;
-  const elementOverride = element ? (state.atomSizeByElement || {})[element] : undefined;
+  const elementOverride = element ? (displayStore.atomSizeByElement || {})[element] : undefined;
   if (Number.isFinite(elementOverride)) return clampAtomSize(elementOverride, fallbackRadius);
 
-  return clampAtomSize(state.atomSizeGlobal, fallbackRadius);
+  return clampAtomSize(displayStore.atomSizeGlobal, fallbackRadius);
 }
 
 function disposeMaterial(material: THREE.Material | THREE.Material[] | null | undefined): void {
@@ -413,18 +415,13 @@ function createUnitCellEdgeMesh(start: THREE.Vector3, end: THREE.Vector3, radius
   return mesh;
 }
 
-interface UnitCellEdge {
-  start: [number, number, number];
-  end: [number, number, number];
-}
-
 function buildUnitCellGroup(edges: UnitCellEdge[], scale: number): THREE.Group | null {
   if (!Array.isArray(edges) || edges.length === 0) return null;
 
-  const color = state.unitCellColor || '#FF6600';
-  const thickness = Number.isFinite(state.unitCellThickness)
-    ? Math.max(0.5, Math.min(6, state.unitCellThickness)) : 1;
-  const style = state.unitCellLineStyle === 'dashed' ? 'dashed' : 'solid';
+  const color = displayStore.unitCellColor || '#FF6600';
+  const thickness = Number.isFinite(displayStore.unitCellThickness)
+    ? Math.max(0.5, Math.min(6, displayStore.unitCellThickness)) : 1;
+  const style = displayStore.unitCellLineStyle === 'dashed' ? 'dashed' : 'solid';
   const radius = Math.max(0.01, thickness * 0.03);
   const dashLength = 0.45;
   const gapLength = 0.28;
@@ -462,10 +459,10 @@ function buildUnitCellGroup(edges: UnitCellEdge[], scale: number): THREE.Group |
 }
 
 function renderStructure(data: Structure, uiHooks?: Partial<UiHooks>, options?: { fitCamera?: boolean }): void {
-  state.currentStructure = data;
-  let scale = state.manualScale;
-  let sizeScale = state.atomSizeScale;
-  if (state.autoScaleEnabled) {
+  structureStore.currentStructure = data;
+  let scale = displayStore.manualScale;
+  let sizeScale = displayStore.atomSizeScale;
+  if (displayStore.autoScaleEnabled) {
     const auto = getAutoScales(data.atoms || []);
     scale = auto.scale;
     sizeScale = auto.sizeScale;
@@ -627,7 +624,7 @@ function renderStructure(data: Structure, uiHooks?: Partial<UiHooks>, options?: 
       const start = new THREE.Vector3(bond.start[0] * scale, bond.start[1] * scale, bond.start[2] * scale);
       const end = new THREE.Vector3(bond.end[0] * scale, bond.end[1] * scale, bond.end[2] * scale);
       const length = start.distanceTo(end);
-      const bondThicknessScale = Number.isFinite(state.bondThicknessScale) ? state.bondThicknessScale : 1;
+      const bondThicknessScale = Number.isFinite(displayStore.bondThicknessScale) ? displayStore.bondThicknessScale : 1;
       const bondRadius = Math.max(bond.radius * sizeScale * bondThicknessScale, 0.03) * (highlightBond ? 1.35 : 1);
       const midpoint = start.clone().add(end).multiplyScalar(0.5);
       const emissive = isSelectedBond ? '#704214' : '#000000';
@@ -746,7 +743,7 @@ function fitCamera(): void {
   if (rendererState.camera instanceof THREE.OrthographicCamera) {
     const cam = rendererState.camera;
     const targetSize = Math.max(maxDim * 1.2, 1);
-    rendererState.orthoSize = targetSize / (state.viewZoom || 1);
+    rendererState.orthoSize = targetSize / (displayStore.viewZoom || 1);
     const cameraDistance = Math.max(targetSize * 2, 20);
     cam.position.set(center.x, center.y, center.z + cameraDistance);
     cam.near = Math.max(0.1, cameraDistance / 100);
@@ -755,7 +752,7 @@ function fitCamera(): void {
   } else {
     const cam = rendererState.camera as THREE.PerspectiveCamera;
     const fov = cam.fov * (Math.PI / 180);
-    const cameraDistance = Math.abs(maxDim / 2 / Math.tan(fov / 2)) * 0.6 / state.viewZoom;
+    const cameraDistance = Math.abs(maxDim / 2 / Math.tan(fov / 2)) * 0.6 / displayStore.viewZoom;
     cam.position.set(center.x, center.y, center.z + cameraDistance * 1.2);
     cam.near = Math.max(0.1, cameraDistance / 100);
     cam.far = Math.max(1000, cameraDistance * 10);
@@ -856,15 +853,15 @@ function updateLighting(): void {
       !rendererState.fillLight || !rendererState.rimLight || !rendererState.camera) {
     return;
   }
-  const enabled = state.lightingEnabled !== false;
-  rendererState.ambientLight.intensity = enabled ? (state.ambientIntensity ?? 0.5) * Math.PI : 0;
-  rendererState.keyLight.intensity = enabled ? (state.keyLight?.intensity ?? 0.7) * Math.PI : 0;
-  rendererState.fillLight.intensity = enabled ? (state.fillLight?.intensity ?? 0) * Math.PI : 0;
-  rendererState.rimLight.intensity = enabled ? (state.rimLight?.intensity ?? 0) * Math.PI : 0;
-  rendererState.ambientLight.color.set(resolveLightColor(state.ambientColor, '#ffffff'));
-  rendererState.keyLight.color.set(resolveLightColor(state.keyLight?.color, '#CCCCCC'));
-  rendererState.fillLight.color.set(resolveLightColor(state.fillLight?.color, '#ffffff'));
-  rendererState.rimLight.color.set(resolveLightColor(state.rimLight?.color, '#ffffff'));
+  const enabled = lightingStore.lightingEnabled !== false;
+  rendererState.ambientLight.intensity = enabled ? (lightingStore.ambientIntensity ?? 0.5) * Math.PI : 0;
+  rendererState.keyLight.intensity = enabled ? (lightingStore.keyLight?.intensity ?? 0.7) * Math.PI : 0;
+  rendererState.fillLight.intensity = enabled ? (lightingStore.fillLight?.intensity ?? 0) * Math.PI : 0;
+  rendererState.rimLight.intensity = enabled ? (lightingStore.rimLight?.intensity ?? 0) * Math.PI : 0;
+  rendererState.ambientLight.color.set(resolveLightColor(lightingStore.ambientColor, '#ffffff'));
+  rendererState.keyLight.color.set(resolveLightColor(lightingStore.keyLight?.color, '#CCCCCC'));
+  rendererState.fillLight.color.set(resolveLightColor(lightingStore.fillLight?.color, '#ffffff'));
+  rendererState.rimLight.color.set(resolveLightColor(lightingStore.rimLight?.color, '#ffffff'));
   applySurfaceShininess();
   updateLightsForCamera();
   markDirty();
@@ -887,13 +884,13 @@ function updateLighting(): void {
  */
 function updateDisplaySettings(): void {
   if (rendererState.axesHelper) {
-    rendererState.axesHelper.visible = state.showAxes !== false;
+    rendererState.axesHelper.visible = displayStore.showAxes !== false;
   }
-  if (rendererState.scene && state.backgroundColor) {
-    rendererState.scene.background = new THREE.Color(state.backgroundColor);
+  if (rendererState.scene && displayStore.backgroundColor) {
+    rendererState.scene.background = new THREE.Color(displayStore.backgroundColor);
   }
-  if (rendererState.unitCellGroup && state.unitCellColor) {
-    const nextColor = new THREE.Color(state.unitCellColor);
+  if (rendererState.unitCellGroup && displayStore.unitCellColor) {
+    const nextColor = new THREE.Color(displayStore.unitCellColor);
     rendererState.unitCellGroup.traverse((node) => {
       const mesh = node as THREE.Mesh;
       if (!mesh.material) return;
@@ -947,7 +944,7 @@ function exportHighResolutionImage(options?: { scale?: number }): { dataUrl: str
       const frustum = getOrthoFrustum(targetWidth, targetHeight);
       camera.left = frustum.left; camera.right = frustum.right;
       camera.top = frustum.top; camera.bottom = frustum.bottom;
-      camera.zoom = state.viewZoom || 1;
+      camera.zoom = displayStore.viewZoom || 1;
     }
     camera.updateProjectionMatrix();
     updateLightsForCamera();
@@ -1017,6 +1014,7 @@ export const renderer: RendererApi = {
   exportHighResolutionImage,
   updateAtomPosition,
   markDirty,
+  dispose,
 };
 
 function dispose(): void {
@@ -1085,3 +1083,8 @@ function dispose(): void {
   rendererState.mouse = null;
   rendererState.dragPlane = null;
 }
+
+// Clean up Three.js resources when the webview closes
+window.addEventListener('beforeunload', () => {
+  dispose();
+});

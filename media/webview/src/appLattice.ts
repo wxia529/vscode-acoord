@@ -7,10 +7,21 @@
  *
  * setup(callbacks) must be called once during app initialisation.
  */
-import { state } from './state';
-import type { AppCallbacks, UnitCellParams, Atom } from './types';
+import { displayStore, structureStore, selectionStore } from './state';
+import { getElementById } from './utils/domCache';
+import type {
+  UnitCellParams,
+  Atom,
+  VscodeContext,
+  ErrorContext,
+  RendererContext,
+  AtomSizeContext,
+} from './types';
 
-let _cb: AppCallbacks | null = null;
+/** Combined context for appLattice module */
+type AppLatticeContext = VscodeContext & ErrorContext & RendererContext & AtomSizeContext;
+
+let _cb: AppLatticeContext | null = null;
 
 // ── Lattice UI sync ────────────────────────────────────────────────────────────
 
@@ -19,18 +30,18 @@ export function updateLatticeUI(
   supercell: [number, number, number] | number[] | null | undefined,
   hasUnitCell: boolean
 ): void {
-  const aInput = document.getElementById('lattice-a') as HTMLInputElement | null;
-  const bInput = document.getElementById('lattice-b') as HTMLInputElement | null;
-  const cInput = document.getElementById('lattice-c') as HTMLInputElement | null;
-  const alphaInput = document.getElementById('lattice-alpha') as HTMLInputElement | null;
-  const betaInput = document.getElementById('lattice-beta') as HTMLInputElement | null;
-  const gammaInput = document.getElementById('lattice-gamma') as HTMLInputElement | null;
-  const scaleToggle = document.getElementById('lattice-scale') as HTMLInputElement | null;
-  const removeBtn = document.getElementById('btn-lattice-remove') as HTMLButtonElement | null;
-  const centerBtn = document.getElementById('btn-center-cell') as HTMLButtonElement | null;
-  const superX = document.getElementById('supercell-x') as HTMLInputElement | null;
-  const superY = document.getElementById('supercell-y') as HTMLInputElement | null;
-  const superZ = document.getElementById('supercell-z') as HTMLInputElement | null;
+  const aInput = getElementById<HTMLInputElement>('lattice-a');
+  const bInput = getElementById<HTMLInputElement>('lattice-b');
+  const cInput = getElementById<HTMLInputElement>('lattice-c');
+  const alphaInput = getElementById<HTMLInputElement>('lattice-alpha');
+  const betaInput = getElementById<HTMLInputElement>('lattice-beta');
+  const gammaInput = getElementById<HTMLInputElement>('lattice-gamma');
+  const scaleToggle = getElementById<HTMLInputElement>('lattice-scale');
+  const removeBtn = getElementById<HTMLButtonElement>('btn-lattice-remove');
+  const centerBtn = getElementById<HTMLButtonElement>('btn-center-cell');
+  const superX = getElementById<HTMLInputElement>('supercell-x');
+  const superY = getElementById<HTMLInputElement>('supercell-y');
+  const superZ = getElementById<HTMLInputElement>('supercell-z');
 
   if (unitCellParams) {
     if (aInput) aInput.value = Number(unitCellParams.a).toFixed(4);
@@ -39,7 +50,7 @@ export function updateLatticeUI(
     if (alphaInput) alphaInput.value = Number(unitCellParams.alpha).toFixed(2);
     if (betaInput) betaInput.value = Number(unitCellParams.beta).toFixed(2);
     if (gammaInput) gammaInput.value = Number(unitCellParams.gamma).toFixed(2);
-  } else if (!state.unitCellEditing) {
+  } else if (!displayStore.unitCellEditing) {
     if (aInput) aInput.value = '';
     if (bInput) bInput.value = '';
     if (cInput) cInput.value = '';
@@ -48,7 +59,7 @@ export function updateLatticeUI(
     if (gammaInput) gammaInput.value = '';
   }
 
-  if (scaleToggle) scaleToggle.checked = !!state.scaleAtomsWithLattice;
+  if (scaleToggle) scaleToggle.checked = !!displayStore.scaleAtomsWithLattice;
   if (removeBtn) removeBtn.disabled = !hasUnitCell;
   if (centerBtn) centerBtn.disabled = !hasUnitCell;
 
@@ -73,16 +84,16 @@ export function updateAtomSizePanel(): void {
     ATOM_SIZE_MIN, ATOM_SIZE_MAX,
   } = _cb;
 
-  const globalSlider = document.getElementById('atom-size-global-slider') as HTMLInputElement | null;
-  const globalValue = document.getElementById('atom-size-global-value') as HTMLElement | null;
-  const useDefaultCheckbox = document.getElementById('atom-size-use-default') as HTMLInputElement | null;
-  const selectedSection = document.getElementById('atom-size-selected-section') as HTMLElement | null;
-  const selectedCount = document.getElementById('atom-size-selected-count') as HTMLElement | null;
-  const selectedSlider = document.getElementById('atom-size-selected-slider') as HTMLInputElement | null;
-  const selectedValue = document.getElementById('atom-size-selected-value') as HTMLElement | null;
-  const resetSelectedButton = document.getElementById('btn-atom-size-reset-selected') as HTMLButtonElement | null;
-  const elementToggle = document.getElementById('atom-size-element-toggle') as HTMLButtonElement | null;
-  const elementList = document.getElementById('atom-size-element-list') as HTMLElement | null;
+  const globalSlider = getElementById<HTMLInputElement>('atom-size-global-slider');
+  const globalValue = getElementById<HTMLElement>('atom-size-global-value');
+  const useDefaultCheckbox = getElementById<HTMLInputElement>('atom-size-use-default');
+  const selectedSection = getElementById<HTMLElement>('atom-size-selected-section');
+  const selectedCount = getElementById<HTMLElement>('atom-size-selected-count');
+  const selectedSlider = getElementById<HTMLInputElement>('atom-size-selected-slider');
+  const selectedValue = getElementById<HTMLElement>('atom-size-selected-value');
+  const resetSelectedButton = getElementById<HTMLButtonElement>('btn-atom-size-reset-selected');
+  const elementToggle = getElementById<HTMLButtonElement>('atom-size-element-toggle');
+  const elementList = getElementById<HTMLElement>('atom-size-element-list');
 
   if (!globalSlider || !globalValue || !useDefaultCheckbox || !selectedSection || !selectedCount ||
     !selectedSlider || !selectedValue || !resetSelectedButton || !elementToggle || !elementList) {
@@ -91,19 +102,19 @@ export function updateAtomSizePanel(): void {
 
   cleanupAtomSizeOverrides();
 
-  const manualEnabled = state.atomSizeUseDefaultSettings === false;
-  const selectedIds = Array.isArray(state.selectedAtomIds) ? state.selectedAtomIds : [];
+  const manualEnabled = displayStore.atomSizeUseDefaultSettings === false;
+  const selectedIds = Array.isArray(selectionStore.selectedAtomIds) ? selectionStore.selectedAtomIds : [];
   const selectedAtomCount = selectedIds.length;
   const currentSelectedId = selectedAtomCount > 0 ? selectedIds[selectedAtomCount - 1] : '';
   const selectedAtomSize = selectedAtomCount > 0
     ? getAtomSizeForAtomId(currentSelectedId)
-    : clampAtomSize(state.atomSizeGlobal, 0.3);
+    : clampAtomSize(displayStore.atomSizeGlobal, 0.3);
   const selectedHasAtomOverride = selectedIds.some((id) => hasAtomSizeOverride(id));
   const availableElements = getAvailableElements();
 
-  state.atomSizeGlobal = clampAtomSize(state.atomSizeGlobal, 0.3);
-  globalSlider.value = state.atomSizeGlobal.toFixed(2);
-  globalValue.textContent = `${state.atomSizeGlobal.toFixed(2)} Å`;
+  displayStore.atomSizeGlobal = clampAtomSize(displayStore.atomSizeGlobal, 0.3);
+  globalSlider.value = displayStore.atomSizeGlobal.toFixed(2);
+  globalValue.textContent = `${displayStore.atomSizeGlobal.toFixed(2)} Å`;
   globalSlider.disabled = !manualEnabled;
   useDefaultCheckbox.checked = !manualEnabled;
 
@@ -114,13 +125,13 @@ export function updateAtomSizePanel(): void {
   selectedSlider.disabled = !manualEnabled;
   resetSelectedButton.disabled = !manualEnabled || !selectedHasAtomOverride;
 
-  if (availableElements.length === 0) { state.atomSizeElementExpanded = false; }
+  if (availableElements.length === 0) { displayStore.atomSizeElementExpanded = false; }
   elementToggle.disabled = availableElements.length === 0;
-  elementToggle.textContent = `By Element ${state.atomSizeElementExpanded ? '▲' : '▼'}`;
-  elementList.style.display = state.atomSizeElementExpanded && availableElements.length > 0 ? '' : 'none';
+  elementToggle.textContent = `By Element ${displayStore.atomSizeElementExpanded ? '▲' : '▼'}`;
+  elementList.style.display = displayStore.atomSizeElementExpanded && availableElements.length > 0 ? '' : 'none';
   elementList.innerHTML = '';
 
-  if (state.atomSizeElementExpanded && availableElements.length > 0) {
+  if (displayStore.atomSizeElementExpanded && availableElements.length > 0) {
     for (const element of availableElements) {
       const size = getAtomSizeForElement(element);
       const hasOverride = hasElementSizeOverride(element);
@@ -140,7 +151,7 @@ export function updateAtomSizePanel(): void {
       resetButton.textContent = '↺';
       resetButton.disabled = !manualEnabled || !hasOverride;
       resetButton.onclick = () => {
-        delete state.atomSizeByElement[element];
+        delete displayStore.atomSizeByElement[element];
         updateAtomSizePanel();
         rerenderCurrentStructure();
       };
@@ -158,7 +169,7 @@ export function updateAtomSizePanel(): void {
       slider.oninput = (event: Event) => {
         const target = event.target as HTMLInputElement;
         const nextSize = clampAtomSize(target.value, size);
-        state.atomSizeByElement[element] = nextSize;
+        displayStore.atomSizeByElement[element] = nextSize;
         updateAtomSizePanel();
         rerenderCurrentStructure();
       };
@@ -172,41 +183,41 @@ export function updateAtomSizePanel(): void {
 
 // ── UI wiring ──────────────────────────────────────────────────────────────────
 
-export function setup(callbacks: AppCallbacks): void {
+export function setup(callbacks: AppLatticeContext): void {
   _cb = callbacks;
   const { vscode, renderer, setError, rerenderCurrentStructure, updateCounts, updateAtomList,
     clampAtomSize, getBaseAtomId, ATOM_SIZE_MIN, ATOM_SIZE_MAX } = callbacks;
 
   // ── Lattice params ────────────────────────────────────────────────────────
 
-  const latticeApply = document.getElementById('btn-lattice-apply') as HTMLButtonElement | null;
-  const latticeRemove = document.getElementById('btn-lattice-remove') as HTMLButtonElement | null;
-  const latticeCenter = document.getElementById('btn-center-cell') as HTMLButtonElement | null;
-  const latticeScale = document.getElementById('lattice-scale') as HTMLInputElement | null;
+  const latticeApply = getElementById<HTMLButtonElement>('btn-lattice-apply');
+  const latticeRemove = getElementById<HTMLButtonElement>('btn-lattice-remove');
+  const latticeCenter = getElementById<HTMLButtonElement>('btn-center-cell');
+  const latticeScale = getElementById<HTMLInputElement>('lattice-scale');
   const latticeInputIds = ['lattice-a', 'lattice-b', 'lattice-c', 'lattice-alpha', 'lattice-beta', 'lattice-gamma'];
   const latticeInputs = latticeInputIds
-    .map((id) => document.getElementById(id) as HTMLInputElement | null)
+    .map((id) => getElementById<HTMLInputElement>(id))
     .filter((el): el is HTMLInputElement => el !== null);
 
   if (latticeScale) {
     latticeScale.addEventListener('change', (event: Event) => {
-      state.scaleAtomsWithLattice = (event.target as HTMLInputElement).checked;
+      displayStore.scaleAtomsWithLattice = (event.target as HTMLInputElement).checked;
     });
   }
 
   for (const input of latticeInputs) {
-    input.addEventListener('input', () => { state.unitCellEditing = true; });
-    input.addEventListener('blur', () => { state.unitCellEditing = false; });
+    input.addEventListener('input', () => { displayStore.unitCellEditing = true; });
+    input.addEventListener('blur', () => { displayStore.unitCellEditing = false; });
   }
 
   if (latticeApply) {
     latticeApply.onclick = () => {
-      const a = parseFloat((document.getElementById('lattice-a') as HTMLInputElement | null)?.value ?? '');
-      const b = parseFloat((document.getElementById('lattice-b') as HTMLInputElement | null)?.value ?? '');
-      const c = parseFloat((document.getElementById('lattice-c') as HTMLInputElement | null)?.value ?? '');
-      const alpha = parseFloat((document.getElementById('lattice-alpha') as HTMLInputElement | null)?.value ?? '');
-      const beta = parseFloat((document.getElementById('lattice-beta') as HTMLInputElement | null)?.value ?? '');
-      const gamma = parseFloat((document.getElementById('lattice-gamma') as HTMLInputElement | null)?.value ?? '');
+      const a = parseFloat(getElementById<HTMLInputElement>('lattice-a')?.value ?? '');
+      const b = parseFloat(getElementById<HTMLInputElement>('lattice-b')?.value ?? '');
+      const c = parseFloat(getElementById<HTMLInputElement>('lattice-c')?.value ?? '');
+      const alpha = parseFloat(getElementById<HTMLInputElement>('lattice-alpha')?.value ?? '');
+      const beta = parseFloat(getElementById<HTMLInputElement>('lattice-beta')?.value ?? '');
+      const gamma = parseFloat(getElementById<HTMLInputElement>('lattice-gamma')?.value ?? '');
       if (![a, b, c, alpha, beta, gamma].every((value) => Number.isFinite(value))) {
         setError('Lattice parameters must be valid numbers.');
         return;
@@ -214,7 +225,7 @@ export function setup(callbacks: AppCallbacks): void {
       vscode.postMessage({
         command: 'setUnitCell',
         params: { a, b, c, alpha, beta, gamma },
-        scaleAtoms: !!state.scaleAtomsWithLattice,
+        scaleAtoms: !!displayStore.scaleAtomsWithLattice,
       });
       setError('');
     };
@@ -225,12 +236,12 @@ export function setup(callbacks: AppCallbacks): void {
 
   // ── Supercell ─────────────────────────────────────────────────────────────
 
-  const supercellApply = document.getElementById('btn-supercell-apply') as HTMLButtonElement | null;
+  const supercellApply = getElementById<HTMLButtonElement>('btn-supercell-apply');
   if (supercellApply) {
     supercellApply.onclick = () => {
-      const nx = parseInt((document.getElementById('supercell-x') as HTMLInputElement | null)?.value ?? '', 10);
-      const ny = parseInt((document.getElementById('supercell-y') as HTMLInputElement | null)?.value ?? '', 10);
-      const nz = parseInt((document.getElementById('supercell-z') as HTMLInputElement | null)?.value ?? '', 10);
+      const nx = parseInt(getElementById<HTMLInputElement>('supercell-x')?.value ?? '', 10);
+      const ny = parseInt(getElementById<HTMLInputElement>('supercell-y')?.value ?? '', 10);
+      const nz = parseInt(getElementById<HTMLInputElement>('supercell-z')?.value ?? '', 10);
       if (![nx, ny, nz].every((value) => Number.isFinite(value) && value >= 1)) {
         setError('Supercell values must be integers >= 1.');
         return;
@@ -242,101 +253,101 @@ export function setup(callbacks: AppCallbacks): void {
 
   // ── Scale / size sliders ───────────────────────────────────────────────────
 
-  const scaleSlider = document.getElementById('scale-slider') as HTMLInputElement | null;
-  const sizeSlider = document.getElementById('size-slider') as HTMLInputElement | null;
-  const bondSizeSlider = document.getElementById('bond-size-slider') as HTMLInputElement | null;
-  const scaleAuto = document.getElementById('scale-auto') as HTMLInputElement | null;
+  const scaleSlider = getElementById<HTMLInputElement>('scale-slider');
+  const sizeSlider = getElementById<HTMLInputElement>('size-slider');
+  const bondSizeSlider = getElementById<HTMLInputElement>('bond-size-slider');
+  const scaleAuto = getElementById<HTMLInputElement>('scale-auto');
 
   if (scaleSlider) {
     scaleSlider.addEventListener('input', (event: Event) => {
-      state.manualScale = parseFloat((event.target as HTMLInputElement).value);
-      const scaleValue = document.getElementById('scale-value') as HTMLElement | null;
-      if (scaleValue) scaleValue.textContent = state.manualScale.toFixed(1);
-      if (!state.autoScaleEnabled && state.currentStructure) {
-        renderer.renderStructure(state.currentStructure, { updateCounts, updateAtomList });
+      displayStore.manualScale = parseFloat((event.target as HTMLInputElement).value);
+      const scaleValue = getElementById<HTMLElement>('scale-value');
+      if (scaleValue) scaleValue.textContent = displayStore.manualScale.toFixed(1);
+      if (!displayStore.autoScaleEnabled && structureStore.currentStructure) {
+        renderer.renderStructure(structureStore.currentStructure, { updateCounts, updateAtomList });
       }
     });
   }
 
   if (sizeSlider) {
     sizeSlider.addEventListener('input', (event: Event) => {
-      state.atomSizeScale = parseFloat((event.target as HTMLInputElement).value);
-      const sizeValue = document.getElementById('size-value') as HTMLElement | null;
-      if (sizeValue) sizeValue.textContent = state.atomSizeScale.toFixed(2);
-      if (state.currentStructure) {
-        renderer.renderStructure(state.currentStructure, { updateCounts, updateAtomList });
+      displayStore.atomSizeScale = parseFloat((event.target as HTMLInputElement).value);
+      const sizeValue = getElementById<HTMLElement>('size-value');
+      if (sizeValue) sizeValue.textContent = displayStore.atomSizeScale.toFixed(2);
+      if (structureStore.currentStructure) {
+        renderer.renderStructure(structureStore.currentStructure, { updateCounts, updateAtomList });
       }
     });
   }
 
   if (bondSizeSlider) {
     bondSizeSlider.addEventListener('input', (event: Event) => {
-      state.bondThicknessScale = parseFloat((event.target as HTMLInputElement).value);
-      const bondSizeValue = document.getElementById('bond-size-value') as HTMLElement | null;
-      if (bondSizeValue) bondSizeValue.textContent = state.bondThicknessScale.toFixed(1);
-      if (state.currentStructure) {
-        renderer.renderStructure(state.currentStructure, { updateCounts, updateAtomList });
+      displayStore.bondThicknessScale = parseFloat((event.target as HTMLInputElement).value);
+      const bondSizeValue = getElementById<HTMLElement>('bond-size-value');
+      if (bondSizeValue) bondSizeValue.textContent = displayStore.bondThicknessScale.toFixed(1);
+      if (structureStore.currentStructure) {
+        renderer.renderStructure(structureStore.currentStructure, { updateCounts, updateAtomList });
       }
     });
   }
 
   if (scaleAuto) {
     scaleAuto.addEventListener('change', (event: Event) => {
-      state.autoScaleEnabled = (event.target as HTMLInputElement).checked;
-      if (state.currentStructure) {
-        renderer.renderStructure(state.currentStructure, { updateCounts, updateAtomList });
+      displayStore.autoScaleEnabled = (event.target as HTMLInputElement).checked;
+      if (structureStore.currentStructure) {
+        renderer.renderStructure(structureStore.currentStructure, { updateCounts, updateAtomList });
       }
     });
   }
 
   // ── Atom size panel ────────────────────────────────────────────────────────
 
-  const globalSlider = document.getElementById('atom-size-global-slider') as HTMLInputElement | null;
-  const useDefaultCheckbox = document.getElementById('atom-size-use-default') as HTMLInputElement | null;
-  const selectedSlider = document.getElementById('atom-size-selected-slider') as HTMLInputElement | null;
-  const resetSelectedButton = document.getElementById('btn-atom-size-reset-selected') as HTMLButtonElement | null;
-  const elementToggle = document.getElementById('atom-size-element-toggle') as HTMLButtonElement | null;
+  const globalSlider = getElementById<HTMLInputElement>('atom-size-global-slider');
+  const useDefaultCheckbox = getElementById<HTMLInputElement>('atom-size-use-default');
+  const selectedSlider = getElementById<HTMLInputElement>('atom-size-selected-slider');
+  const resetSelectedButton = getElementById<HTMLButtonElement>('btn-atom-size-reset-selected');
+  const elementToggle = getElementById<HTMLButtonElement>('atom-size-element-toggle');
 
   if (globalSlider && useDefaultCheckbox && selectedSlider && resetSelectedButton && elementToggle) {
     globalSlider.addEventListener('input', (event: Event) => {
-      state.atomSizeGlobal = clampAtomSize((event.target as HTMLInputElement).value, state.atomSizeGlobal || 0.3);
+      displayStore.atomSizeGlobal = clampAtomSize((event.target as HTMLInputElement).value, displayStore.atomSizeGlobal || 0.3);
       updateAtomSizePanel();
       rerenderCurrentStructure();
     });
 
     useDefaultCheckbox.addEventListener('change', (event: Event) => {
-      state.atomSizeUseDefaultSettings = !!(event.target as HTMLInputElement).checked;
+      displayStore.atomSizeUseDefaultSettings = !!(event.target as HTMLInputElement).checked;
       updateAtomSizePanel();
       rerenderCurrentStructure();
     });
 
     selectedSlider.addEventListener('input', (event: Event) => {
-      if (state.atomSizeUseDefaultSettings !== false) {
+      if (displayStore.atomSizeUseDefaultSettings !== false) {
         updateAtomSizePanel();
         return;
       }
-      const nextSize = clampAtomSize((event.target as HTMLInputElement).value, state.atomSizeGlobal || 0.3);
-      const selectedIds = Array.isArray(state.selectedAtomIds) ? state.selectedAtomIds : [];
+      const nextSize = clampAtomSize((event.target as HTMLInputElement).value, displayStore.atomSizeGlobal || 0.3);
+      const selectedIds = Array.isArray(selectionStore.selectedAtomIds) ? selectionStore.selectedAtomIds : [];
       for (const atomId of selectedIds) {
         const baseId = getBaseAtomId(atomId);
-        if (baseId) { state.atomSizeByAtom[baseId] = nextSize; }
+        if (baseId) { displayStore.atomSizeByAtom[baseId] = nextSize; }
       }
       updateAtomSizePanel();
       rerenderCurrentStructure();
     });
 
     resetSelectedButton.addEventListener('click', () => {
-      const selectedIds = Array.isArray(state.selectedAtomIds) ? state.selectedAtomIds : [];
+      const selectedIds = Array.isArray(selectionStore.selectedAtomIds) ? selectionStore.selectedAtomIds : [];
       for (const atomId of selectedIds) {
         const baseId = getBaseAtomId(atomId);
-        if (baseId) { delete state.atomSizeByAtom[baseId]; }
+        if (baseId) { delete displayStore.atomSizeByAtom[baseId]; }
       }
       updateAtomSizePanel();
       rerenderCurrentStructure();
     });
 
     elementToggle.addEventListener('click', () => {
-      state.atomSizeElementExpanded = !state.atomSizeElementExpanded;
+      displayStore.atomSizeElementExpanded = !displayStore.atomSizeElementExpanded;
       updateAtomSizePanel();
     });
 

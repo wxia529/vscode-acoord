@@ -1,4 +1,4 @@
-import { state } from './state';
+import { selectionStore, interactionStore } from './state';
 import { renderer } from './renderer';
 import { Vector3 } from 'three';
 import * as interactionLighting from './interactionLighting';
@@ -56,7 +56,7 @@ export function init(canvas: HTMLCanvasElement, handlers: InteractionHandlers): 
       const atomId = hit.object.userData && (hit.object.userData as Record<string, unknown>).atomId as string | undefined;
       if (atomId) {
         if (event.shiftKey) {
-          const isSelected = state.selectedAtomIds && state.selectedAtomIds.includes(atomId);
+          const isSelected = selectionStore.selectedAtomIds && selectionStore.selectedAtomIds.includes(atomId);
           if (isSelected) {
             pendingDrag = {
               atomId,
@@ -143,16 +143,16 @@ export function init(canvas: HTMLCanvasElement, handlers: InteractionHandlers): 
     const camera = renderer.getCamera();
     if (!raycaster || !mouse || !camera) { return; }
 
-    if (pendingDrag && !state.isDragging) {
+    if (pendingDrag && !interactionStore.isDragging) {
       const dx = event.clientX - pendingDrag.startX;
       const dy = event.clientY - pendingDrag.startY;
       if (Math.hypot(dx, dy) > dragThreshold) {
-        state.isDragging = true;
-        state.dragAtomId = pendingDrag.atomId;
-        state.lastDragWorld = pendingDrag.hitPoint.clone();
+        interactionStore.isDragging = true;
+        interactionStore.dragAtomId = pendingDrag.atomId;
+        interactionStore.lastDragWorld = pendingDrag.hitPoint.clone();
         renderer.setControlsEnabled(false);
         const normal = camera.getWorldDirection(new Vector3());
-        state.dragPlaneNormal = normal.clone();
+        interactionStore.dragPlaneNormal = normal.clone();
         renderer.getDragPlane().setFromNormalAndCoplanarPoint(normal, pendingDrag.hitPoint);
         if (handlers.onBeginDrag) {
           handlers.onBeginDrag(pendingDrag.atomId);
@@ -160,7 +160,7 @@ export function init(canvas: HTMLCanvasElement, handlers: InteractionHandlers): 
       }
     }
 
-    if (state.isDragging && state.dragAtomId) {
+    if (interactionStore.isDragging && interactionStore.dragAtomId) {
       const rect = canvas.getBoundingClientRect();
       mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
       mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
@@ -168,22 +168,22 @@ export function init(canvas: HTMLCanvasElement, handlers: InteractionHandlers): 
       const intersection = new Vector3();
       const hit = raycaster.ray.intersectPlane(renderer.getDragPlane(), intersection);
       if (hit) {
-        const mesh = renderer.getAtomMeshes().get(state.dragAtomId);
+        const mesh = renderer.getAtomMeshes().get(interactionStore.dragAtomId);
         let nextPosition = intersection;
         if (mesh) {
           nextPosition = mesh.position.clone().lerp(intersection, dragLerp);
         }
 
-        const normal = state.dragPlaneNormal instanceof Vector3
-          ? state.dragPlaneNormal
+        const normal = interactionStore.dragPlaneNormal instanceof Vector3
+          ? interactionStore.dragPlaneNormal
           : camera.getWorldDirection(new Vector3());
-        if (state.selectedAtomIds.length > 1) {
-          const last = state.lastDragWorld instanceof Vector3 ? state.lastDragWorld : nextPosition.clone();
+        if (selectionStore.selectedAtomIds.length > 1) {
+          const last = interactionStore.lastDragWorld instanceof Vector3 ? interactionStore.lastDragWorld : nextPosition.clone();
           const delta = nextPosition.clone().sub(last);
           const normalDelta = normal.clone().multiplyScalar(delta.dot(normal));
           delta.sub(normalDelta);
           if (delta.length() > 0) {
-            for (const id of state.selectedAtomIds) {
+            for (const id of selectionStore.selectedAtomIds) {
               const selectedMesh = renderer.getAtomMeshes().get(id);
               if (selectedMesh) {
                 const newPos = selectedMesh.position.clone().add(delta);
@@ -198,11 +198,11 @@ export function init(canvas: HTMLCanvasElement, handlers: InteractionHandlers): 
           const delta = nextPosition.clone().sub(mesh.position);
           const normalDelta = normal.clone().multiplyScalar(delta.dot(normal));
           nextPosition.sub(normalDelta);
-          renderer.updateAtomPosition(state.dragAtomId, nextPosition);
-          handlers.onDragAtom(state.dragAtomId, nextPosition);
+          renderer.updateAtomPosition(interactionStore.dragAtomId, nextPosition);
+          handlers.onDragAtom(interactionStore.dragAtomId, nextPosition);
         }
 
-        state.lastDragWorld = nextPosition.clone();
+        interactionStore.lastDragWorld = nextPosition.clone();
       }
       return;
     }
@@ -228,14 +228,14 @@ export function init(canvas: HTMLCanvasElement, handlers: InteractionHandlers): 
       renderer.setControlsEnabled(!pickerState.activeLightPicker);
       return;
     }
-    if (state.isDragging) {
-      state.isDragging = false;
-      if (handlers.onEndDrag && state.dragAtomId) {
+    if (interactionStore.isDragging) {
+      interactionStore.isDragging = false;
+      if (handlers.onEndDrag && interactionStore.dragAtomId) {
         handlers.onEndDrag();
       }
-      state.dragAtomId = null;
-      state.lastDragWorld = null;
-      state.dragPlaneNormal = null;
+      interactionStore.dragAtomId = null;
+      interactionStore.lastDragWorld = null;
+      interactionStore.dragPlaneNormal = null;
       renderer.setControlsEnabled(true);
     }
     if (boxSelect) {

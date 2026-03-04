@@ -172,24 +172,30 @@ export interface VsCodeApi {
   setState(state: unknown): void;
 }
 
-export interface RendererHandlers {
-  setError: (message: string) => void;
-  setStatus: (message: string) => void;
-}
+// =============================================================================
+// Domain-specific context interfaces (replacing the monolithic AppCallbacks)
+// =============================================================================
 
-export interface UiHooks {
-  updateCounts: (atomCount: number, bondCount: number) => void;
-  updateAtomList: (atoms: Atom[], selectedIds: string[], selectedId: string | null) => void;
-}
-
-export interface AppCallbacks {
+/** VSCode communication context */
+export interface VscodeContext {
   vscode: VsCodeApi;
-  state: AppState;
-  renderer: import('./renderer').RendererApi;
+}
+
+/** Error handling context */
+export interface ErrorContext {
   setError: (message: string) => void;
+}
+
+/** Rendering and UI update context */
+export interface RendererContext {
+  renderer: import('./renderer').RendererApi;
   rerenderCurrentStructure: () => void;
   updateCounts: (atomCount: number, bondCount: number) => void;
   updateAtomList: (atoms: Atom[], selectedIds: string[], selectedId: string | null) => void;
+}
+
+/** Atom size management context */
+export interface AtomSizeContext {
   clampAtomSize: (value: unknown, fallback: number) => number;
   getBaseAtomId: (atomId: string) => string;
   getCurrentStructureAtoms: () => Atom[];
@@ -202,15 +208,53 @@ export interface AppCallbacks {
   cleanupAtomSizeOverrides: () => void;
   ATOM_SIZE_MIN: number;
   ATOM_SIZE_MAX: number;
+}
+
+/** Selection management context */
+export interface SelectionContext {
   getSelectedBondKeys: () => string[];
   setSelectedBondSelection: (keys: string[], syncBackend: boolean) => void;
-  normalizeHexColor: (value: string) => string | null;
-  applySelectedAtomChanges: () => void;
+}
+
+/** Transformation operations context */
+export interface TransformContext {
   applyBondAngle: (targetDeg: number) => void;
   applyRotation: (angleDeg: number, preview: boolean) => void;
   applyAdsorptionDistance: (target: number, preview: boolean) => void;
   updateMeasurements: () => void;
   updateAdsorptionUI: () => void;
   resetRotationBase?: () => void;
+}
+
+/** Atom editing context */
+export interface EditContext {
+  normalizeHexColor: (value: string) => string | null;
+  applySelectedAtomChanges: () => void;
   deleteSelectedAtoms?: () => boolean;
+}
+
+export interface RendererHandlers {
+  setError: (message: string) => void;
+  setStatus: (message: string) => void;
+}
+
+export interface UiHooks {
+  updateCounts: (atomCount: number, bondCount: number) => void;
+  updateAtomList: (atoms: Atom[], selectedIds: string[], selectedId: string | null) => void;
+}
+
+/**
+ * Legacy monolithic callbacks interface.
+ * @deprecated Use domain-specific contexts (VscodeContext, RendererContext, etc.) instead.
+ */
+export interface AppCallbacks
+  extends VscodeContext,
+    ErrorContext,
+    RendererContext,
+    AtomSizeContext,
+    SelectionContext,
+    TransformContext,
+    EditContext {
+  /** @deprecated Access state directly or through specific store modules */
+  state: AppState;
 }

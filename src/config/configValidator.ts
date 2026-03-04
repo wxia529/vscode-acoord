@@ -62,9 +62,7 @@ export class ConfigValidator {
    */
   validate(config: DisplayConfig): ValidationResult {
     const errors: string[] = [];
-    const warnings: string[] = [];
 
-    // Check required fields
     if (!config.id) {
       errors.push('Config must have an ID');
     }
@@ -73,42 +71,39 @@ export class ConfigValidator {
       errors.push('Config must have a name');
     }
 
-    if (!config.settings) {
-      errors.push('Config must have settings');
-    } else {
-      const settingsErrors = this.validateSettings(config.settings);
-      errors.push(...settingsErrors);
-    }
-
-    // Check version
     if (typeof config.schemaVersion !== 'number') {
       errors.push('Config must have a schemaVersion');
     }
 
+    const { errors: settingsErrors } = this.normalizeSettings(config.settings);
+    errors.push(...settingsErrors);
+
     return {
       valid: errors.length === 0,
       errors,
-      warnings
+      warnings: []
     };
   }
 
-  normalizeConfig(config: DisplayConfig): { config: DisplayConfig; warnings: string[]; changed: boolean } {
-    const { settings, warnings, changed } = this.normalizeSettings(config.settings);
+  normalizeConfig(config: DisplayConfig): { config: DisplayConfig; errors: string[]; warnings: string[]; changed: boolean } {
+    const { settings, errors, warnings, changed } = this.normalizeSettings(config.settings);
     if (!changed) {
-      return { config, warnings, changed };
+      return { config, errors, warnings, changed };
     }
     return {
       config: {
         ...config,
         settings
       },
+      errors,
       warnings,
       changed
     };
   }
 
-  normalizeSettings(settings: DisplaySettings): { settings: DisplaySettings; warnings: string[]; changed: boolean } {
+  normalizeSettings(settings: DisplaySettings): { settings: DisplaySettings; errors: string[]; warnings: string[]; changed: boolean } {
     const input: Record<string, any> = settings && typeof settings === 'object' ? settings : {};
+    const errors: string[] = [];
     const warnings: string[] = [];
     let changed = false;
 
@@ -119,7 +114,7 @@ export class ConfigValidator {
       label: string
     ): number => {
       if (typeof value !== 'number' || !Number.isFinite(value)) {
-        warnings.push(`${label} must be a number; using default.`);
+        errors.push(`${label} must be a number`);
         changed = true;
         return fallback;
       }
@@ -133,7 +128,7 @@ export class ConfigValidator {
 
     const normalizeBoolean = (value: any, fallback: boolean, label: string): boolean => {
       if (typeof value !== 'boolean') {
-        warnings.push(`${label} must be a boolean; using default.`);
+        errors.push(`${label} must be a boolean`);
         changed = true;
         return fallback;
       }
@@ -142,7 +137,7 @@ export class ConfigValidator {
 
     const normalizeColor = (value: any, fallback: string, label: string): string => {
       if (typeof value !== 'string' || !ConfigValidator.colorPattern.test(value)) {
-        warnings.push(`${label} must be a hex color; using default.`);
+        errors.push(`${label} must be a hex color`);
         changed = true;
         return fallback;
       }
@@ -156,7 +151,7 @@ export class ConfigValidator {
       label: string
     ): T => {
       if (!allowed.includes(value)) {
-        warnings.push(`${label} must be one of ${allowed.join(', ')}; using default.`);
+        errors.push(`${label} must be one of ${allowed.join(', ')}`);
         changed = true;
         return fallback;
       }
@@ -345,223 +340,6 @@ export class ConfigValidator {
       rimLight: normalizeLight(input.rimLight, defaults.rimLight, 'settings.rimLight')
     };
 
-    return { settings: normalized, warnings, changed };
-  }
-
-  private validateSettings(settings: any): string[] {
-    const errors: string[] = [];
-
-    // Check required settings
-    if (typeof settings.showAxes !== 'boolean') {
-      errors.push('settings.showAxes must be a boolean');
-    }
-
-    if (typeof settings.backgroundColor !== 'string') {
-      errors.push('settings.backgroundColor must be a string');
-    } else if (!ConfigValidator.colorPattern.test(settings.backgroundColor)) {
-      errors.push('settings.backgroundColor must be a hex color');
-    }
-
-    if (typeof settings.unitCellColor !== 'string') {
-      errors.push('settings.unitCellColor must be a string');
-    } else if (!ConfigValidator.colorPattern.test(settings.unitCellColor)) {
-      errors.push('settings.unitCellColor must be a hex color');
-    }
-
-    if (typeof settings.unitCellThickness !== 'number') {
-      errors.push('settings.unitCellThickness must be a number');
-    } else if (
-      settings.unitCellThickness < ConfigValidator.ranges.unitCellThickness.min ||
-      settings.unitCellThickness > ConfigValidator.ranges.unitCellThickness.max
-    ) {
-      errors.push('settings.unitCellThickness out of range');
-    }
-
-    if (!['solid', 'dashed'].includes(settings.unitCellLineStyle)) {
-      errors.push('settings.unitCellLineStyle must be "solid" or "dashed"');
-    }
-
-    if (typeof settings.atomSizeUseDefaultSettings !== 'boolean') {
-      errors.push('settings.atomSizeUseDefaultSettings must be a boolean');
-    }
-
-    if (typeof settings.atomSizeGlobal !== 'number') {
-      errors.push('settings.atomSizeGlobal must be a number');
-    } else if (
-      settings.atomSizeGlobal < ConfigValidator.ranges.atomSizeGlobal.min ||
-      settings.atomSizeGlobal > ConfigValidator.ranges.atomSizeGlobal.max
-    ) {
-      errors.push('settings.atomSizeGlobal out of range');
-    }
-
-    if (typeof settings.manualScale !== 'number') {
-      errors.push('settings.manualScale must be a number');
-    } else if (
-      settings.manualScale < ConfigValidator.ranges.manualScale.min ||
-      settings.manualScale > ConfigValidator.ranges.manualScale.max
-    ) {
-      errors.push('settings.manualScale out of range');
-    }
-
-    if (typeof settings.autoScaleEnabled !== 'boolean') {
-      errors.push('settings.autoScaleEnabled must be a boolean');
-    }
-
-    if (typeof settings.atomSizeScale !== 'number') {
-      errors.push('settings.atomSizeScale must be a number');
-    } else if (
-      settings.atomSizeScale < ConfigValidator.ranges.atomSizeScale.min ||
-      settings.atomSizeScale > ConfigValidator.ranges.atomSizeScale.max
-    ) {
-      errors.push('settings.atomSizeScale out of range');
-    }
-
-    if (typeof settings.bondThicknessScale !== 'number') {
-      errors.push('settings.bondThicknessScale must be a number');
-    } else if (
-      settings.bondThicknessScale < ConfigValidator.ranges.bondThicknessScale.min ||
-      settings.bondThicknessScale > ConfigValidator.ranges.bondThicknessScale.max
-    ) {
-      errors.push('settings.bondThicknessScale out of range');
-    }
-
-    if (typeof settings.viewZoom !== 'number') {
-      errors.push('settings.viewZoom must be a number');
-    } else if (
-      settings.viewZoom < ConfigValidator.ranges.viewZoom.min ||
-      settings.viewZoom > ConfigValidator.ranges.viewZoom.max
-    ) {
-      errors.push('settings.viewZoom out of range');
-    }
-
-    if (typeof settings.scaleAtomsWithLattice !== 'boolean') {
-      errors.push('settings.scaleAtomsWithLattice must be a boolean');
-    }
-
-    if (!['orthographic', 'perspective'].includes(settings.projectionMode)) {
-      errors.push('settings.projectionMode must be "orthographic" or "perspective"');
-    }
-
-    if (typeof settings.lightingEnabled !== 'boolean') {
-      errors.push('settings.lightingEnabled must be a boolean');
-    }
-
-    if (typeof settings.ambientIntensity !== 'number') {
-      errors.push('settings.ambientIntensity must be a number');
-    } else if (
-      settings.ambientIntensity < ConfigValidator.ranges.ambientIntensity.min ||
-      settings.ambientIntensity > ConfigValidator.ranges.ambientIntensity.max
-    ) {
-      errors.push('settings.ambientIntensity out of range');
-    }
-
-    if (typeof settings.ambientColor !== 'string') {
-      errors.push('settings.ambientColor must be a string');
-    } else if (!ConfigValidator.colorPattern.test(settings.ambientColor)) {
-      errors.push('settings.ambientColor must be a hex color');
-    }
-
-    if (typeof settings.shininess !== 'number') {
-      errors.push('settings.shininess must be a number');
-    } else if (
-      settings.shininess < ConfigValidator.ranges.shininess.min ||
-      settings.shininess > ConfigValidator.ranges.shininess.max
-    ) {
-      errors.push('settings.shininess out of range');
-    }
-
-    if (typeof settings.atomSizeByElement !== 'object' || settings.atomSizeByElement === null) {
-      errors.push('settings.atomSizeByElement must be an object');
-    } else {
-      for (const [key, value] of Object.entries(settings.atomSizeByElement)) {
-        const symbol = typeof key === 'string' ? parseElement(key) : undefined;
-        if (!symbol) {
-          errors.push(`settings.atomSizeByElement contains unknown element ${String(key)}`);
-          continue;
-        }
-        if (typeof value !== 'number' || !Number.isFinite(value)) {
-          errors.push(`settings.atomSizeByElement.${symbol} must be a number`);
-          continue;
-        }
-        if (
-          value < ConfigValidator.ranges.atomSizeMap.min ||
-          value > ConfigValidator.ranges.atomSizeMap.max
-        ) {
-          errors.push(`settings.atomSizeByElement.${symbol} out of range`);
-        }
-      }
-    }
-
-    if (typeof settings.atomSizeByAtom !== 'object' || settings.atomSizeByAtom === null) {
-      errors.push('settings.atomSizeByAtom must be an object');
-    } else {
-      for (const [key, value] of Object.entries(settings.atomSizeByAtom)) {
-        if (typeof key !== 'string' || !key.trim()) {
-          errors.push('settings.atomSizeByAtom contains invalid atom id');
-          continue;
-        }
-        if (typeof value !== 'number' || !Number.isFinite(value)) {
-          errors.push(`settings.atomSizeByAtom.${key} must be a number`);
-          continue;
-        }
-        if (
-          value < ConfigValidator.ranges.atomSizeMap.min ||
-          value > ConfigValidator.ranges.atomSizeMap.max
-        ) {
-          errors.push(`settings.atomSizeByAtom.${key} out of range`);
-        }
-      }
-    }
-
-    // Check light configs
-    if (!this.validateLightConfig(settings.keyLight)) {
-      errors.push('settings.keyLight must be a valid light configuration');
-    }
-
-    if (!this.validateLightConfig(settings.fillLight)) {
-      errors.push('settings.fillLight must be a valid light configuration');
-    }
-
-    if (!this.validateLightConfig(settings.rimLight)) {
-      errors.push('settings.rimLight must be a valid light configuration');
-    }
-
-    return errors;
-  }
-
-  private validateLightConfig(light: any): boolean {
-    if (!light || typeof light !== 'object') {
-      return false;
-    }
-
-    if (typeof light.intensity !== 'number') {
-      return false;
-    }
-
-    // Support both nested position format and flat format
-    let hasPosition = false;
-    if (light.position && typeof light.position === 'object') {
-      // Nested format: { position: { x, y, z } }
-      hasPosition = 
-        typeof light.position.x === 'number' &&
-        typeof light.position.y === 'number' &&
-        typeof light.position.z === 'number';
-    } else {
-      // Flat format: { x, y, z }
-      hasPosition = 
-        typeof light.x === 'number' &&
-        typeof light.y === 'number' &&
-        typeof light.z === 'number';
-    }
-
-    if (!hasPosition) {
-      return false;
-    }
-
-    if (typeof light.color !== 'string') {
-      return false;
-    }
-
-    return true;
+    return { settings: normalized, errors, warnings, changed };
   }
 }

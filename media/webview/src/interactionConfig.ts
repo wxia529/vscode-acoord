@@ -1,4 +1,4 @@
-import { state } from './state';
+import { configStore, extractDisplaySettings } from './state';
 import * as configHandler from './configHandler';
 import type { VsCodeApi } from './types';
 
@@ -43,7 +43,7 @@ export function init(): void {
     btnSaveConfig.addEventListener('click', () => {
       _vscode?.postMessage({
         command: 'promptSaveDisplayConfig',
-        settings: state.extractDisplaySettings(),
+        settings: extractDisplaySettings(),
       });
     });
   }
@@ -86,7 +86,7 @@ export function updateConfigSelector(): void {
   configSelect.innerHTML = '';
 
   // Add presets group
-  const presets = state.availableConfigs.presets || [];
+  const presets = configStore.availableConfigs.presets || [];
   if (presets.length > 0) {
     const presetGroup = document.createElement('optgroup');
     presetGroup.label = 'Presets';
@@ -94,7 +94,7 @@ export function updateConfigSelector(): void {
       const option = document.createElement('option');
       option.value = preset.id;
       option.textContent = preset.name;
-      if (preset.id === state.currentConfigId) {
+      if (preset.id === configStore.currentConfigId) {
         option.selected = true;
       }
       presetGroup.appendChild(option);
@@ -103,7 +103,7 @@ export function updateConfigSelector(): void {
   }
 
   // Add user configs group
-  const userConfigs = state.availableConfigs.user || [];
+  const userConfigs = configStore.availableConfigs.user || [];
   if (userConfigs.length > 0) {
     const userGroup = document.createElement('optgroup');
     userGroup.label = 'Your Configs';
@@ -111,7 +111,7 @@ export function updateConfigSelector(): void {
       const option = document.createElement('option');
       option.value = config.id;
       option.textContent = config.name;
-      if (config.id === state.currentConfigId) {
+      if (config.id === configStore.currentConfigId) {
         option.selected = true;
       }
       userGroup.appendChild(option);
@@ -121,7 +121,7 @@ export function updateConfigSelector(): void {
 
   // Update config info
   if (configInfo) {
-    const currentConfig = [...presets, ...userConfigs].find((c) => c.id === state.currentConfigId);
+    const currentConfig = [...presets, ...userConfigs].find((c) => c.id === configStore.currentConfigId);
     configInfo.textContent = (currentConfig && currentConfig.description) ? currentConfig.description : '';
   }
 }

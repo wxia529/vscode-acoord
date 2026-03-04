@@ -28,16 +28,3 @@ export abstract class BaseStructureParser {
     return this.serialize(structures[0]);
   }
 }
-
-/**
- * Parser interface for different file formats
- * @deprecated Use BaseStructureParser instead for new implementations
- */
-export interface StructureParser {
-  parse(content: string): Structure;
-  serialize(structure: Structure): string;
-  /** @deprecated Use BaseStructureParser.parseTrajectory instead */
-  parseTrajectory?(content: string): Structure[];
-  /** @deprecated Use BaseStructureParser.serializeTrajectory instead */
-  serializeTrajectory?(structures: Structure[]): string;
-}

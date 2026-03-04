@@ -5,7 +5,8 @@ const MAX_MEMORY_MB = 100;
 const ESTIMATED_BYTES_PER_ATOM = 200;
 
 export class UndoManager {
-  private readonly stack: Structure[] = [];
+  private readonly undoStack: Structure[] = [];
+  private readonly redoStack: Structure[] = [];
   private readonly maxDepth: number;
   private readonly maxAtoms: number;
   private warnedAboutSize = false;
@@ -32,20 +33,21 @@ export class UndoManager {
       return false;
     }
 
-    const currentMemory = this.stack.reduce(
+    let currentMemory = this.undoStack.reduce(
       (sum, s) => sum + this.estimateMemoryUsage(s),
       0
     );
     const newMemory = this.estimateMemoryUsage(structure);
     const maxMemoryBytes = MAX_MEMORY_MB * 1024 * 1024;
-    
+
     if (currentMemory + newMemory > maxMemoryBytes) {
       while (
-        this.stack.length > 0 &&
+        this.undoStack.length > 0 &&
         currentMemory + newMemory > maxMemoryBytes
       ) {
-        const removed = this.stack.shift()!;
+        const removed = this.undoStack.shift()!;
         const removedMemory = this.estimateMemoryUsage(removed);
+        currentMemory -= removedMemory;
       }
     }
 
@@ -56,34 +58,62 @@ export class UndoManager {
     if (!this.canAffordUndo(structure)) {
       return;
     }
-    this.stack.push(structure.clone());
-    if (this.stack.length > this.maxDepth) {
-      this.stack.shift();
+    this.undoStack.push(structure.clone());
+    if (this.undoStack.length > this.maxDepth) {
+      this.undoStack.shift();
     }
+    this.redoStack.length = 0;
   }
 
   pop(): Structure | null {
-    return this.stack.pop() ?? null;
+    return this.undoStack.pop() ?? null;
+  }
+
+  redo(): Structure | null {
+    return this.redoStack.pop() ?? null;
+  }
+
+  pushToRedo(structure: Structure): void {
+    if (!this.canAffordUndo(structure)) {
+      return;
+    }
+    this.redoStack.push(structure.clone());
+    if (this.redoStack.length > this.maxDepth) {
+      this.redoStack.shift();
+    }
   }
 
   clear(): void {
-    this.stack.length = 0;
+    this.undoStack.length = 0;
+    this.redoStack.length = 0;
     this.warnedAboutSize = false;
   }
 
   get isEmpty(): boolean {
-    return this.stack.length === 0;
+    return this.undoStack.length === 0;
+  }
+
+  get canRedo(): boolean {
+    return this.redoStack.length > 0;
   }
 
   get depth(): number {
-    return this.stack.length;
+    return this.undoStack.length;
+  }
+
+  get redoDepth(): number {
+    return this.redoStack.length;
   }
 
   get estimatedMemoryMB(): number {
-    const bytes = this.stack.reduce(
+    const undoBytes = this.undoStack.reduce(
       (sum, s) => sum + this.estimateMemoryUsage(s),
       0
     );
-    return bytes / (1024 * 1024);
+    const redoBytes = this.redoStack.reduce(
+      (sum, s) => sum + this.estimateMemoryUsage(s),
+      0
+    );
+    return (undoBytes + redoBytes) / (1024 * 1024);
   }
 }

@@ -1,4 +1,4 @@
-import { state } from './state';
+import { lightingStore, displayStore } from './state';
 import { renderer } from './renderer';
 import { updateSettings } from './configHandler';
 
@@ -13,9 +13,9 @@ export const pickerState: LightPickerState = {
 };
 
 function getLightObject(prefix: string): { intensity: number; color: string; x: number; y: number; z: number } | null {
-  if (prefix === 'key') return state.keyLight;
-  if (prefix === 'fill') return state.fillLight;
-  if (prefix === 'rim') return state.rimLight;
+  if (prefix === 'key') return lightingStore.keyLight;
+  if (prefix === 'fill') return lightingStore.fillLight;
+  if (prefix === 'rim') return lightingStore.rimLight;
   return null;
 }
 
@@ -169,7 +169,7 @@ export function init(canvas: HTMLCanvasElement, onSetStatus: (msg: string) => vo
   const lightingEnabled = document.getElementById('lighting-enabled') as HTMLInputElement | null;
   if (lightingEnabled) {
     lightingEnabled.addEventListener('change', () => {
-      state.lightingEnabled = lightingEnabled.checked;
+      lightingStore.lightingEnabled = lightingEnabled.checked;
       renderer.updateLighting();
       updateSettings();
     });
@@ -183,30 +183,30 @@ export function init(canvas: HTMLCanvasElement, onSetStatus: (msg: string) => vo
 
   if (ambientSlider) {
     ambientSlider.addEventListener('input', () => {
-      state.ambientIntensity = parseFloat(ambientSlider.value);
-      if (ambientValue) ambientValue.textContent = state.ambientIntensity.toFixed(1);
+      lightingStore.ambientIntensity = parseFloat(ambientSlider.value);
+      if (ambientValue) ambientValue.textContent = lightingStore.ambientIntensity.toFixed(1);
       renderer.updateLighting();
       updateSettings();
     });
   }
   if (shininessSlider) {
-    const initialShininess = Number.isFinite(state.shininess)
-      ? Math.max(0, Math.min(200, Number(state.shininess)))
+    const initialShininess = Number.isFinite(displayStore.shininess)
+      ? Math.max(0, Math.min(200, Number(displayStore.shininess)))
       : 50;
-    state.shininess = initialShininess;
+    displayStore.shininess = initialShininess;
     shininessSlider.value = String(initialShininess);
     if (shininessValue) shininessValue.textContent = String(Math.round(initialShininess));
     shininessSlider.addEventListener('input', () => {
-      state.shininess = Math.max(0, Math.min(200, Number(shininessSlider.value) || 50));
-      if (shininessValue) shininessValue.textContent = String(Math.round(state.shininess));
+      displayStore.shininess = Math.max(0, Math.min(200, Number(shininessSlider.value) || 50));
+      if (shininessValue) shininessValue.textContent = String(Math.round(displayStore.shininess));
       renderer.updateLighting();
       updateSettings();
     });
   }
   if (ambientColorPicker) {
-    ambientColorPicker.value = state.ambientColor || '#ffffff';
+    ambientColorPicker.value = lightingStore.ambientColor || '#ffffff';
     ambientColorPicker.addEventListener('input', () => {
-      state.ambientColor = ambientColorPicker.value;
+      lightingStore.ambientColor = ambientColorPicker.value;
       renderer.updateLighting();
       updateSettings();
     });
@@ -215,9 +215,9 @@ export function init(canvas: HTMLCanvasElement, onSetStatus: (msg: string) => vo
   setupLightSliders('key');
   setupLightSliders('fill');
   setupLightSliders('rim');
-  updateLightSliderUI('key', state.keyLight);
-  updateLightSliderUI('fill', state.fillLight);
-  updateLightSliderUI('rim', state.rimLight);
+  updateLightSliderUI('key', lightingStore.keyLight);
+  updateLightSliderUI('fill', lightingStore.fillLight);
+  updateLightSliderUI('rim', lightingStore.rimLight);
 
   for (const prefix of ['key', 'fill', 'rim']) {
     const button = document.getElementById(`btn-pick-${prefix}-light`) as HTMLButtonElement | null;
@@ -235,13 +235,13 @@ export function init(canvas: HTMLCanvasElement, onSetStatus: (msg: string) => vo
   const btnResetLighting = document.getElementById('btn-reset-lighting') as HTMLButtonElement | null;
   if (btnResetLighting) {
     btnResetLighting.addEventListener('click', () => {
-      state.keyLight = { intensity: 0.7, x: 0, y: 0, z: 10, color: '#CCCCCC' };
-      state.fillLight = { intensity: 0, x: -10, y: -5, z: 5, color: '#ffffff' };
-      state.rimLight = { intensity: 0, x: 0, y: 5, z: -10, color: '#ffffff' };
-      state.ambientIntensity = 0.5;
-      state.ambientColor = '#ffffff';
-      state.shininess = 50;
-      state.lightingEnabled = true;
+      lightingStore.keyLight = { intensity: 0.7, x: 0, y: 0, z: 10, color: '#CCCCCC' };
+      lightingStore.fillLight = { intensity: 0, x: -10, y: -5, z: 5, color: '#ffffff' };
+      lightingStore.rimLight = { intensity: 0, x: 0, y: 5, z: -10, color: '#ffffff' };
+      lightingStore.ambientIntensity = 0.5;
+      lightingStore.ambientColor = '#ffffff';
+      displayStore.shininess = 50;
+      lightingStore.lightingEnabled = true;
 
       if (lightingEnabled) lightingEnabled.checked = true;
       if (ambientSlider) ambientSlider.value = '0.5';

@@ -8,4 +8,4 @@ export { XDATCARParser } from './xdatcarParser';
 export { OUTCARParser } from './outcarParser';
 export { PDBParser } from './pdbParser';
 export { STRUParser } from './struParser';
-export { StructureParser, BaseStructureParser } from './structureParser';
+export { BaseStructureParser } from './structureParser';

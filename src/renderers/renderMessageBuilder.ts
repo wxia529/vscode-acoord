@@ -25,9 +25,9 @@ export interface RendererState {
 }
 
 /**
- * Three.js renderer wrapper for webview
+ * Builds render message data for webview visualization
  */
-export class ThreeJSRenderer {
+export class RenderMessageBuilder {
   private state: RendererState;
 
   constructor(structure: Structure) {

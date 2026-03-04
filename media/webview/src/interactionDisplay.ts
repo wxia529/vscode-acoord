@@ -1,4 +1,4 @@
-import { state } from './state';
+import { structureStore, displayStore } from './state';
 import { renderer } from './renderer';
 import { updateSettings } from './configHandler';
 
@@ -13,16 +13,16 @@ export function init(): void {
   const latticeLineStyle = document.getElementById('lattice-line-style') as HTMLSelectElement | null;
 
   const rerenderStructure = (): void => {
-    if (!state.currentStructure) return;
+    if (!structureStore.currentStructure) return;
     // Dynamically imported to avoid circular dep at module load time.
     // renderer.renderStructure is safe to call here since this runs only on user events.
-    renderer.renderStructure(state.currentStructure);
+    renderer.renderStructure(structureStore.currentStructure);
   };
 
   if (showAxes) {
-    showAxes.checked = state.showAxes !== false;
+    showAxes.checked = displayStore.showAxes !== false;
     showAxes.addEventListener('change', () => {
-      state.showAxes = showAxes.checked;
+      displayStore.showAxes = showAxes.checked;
       renderer.updateDisplaySettings();
       updateSettings();
     });
@@ -30,7 +30,7 @@ export function init(): void {
 
   if (bgColorPicker && bgColorText) {
     bgColorPicker.addEventListener('input', () => {
-      state.backgroundColor = bgColorPicker.value;
+      displayStore.backgroundColor = bgColorPicker.value;
       bgColorText.value = bgColorPicker.value;
       renderer.updateDisplaySettings();
       updateSettings();
@@ -39,7 +39,7 @@ export function init(): void {
     bgColorText.addEventListener('change', () => {
       const color = bgColorText.value.trim();
       if (/^#[0-9A-Fa-f]{6}$/.test(color)) {
-        state.backgroundColor = color;
+        displayStore.backgroundColor = color;
         bgColorPicker.value = color;
         renderer.updateDisplaySettings();
         updateSettings();
@@ -49,7 +49,7 @@ export function init(): void {
 
   if (latticeColorPicker && latticeColorText) {
     latticeColorPicker.addEventListener('input', () => {
-      state.unitCellColor = latticeColorPicker.value;
+      displayStore.unitCellColor = latticeColorPicker.value;
       latticeColorText.value = latticeColorPicker.value;
       renderer.updateDisplaySettings();
       updateSettings();
@@ -58,7 +58,7 @@ export function init(): void {
     latticeColorText.addEventListener('change', () => {
       const color = latticeColorText.value.trim();
       if (/^#[0-9A-Fa-f]{6}$/.test(color)) {
-        state.unitCellColor = color;
+        displayStore.unitCellColor = color;
         latticeColorPicker.value = color;
         renderer.updateDisplaySettings();
         updateSettings();
@@ -67,12 +67,12 @@ export function init(): void {
   }
 
   if (latticeThicknessSlider) {
-    const initialThickness = Number.isFinite(state.unitCellThickness) ? state.unitCellThickness : 1;
+    const initialThickness = Number.isFinite(displayStore.unitCellThickness) ? displayStore.unitCellThickness : 1;
     latticeThicknessSlider.value = String(initialThickness);
     if (latticeThicknessValue) latticeThicknessValue.textContent = initialThickness.toFixed(1);
     latticeThicknessSlider.addEventListener('input', () => {
       const nextThickness = Math.max(0.5, Math.min(6, parseFloat(latticeThicknessSlider.value) || 1));
-      state.unitCellThickness = nextThickness;
+      displayStore.unitCellThickness = nextThickness;
       if (latticeThicknessValue) latticeThicknessValue.textContent = nextThickness.toFixed(1);
       rerenderStructure();
       updateSettings();
@@ -80,9 +80,9 @@ export function init(): void {
   }
 
   if (latticeLineStyle) {
-    latticeLineStyle.value = state.unitCellLineStyle === 'dashed' ? 'dashed' : 'solid';
+    latticeLineStyle.value = displayStore.unitCellLineStyle === 'dashed' ? 'dashed' : 'solid';
     latticeLineStyle.addEventListener('change', () => {
-      state.unitCellLineStyle = latticeLineStyle.value === 'dashed' ? 'dashed' : 'solid';
+      displayStore.unitCellLineStyle = latticeLineStyle.value === 'dashed' ? 'dashed' : 'solid';
       rerenderStructure();
       updateSettings();
     });

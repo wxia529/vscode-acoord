@@ -31,24 +31,13 @@
   "engines": {
     "vscode": "^1.109.0"
   },
-  "categories": [
-    "Data Science",
-    "Other"
-  ],
-  "main": "./out/extension.js",
   "activationEvents": [
     "onCustomEditor:acoord.structureEditor",
     "onCommand:acoord.openStructureEditor",
     "onCommand:acoord.createNewMolecule",
     "onCommand:acoord.createNewCrystal",
-    "onCommand:acoord.exportStructure",
-    "onCommand:acoord.addAtom",
-    "onCommand:acoord.deleteAtom",
-    "onCommand:acoord.selectDisplayConfig",
-    "onCommand:acoord.saveDisplayConfig",
-    "onCommand:acoord.exportDisplayConfigs",
-    "onCommand:acoord.importDisplayConfigs",
-    "onCommand:acoord.deleteDisplayConfig"
+    "onLanguage:cif",
+    "onLanguage:xyz"
   ],
   "contributes": {
     "customEditors": [
@@ -124,7 +113,7 @@
       "editor/title": [
         {
           "command": "acoord.openStructureEditor",
-          "when": "resourceExtname =~ /\\.(cif|xyz|poscar|vasp|xdatcar|outcar|pdb|gjf|com|inp|in|pwi|out|pwo|log|stru)$/i || resourceFilename =~ /^(POSCAR|CONTCAR|XDATCAR|OUTCAR|STRU)$/i",
+          "when": "resourceExtname =~ /\\.(cif|xyz|poscar|vasp|xdatcar|outcar|pdb|gjf|com|inp|in|pwi|out|pwo|log|stru)$/i || resourceFilename =~ /^(POSCAR|CONTCAR|XDATCAR|OUTCAR|STRU)$/i || editorLangId == gaussian",
           "group": "navigation"
         }
       ]
@@ -204,21 +193,25 @@
   "scripts": {
     "vscode:prepublish": "npm run compile",
     "compile": "tsc -p ./ && node build/webview.mjs",
-    "watch": "tsc -watch -p ./ & node build/webview.mjs --watch",
+    "watch": "concurrently \"tsc -watch -p ./\" \"node build/webview.mjs --watch\"",
+    "watch:tsc": "tsc -watch -p ./",
+    "watch:webview": "node build/webview.mjs --watch",
     "pretest": "npm run compile && npm run lint",
     "lint": "eslint src",
     "test": "vscode-test"
   },
   "dependencies": {
-    "@types/three": "^0.183.1",
+    "@github/copilot": "^0.0.421",
     "three": "^0.183.2"
   },
   "devDependencies": {
     "@types/mocha": "^10.0.10",
     "@types/node": "22.x",
+    "@types/three": "^0.183.1",
     "@types/vscode": "^1.109.0",
     "@vscode/test-cli": "^0.0.12",
     "@vscode/test-electron": "^2.5.2",
+    "concurrently": "^9.2.1",
     "esbuild": "^0.27.3",
     "eslint": "^9.39.2",
     "typescript": "^5.9.3",

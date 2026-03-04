@@ -1,6 +1,7 @@
-import { state } from './state';
+import { configStore, displayStore, lightingStore, extractDisplaySettings, applyDisplaySettings } from './state';
 import { renderer } from './renderer';
 import type { VsCodeApi, DisplaySettings } from './types';
+import type { ExtensionToWebviewMessage, DisplayConfigLoadedMessage, DisplayConfigSavedMessage, DisplayConfigErrorMessage, CurrentDisplaySettingsMessage } from './messages';
 
 let _vscode: VsCodeApi | null = null;
 let _showStatus: ((msg: string) => void) | null = null;
@@ -29,12 +30,12 @@ export function requestConfigList(): void {
 }
 
 export function loadConfig(configId: string): void {
-  state.isLoadingConfig = true;
+  configStore.isLoadingConfig = true;
   postMessage({ command: 'loadDisplayConfig', configId });
 }
 
 export function saveAsUserConfig(name: string, description?: string): void {
-  const settings = state.extractDisplaySettings();
+  const settings = extractDisplaySettings();
   postMessage({ command: 'saveDisplayConfig', name, description, settings });
 }
 
@@ -48,7 +49,7 @@ export function updateSettings(): void {
   }
   _settingsTimer = setTimeout(() => {
     _settingsTimer = null;
-    const settings = state.extractDisplaySettings();
+    const settings = extractDisplaySettings();
     postMessage({ command: 'updateDisplaySettings', settings });
   }, 80);
 }
@@ -58,7 +59,7 @@ function updateConfigUI(): void {
 }
 
 function handleConfigsLoaded(presets: unknown, user: unknown): void {
-  state.availableConfigs = {
+  configStore.availableConfigs = {
     presets: Array.isArray(presets) ? presets : [],
     user: Array.isArray(user) ? user : [],
   };
@@ -68,14 +69,14 @@ function handleConfigsLoaded(presets: unknown, user: unknown): void {
 function handleConfigLoaded(config: { id: string; name: string; settings: DisplaySettings } | null | undefined): void {
   if (!config || !config.settings) {
     console.error('Invalid config loaded');
-    state.isLoadingConfig = false;
+    configStore.isLoadingConfig = false;
     return;
   }
 
-  state.applyDisplaySettings(config.settings);
-  state.currentConfigId = config.id;
-  state.currentConfigName = config.name;
-  state.isLoadingConfig = false;
+  applyDisplaySettings(config.settings);
+  configStore.currentConfigId = config.id;
+  configStore.currentConfigName = config.name;
+  configStore.isLoadingConfig = false;
 
   updateUI();
   renderer.updateDisplaySettings();
@@ -98,18 +99,18 @@ function handleConfigSaved(config: { name: string } | null | undefined): void {
   }
 }
 
-export function handleMessage(message: { command: string; [key: string]: unknown }): void {
+export function handleMessage(message: ExtensionToWebviewMessage): void {
   switch (message.command) {
     case 'displayConfigsLoaded':
       handleConfigsLoaded(message.presets, message.user);
       break;
 
     case 'displayConfigLoaded':
-      handleConfigLoaded(message.config as { id: string; name: string; settings: DisplaySettings } | null);
+      handleConfigLoaded((message as DisplayConfigLoadedMessage).config);
       break;
 
     case 'displayConfigSaved':
-      handleConfigSaved(message.config as { name: string } | null);
+      handleConfigSaved((message as DisplayConfigSavedMessage).config);
       break;
 
     case 'displayConfigChanged':
@@ -120,21 +121,14 @@ export function handleMessage(message: { command: string; [key: string]: unknown
 
     case 'currentDisplaySettings':
       if (message.settings) {
-        state.applyDisplaySettings(message.settings as DisplaySettings);
+        applyDisplaySettings(message.settings);
         updateUI();
       }
       break;
 
     case 'displayConfigError':
       console.error('Display config error:', message.error);
-      state.isLoadingConfig = false;
-      break;
-
-    case 'render':
-      if (message.displaySettings) {
-        state.applyDisplaySettings(message.displaySettings as DisplaySettings);
-        updateUI();
-      }
+      configStore.isLoadingConfig = false;
       break;
   }
 }
@@ -158,77 +152,77 @@ export function updateUI(): void {
     if (el) el.textContent = value;
   };
 
-  setChecked('show-axes', state.showAxes);
+  setChecked('show-axes', displayStore.showAxes);
 
-  setInput('bg-color-picker', state.backgroundColor);
-  setInput('bg-color-text', state.backgroundColor);
+  setInput('bg-color-picker', displayStore.backgroundColor);
+  setInput('bg-color-text', displayStore.backgroundColor);
 
-  setInput('lattice-color-picker', state.unitCellColor);
-  setInput('lattice-color-text', state.unitCellColor);
+  setInput('lattice-color-picker', displayStore.unitCellColor);
+  setInput('lattice-color-text', displayStore.unitCellColor);
 
-  setInput('lattice-thickness-slider', state.unitCellThickness);
-  setText('lattice-thickness-value', state.unitCellThickness.toFixed(1));
+  setInput('lattice-thickness-slider', displayStore.unitCellThickness);
+  setText('lattice-thickness-value', displayStore.unitCellThickness.toFixed(1));
 
-  setInput('lattice-line-style', state.unitCellLineStyle);
+  setInput('lattice-line-style', displayStore.unitCellLineStyle);
 
-  setInput('atom-size-global-slider', state.atomSizeGlobal);
-  setText('atom-size-global-value', state.atomSizeGlobal.toFixed(2) + ' Å');
+  setInput('atom-size-global-slider', displayStore.atomSizeGlobal);
+  setText('atom-size-global-value', displayStore.atomSizeGlobal.toFixed(2) + ' Å');
 
-  setChecked('atom-size-use-default', state.atomSizeUseDefaultSettings);
+  setChecked('atom-size-use-default', displayStore.atomSizeUseDefaultSettings);
 
-  setInput('bond-size-slider', state.bondThicknessScale);
-  setText('bond-size-value', state.bondThicknessScale.toFixed(1) + 'x');
+  setInput('bond-size-slider', displayStore.bondThicknessScale);
+  setText('bond-size-value', displayStore.bondThicknessScale.toFixed(1) + 'x');
 
-  setInput('scale-slider', state.manualScale);
-  setText('scale-value', state.manualScale.toFixed(1) + 'x');
+  setInput('scale-slider', displayStore.manualScale);
+  setText('scale-value', displayStore.manualScale.toFixed(1) + 'x');
 
-  setChecked('scale-auto', !!state.autoScaleEnabled);
+  setChecked('scale-auto', !!displayStore.autoScaleEnabled);
 
-  setInput('size-slider', state.atomSizeScale);
-  setText('size-value', state.atomSizeScale.toFixed(2) + 'x');
+  setInput('size-slider', displayStore.atomSizeScale);
+  setText('size-value', displayStore.atomSizeScale.toFixed(2) + 'x');
 
-  setChecked('lighting-enabled', state.lightingEnabled);
+  setChecked('lighting-enabled', lightingStore.lightingEnabled);
 
-  setInput('ambient-slider', state.ambientIntensity);
-  setText('ambient-value', state.ambientIntensity.toFixed(1));
-  setInput('ambient-color-picker', state.ambientColor);
+  setInput('ambient-slider', lightingStore.ambientIntensity);
+  setText('ambient-value', lightingStore.ambientIntensity.toFixed(1));
+  setInput('ambient-color-picker', lightingStore.ambientColor);
 
-  setInput('shininess-slider', state.shininess);
-  setText('shininess-value', state.shininess.toString());
+  setInput('shininess-slider', displayStore.shininess);
+  setText('shininess-value', displayStore.shininess.toString());
 
-  setInput('proj-select', state.projectionMode);
-  setChecked('lattice-scale', !!state.scaleAtomsWithLattice);
+  setInput('proj-select', displayStore.projectionMode);
+  setChecked('lattice-scale', !!displayStore.scaleAtomsWithLattice);
 
   // Key light
-  setInput('key-intensity-slider', getLightValue(state.keyLight, 'intensity'));
-  setText('key-intensity-value', Number(getLightValue(state.keyLight, 'intensity')).toFixed(1));
-  setInput('key-color-picker', getLightValue(state.keyLight, 'color'));
-  setInput('key-x-slider', getLightValue(state.keyLight, 'x'));
-  setText('key-x-value', String(getLightValue(state.keyLight, 'x')));
-  setInput('key-y-slider', getLightValue(state.keyLight, 'y'));
-  setText('key-y-value', String(getLightValue(state.keyLight, 'y')));
-  setInput('key-z-slider', getLightValue(state.keyLight, 'z'));
-  setText('key-z-value', String(getLightValue(state.keyLight, 'z')));
+  setInput('key-intensity-slider', getLightValue(lightingStore.keyLight, 'intensity'));
+  setText('key-intensity-value', Number(getLightValue(lightingStore.keyLight, 'intensity')).toFixed(1));
+  setInput('key-color-picker', getLightValue(lightingStore.keyLight, 'color'));
+  setInput('key-x-slider', getLightValue(lightingStore.keyLight, 'x'));
+  setText('key-x-value', String(getLightValue(lightingStore.keyLight, 'x')));
+  setInput('key-y-slider', getLightValue(lightingStore.keyLight, 'y'));
+  setText('key-y-value', String(getLightValue(lightingStore.keyLight, 'y')));
+  setInput('key-z-slider', getLightValue(lightingStore.keyLight, 'z'));
+  setText('key-z-value', String(getLightValue(lightingStore.keyLight, 'z')));
 
   // Fill light
-  setInput('fill-intensity-slider', getLightValue(state.fillLight, 'intensity'));
-  setText('fill-intensity-value', Number(getLightValue(state.fillLight, 'intensity')).toFixed(1));
-  setInput('fill-color-picker', getLightValue(state.fillLight, 'color'));
-  setInput('fill-x-slider', getLightValue(state.fillLight, 'x'));
-  setText('fill-x-value', String(getLightValue(state.fillLight, 'x')));
-  setInput('fill-y-slider', getLightValue(state.fillLight, 'y'));
-  setText('fill-y-value', String(getLightValue(state.fillLight, 'y')));
-  setInput('fill-z-slider', getLightValue(state.fillLight, 'z'));
-  setText('fill-z-value', String(getLightValue(state.fillLight, 'z')));
+  setInput('fill-intensity-slider', getLightValue(lightingStore.fillLight, 'intensity'));
+  setText('fill-intensity-value', Number(getLightValue(lightingStore.fillLight, 'intensity')).toFixed(1));
+  setInput('fill-color-picker', getLightValue(lightingStore.fillLight, 'color'));
+  setInput('fill-x-slider', getLightValue(lightingStore.fillLight, 'x'));
+  setText('fill-x-value', String(getLightValue(lightingStore.fillLight, 'x')));
+  setInput('fill-y-slider', getLightValue(lightingStore.fillLight, 'y'));
+  setText('fill-y-value', String(getLightValue(lightingStore.fillLight, 'y')));
+  setInput('fill-z-slider', getLightValue(lightingStore.fillLight, 'z'));
+  setText('fill-z-value', String(getLightValue(lightingStore.fillLight, 'z')));
 
   // Rim light
-  setInput('rim-intensity-slider', getLightValue(state.rimLight, 'intensity'));
-  setText('rim-intensity-value', Number(getLightValue(state.rimLight, 'intensity')).toFixed(1));
-  setInput('rim-color-picker', getLightValue(state.rimLight, 'color'));
-  setInput('rim-x-slider', getLightValue(state.rimLight, 'x'));
-  setText('rim-x-value', String(getLightValue(state.rimLight, 'x')));
-  setInput('rim-y-slider', getLightValue(state.rimLight, 'y'));
-  setText('rim-y-value', String(getLightValue(state.rimLight, 'y')));
-  setInput('rim-z-slider', getLightValue(state.rimLight, 'z'));
-  setText('rim-z-value', String(getLightValue(state.rimLight, 'z')));
+  setInput('rim-intensity-slider', getLightValue(lightingStore.rimLight, 'intensity'));
+  setText('rim-intensity-value', Number(getLightValue(lightingStore.rimLight, 'intensity')).toFixed(1));
+  setInput('rim-color-picker', getLightValue(lightingStore.rimLight, 'color'));
+  setInput('rim-x-slider', getLightValue(lightingStore.rimLight, 'x'));
+  setText('rim-x-value', String(getLightValue(lightingStore.rimLight, 'x')));
+  setInput('rim-y-slider', getLightValue(lightingStore.rimLight, 'y'));
+  setText('rim-y-value', String(getLightValue(lightingStore.rimLight, 'y')));
+  setInput('rim-z-slider', getLightValue(lightingStore.rimLight, 'z'));
+  setText('rim-z-value', String(getLightValue(lightingStore.rimLight, 'z')));
 }

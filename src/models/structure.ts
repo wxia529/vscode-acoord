@@ -95,8 +95,55 @@ export class Structure {
 
   /**
    * Get list of bonds based on covalent radii
+   * Uses spatial hashing for O(n) performance instead of O(n²)
    */
   private static readonly BOND_TOLERANCE = 1.1; // 10% tolerance for covalent radii comparison
+  private static readonly MAX_COVALENT_RADIUS = 2.5; // Maximum covalent radius in Angstroms
+
+  private buildSpatialHash(cellSize: number): Map<string, Atom[]> {
+    const grid = new Map<string, Atom[]>();
+    for (const atom of this.atoms) {
+      const cx = Math.floor(atom.x / cellSize);
+      const cy = Math.floor(atom.y / cellSize);
+      const cz = Math.floor(atom.z / cellSize);
+      const key = `${cx},${cy},${cz}`;
+      const cell = grid.get(key);
+      if (cell) {
+        cell.push(atom);
+      } else {
+        grid.set(key, [atom]);
+      }
+    }
+    return grid;
+  }
+
+  private *getNeighboringAtoms(
+    atom: Atom,
+    grid: Map<string, Atom[]>,
+    cellSize: number,
+    maxDistance: number
+  ): Generator<Atom> {
+    const cx = Math.floor(atom.x / cellSize);
+    const cy = Math.floor(atom.y / cellSize);
+    const cz = Math.floor(atom.z / cellSize);
+    const range = Math.ceil(maxDistance / cellSize);
+
+    for (let dx = -range; dx <= range; dx++) {
+      for (let dy = -range; dy <= range; dy++) {
+        for (let dz = -range; dz <= range; dz++) {
+          const key = `${cx + dx},${cy + dy},${cz + dz}`;
+          const cell = grid.get(key);
+          if (cell) {
+            for (const other of cell) {
+              if (other.id !== atom.id) {
+                yield other;
+              }
+            }
+          }
+        }
+      }
+    }
+  }
 
   getBonds(): Array<{ atomId1: string; atomId2: string; distance: number; manual: boolean }> {
     const bonds: Array<{ atomId1: string; atomId2: string; distance: number; manual: boolean }> = [];
@@ -104,19 +151,43 @@ export class Structure {
     const suppressed = new Set(this.suppressedAutoBonds.map(([a, b]) => Structure.bondKey(a, b)));
     const seen = new Set<string>();
 
-    for (let i = 0; i < this.atoms.length; i++) {
-      for (let j = i + 1; j < this.atoms.length; j++) {
-        const atom1 = this.atoms[i];
-        const atom2 = this.atoms[j];
-        const distance = atom1.distanceTo(atom2);
+    // Pre-compute element symbols and covalent radii to avoid repeated lookups
+    const atomData = new Map<string, { symbol: string; radius: number }>();
+    let maxBondLength = 0;
+    for (const atom of this.atoms) {
+      const symbol = parseElement(atom.element) || atom.element;
+      const radius = ELEMENT_DATA[symbol]?.covalentRadius || 1.5;
+      atomData.set(atom.id, { symbol, radius });
+      maxBondLength = Math.max(maxBondLength, radius * 2 * tolerance);
+    }
+    maxBondLength = Math.max(maxBondLength, Structure.MAX_COVALENT_RADIUS * 2);
 
-        const symbol1 = parseElement(atom1.element) || atom1.element;
-        const symbol2 = parseElement(atom2.element) || atom2.element;
-        const radius1 = ELEMENT_DATA[symbol1]?.covalentRadius || 1.5;
-        const radius2 = ELEMENT_DATA[symbol2]?.covalentRadius || 1.5;
+    // Build spatial hash with cell size equal to max bond length
+    const cellSize = maxBondLength;
+    const grid = this.buildSpatialHash(cellSize);
+
+    // Check bonds using spatial hash - only check neighbors in nearby cells
+    for (const atom1 of this.atoms) {
+      const data1 = atomData.get(atom1.id)!;
+      const radius1 = data1.radius;
+
+      for (const atom2 of this.getNeighboringAtoms(atom1, grid, cellSize, maxBondLength)) {
+        // Only process each pair once (avoid duplicates and self-pairs)
+        if (atom1.id >= atom2.id) {
+          continue;
+        }
+
+        const data2 = atomData.get(atom2.id)!;
+        const radius2 = data2.radius;
         const bondLength = (radius1 + radius2) * tolerance;
 
-        if (distance < bondLength) {
+        // Quick distance check using squared distance to avoid sqrt
+        const dx = atom1.x - atom2.x;
+        const dy = atom1.y - atom2.y;
+        const dz = atom1.z - atom2.z;
+        const distanceSq = dx * dx + dy * dy + dz * dz;
+
+        if (distanceSq < bondLength * bondLength) {
           const key = Structure.bondKey(atom1.id, atom2.id);
           if (suppressed.has(key) || seen.has(key)) {
             continue;
@@ -124,7 +195,7 @@ export class Structure {
           bonds.push({
             atomId1: atom1.id,
             atomId2: atom2.id,
-            distance: distance,
+            distance: Math.sqrt(distanceSq),
             manual: false,
           });
           seen.add(key);

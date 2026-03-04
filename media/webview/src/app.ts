@@ -1,4 +1,4 @@
-import { state } from './state';
+import { structureStore, selectionStore, displayStore, adsorptionStore, interactionStore, applyDisplaySettings, state } from './state';
 import { renderer } from './renderer';
 import * as configHandler from './configHandler';
 import * as appTrajectory from './appTrajectory';
@@ -9,6 +9,7 @@ import { setup as setupTools } from './appTools';
 import { init as initInteraction } from './interaction';
 import { initVscode as initInteractionConfigVscode, updateConfigSelector } from './interactionConfig';
 import type { Atom, Structure, VsCodeApi, AppCallbacks } from './types';
+import type { ExtensionToWebviewMessage, RenderMessage } from './messages';
 
 // UI utilities
 import {
@@ -87,11 +88,11 @@ const uiCallbacks = {
 };
 
 function rerenderCurrentStructure(): void {
-  if (!state.currentStructure) return;
-  renderer.renderStructure(state.currentStructure, {
+  if (!structureStore.currentStructure) return;
+  renderer.renderStructure(structureStore.currentStructure, {
     updateCounts,
     updateAtomList: (atoms, _selectedIds, selectedId) =>
-      updateAtomList(atoms, state.selectedAtomIds, selectedId, vscode, uiCallbacks),
+      updateAtomList(atoms, selectionStore.selectedAtomIds, selectedId, vscode, uiCallbacks),
   });
 }
 
@@ -132,6 +133,7 @@ function setupUI(): void {
     unitCell: document.getElementById('btn-unit-cell') as HTMLButtonElement | null,
     reset: document.getElementById('btn-reset') as HTMLButtonElement | null,
     undo: document.getElementById('btn-undo') as HTMLButtonElement | null,
+    redo: document.getElementById('btn-redo') as HTMLButtonElement | null,
     save: document.getElementById('btn-save') as HTMLButtonElement | null,
     saveAs: document.getElementById('btn-save-as') as HTMLButtonElement | null,
     exportImage: document.getElementById('btn-export-image') as HTMLButtonElement | null,
@@ -142,6 +144,7 @@ function setupUI(): void {
   if (buttons.unitCell) buttons.unitCell.onclick = () => vscode.postMessage({ command: 'toggleUnitCell' });
   if (buttons.reset) buttons.reset.onclick = () => renderer.fitCamera();
   if (buttons.undo) buttons.undo.onclick = () => vscode.postMessage({ command: 'undo' });
+  if (buttons.redo) buttons.redo.onclick = () => vscode.postMessage({ command: 'redo' });
   if (buttons.save) buttons.save.onclick = () => vscode.postMessage({ command: 'saveStructure' });
   if (buttons.saveAs) buttons.saveAs.onclick = () => vscode.postMessage({ command: 'saveStructureAs' });
   if (buttons.openSource) buttons.openSource.onclick = () => vscode.postMessage({ command: 'openSource' });
@@ -179,7 +182,7 @@ function setupUI(): void {
     rerenderCurrentStructure,
     updateCounts,
     updateAtomList: (atoms, _selectedIds, selectedId) =>
-      updateAtomList(atoms, state.selectedAtomIds, selectedId, vscode, uiCallbacks),
+      updateAtomList(atoms, selectionStore.selectedAtomIds, selectedId, vscode, uiCallbacks),
     clampAtomSize,
     getBaseAtomId,
     getCurrentStructureAtoms,
@@ -207,7 +210,7 @@ function setupUI(): void {
   appTrajectory.setup(vscode);
   setupEdit(callbacks);
   setupLattice(callbacks);
-  setupView(callbacks);
+  setupView();
   setupTools(callbacks);
   updateBondSelectionUI();
 }
@@ -242,10 +245,10 @@ function setupInteraction(): void {
       const modelZ = intersection.z * invScale;
 
       updateAtomPosition(atomId, modelX, modelY, modelZ, () => {
-        if (state.currentSelectedAtom?.id === atomId) updateStatusBar();
+        if (structureStore.currentSelectedAtom?.id === atomId) updateStatusBar();
       });
 
-      if (state.currentSelectedAtom?.id === atomId) {
+      if (structureStore.currentSelectedAtom?.id === atomId) {
         const selX = document.getElementById('sel-x') as HTMLInputElement | null;
         const selY = document.getElementById('sel-y') as HTMLInputElement | null;
         const selZ = document.getElementById('sel-z') as HTMLInputElement | null;
@@ -264,7 +267,7 @@ function setupInteraction(): void {
       const dy = deltaWorld.y * invScale;
       const dz = deltaWorld.z * invScale;
 
-      for (const id of state.selectedAtomIds) {
+      for (const id of selectionStore.selectedAtomIds) {
         const atom = getAtomById(id);
         if (atom) {
           updateAtomPosition(id, atom.position[0] + dx, atom.position[1] + dy, atom.position[2] + dz);
@@ -273,13 +276,13 @@ function setupInteraction(): void {
 
       vscode.postMessage({
         command: 'moveGroup',
-        atomIds: state.selectedAtomIds,
+        atomIds: selectionStore.selectedAtomIds,
         dx, dy, dz,
         preview: true,
       });
 
-      if (state.currentSelectedAtom && state.selectedAtomIds.length > 0) {
-        updatePositionInputs(getAtomById(state.currentSelectedAtom.id));
+      if (structureStore.currentSelectedAtom && selectionStore.selectedAtomIds.length > 0) {
+        updatePositionInputs(getAtomById(structureStore.currentSelectedAtom.id));
       }
       updateMeasurements();
     },
@@ -310,73 +313,61 @@ function start(): void {
 }
 
 // Message handlers
-function handleRenderMessage(data: {
-  data?: Structure & {
-    selectedAtomId?: string;
-    selectedAtomIds?: string[];
-    selectedBondKeys?: string[];
-    selectedBondKey?: string;
-    supercell?: [number, number, number];
-    trajectoryFrameIndex?: number;
-    trajectoryFrameCount?: number;
-    renderAtoms?: Atom[];
-  };
-  displaySettings?: import('./types').DisplaySettings;
-}): void {
+function handleRenderMessage(message: RenderMessage): void {
   appTrajectory.clearPending();
-  state.currentStructure = data.data ?? null;
+  structureStore.currentStructure = message.data ?? null;
   cleanupAtomSizeOverrides();
 
-  state.selectedAtomIds = data.data?.selectedAtomIds || [];
-  state.selectedBondKeys = Array.isArray(data.data?.selectedBondKeys)
-    ? data.data!.selectedBondKeys
-    : data.data?.selectedBondKey
-      ? [data.data.selectedBondKey]
+  selectionStore.selectedAtomIds = message.data?.selectedAtomIds || [];
+  selectionStore.selectedBondKeys = Array.isArray(message.data?.selectedBondKeys)
+    ? message.data!.selectedBondKeys
+    : message.data?.selectedBondKey
+      ? [message.data.selectedBondKey]
       : [];
-  state.currentSelectedBondKey = state.selectedBondKeys.at(-1) ?? null;
-  state.supercell = data.data?.supercell || [1, 1, 1];
+  structureStore.currentSelectedBondKey = selectionStore.selectedBondKeys.at(-1) ?? null;
+  displayStore.supercell = message.data?.supercell || [1, 1, 1];
 
   // Apply display settings
-  if (data.displaySettings) {
-    state.applyDisplaySettings(data.displaySettings);
+  if (message.displaySettings) {
+    applyDisplaySettings(message.displaySettings);
     configHandler.updateUI();
   }
 
   appTrajectory.updateUI(
-    data.data?.trajectoryFrameIndex || 0,
-    data.data?.trajectoryFrameCount || 1
+    message.data?.trajectoryFrameIndex || 0,
+    message.data?.trajectoryFrameCount || 1
   );
 
   // Update adsorption state
-  if (state.selectedAtomIds.length >= 2) {
-    state.adsorptionReferenceId = state.selectedAtomIds[state.selectedAtomIds.length - 1];
-    state.adsorptionAdsorbateIds = state.selectedAtomIds.slice(0, -1);
+  if (selectionStore.selectedAtomIds.length >= 2) {
+    adsorptionStore.adsorptionReferenceId = selectionStore.selectedAtomIds[selectionStore.selectedAtomIds.length - 1];
+    adsorptionStore.adsorptionAdsorbateIds = selectionStore.selectedAtomIds.slice(0, -1);
   } else {
-    state.adsorptionReferenceId = null;
-    state.adsorptionAdsorbateIds = state.selectedAtomIds.slice();
+    adsorptionStore.adsorptionReferenceId = null;
+    adsorptionStore.adsorptionAdsorbateIds = selectionStore.selectedAtomIds.slice();
   }
 
   renderer.renderStructure(
-    data.data!,
+    message.data!,
     {
       updateCounts,
       updateAtomList: (atoms, _selectedIds, selectedId) =>
-        updateAtomList(atoms, state.selectedAtomIds, selectedId, vscode, uiCallbacks),
+        updateAtomList(atoms, selectionStore.selectedAtomIds, selectedId, vscode, uiCallbacks),
     },
-    { fitCamera: state.shouldFitCamera }
+    { fitCamera: interactionStore.shouldFitCamera }
   );
-  state.shouldFitCamera = false;
+  interactionStore.shouldFitCamera = false;
   updateStatusBar();
 
   // Process render atom offsets
-  if (data.data?.renderAtoms && data.data?.atoms) {
-    const baseMap = new Map(data.data.atoms.map(a => [a.id, a.position]));
-    state.renderAtomOffsets = {};
-    for (const renderAtom of data.data.renderAtoms) {
+  if (message.data?.renderAtoms && message.data?.atoms) {
+    const baseMap = new Map(message.data.atoms.map(a => [a.id, a.position]));
+    interactionStore.renderAtomOffsets = {};
+    for (const renderAtom of message.data.renderAtoms) {
       const baseId = String(renderAtom.id).split('::')[0];
       const basePos = baseMap.get(baseId);
       if (basePos) {
-        state.renderAtomOffsets[renderAtom.id] = [
+        interactionStore.renderAtomOffsets[renderAtom.id] = [
           renderAtom.position[0] - basePos[0],
           renderAtom.position[1] - basePos[1],
           renderAtom.position[2] - basePos[2],
@@ -384,24 +375,24 @@ function handleRenderMessage(data: {
       }
     }
   } else {
-    state.renderAtomOffsets = {};
+    interactionStore.renderAtomOffsets = {};
   }
 
   updateLatticeUI(
-    data.data?.unitCellParams || null,
-    data.data?.supercell || [1, 1, 1],
-    !!data.data?.unitCellParams
+    message.data?.unitCellParams || null,
+    message.data?.supercell || [1, 1, 1],
+    !!message.data?.unitCellParams
   );
 
   // Update selection UI
-  const atoms = data.data?.atoms || [];
+  const atoms = message.data?.atoms || [];
   const selectedId =
-    data.data?.selectedAtomId ||
-    state.selectedAtomIds.at(-1) ||
+    message.data?.selectedAtomId ||
+    selectionStore.selectedAtomIds.at(-1) ||
     null;
   const selected = atoms.find((atom) => atom.id === selectedId) || null;
 
-  state.currentSelectedAtom = selected;
+  structureStore.currentSelectedAtom = selected;
   updateSelectedInputs(selected);
   updateAtomColorPreview();
   updateAdsorptionUI();
@@ -409,33 +400,29 @@ function handleRenderMessage(data: {
   updateAtomSizePanel();
 }
 
-window.addEventListener('message', (event: MessageEvent) => {
-  const data = event.data as {
-    command: string;
-    data?: unknown;
-    displaySettings?: import('./types').DisplaySettings;
-  };
+window.addEventListener('message', (event: MessageEvent<ExtensionToWebviewMessage>) => {
+  const message = event.data;
 
-  switch (data.command) {
+  switch (message.command) {
     case 'render':
-      handleRenderMessage(data as Parameters<typeof handleRenderMessage>[0]);
+      handleRenderMessage(message as RenderMessage);
       break;
 
     case 'imageSaved': {
-      const fileName = (data.data as { fileName?: string } | undefined)?.fileName || 'image.png';
+      const fileName = (message.data as { fileName?: string } | undefined)?.fileName || 'image.png';
       setStatus(`HD image saved: ${fileName}`);
       setError('');
       break;
     }
 
     case 'imageSaveFailed': {
-      const reason = (data.data as { reason?: string } | undefined)?.reason || 'Failed to save image.';
+      const reason = (message.data as { reason?: string } | undefined)?.reason || 'Failed to save image.';
       setError(reason);
       break;
     }
 
     default:
-      configHandler.handleMessage(data as { command: string; [key: string]: unknown });
+      configHandler.handleMessage(message);
   }
 });
 

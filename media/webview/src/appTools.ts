@@ -8,10 +8,13 @@
  *
  * setup(callbacks) must be called once during app initialisation.
  */
-import { state } from './state';
-import type { AppCallbacks } from './types';
+import { selectionStore, interactionStore } from './state';
+import type { VscodeContext, SelectionContext, TransformContext } from './types';
 
-export function setup(callbacks: AppCallbacks): void {
+/** Combined context for appTools module */
+type AppToolsContext = VscodeContext & SelectionContext & TransformContext;
+
+export function setup(callbacks: AppToolsContext): void {
   const {
     vscode,
     applyBondAngle,
@@ -32,10 +35,10 @@ export function setup(callbacks: AppCallbacks): void {
     btnApplyBond.onclick = () => {
       const value = parseFloat((document.getElementById('bond-length-input') as HTMLInputElement | null)?.value ?? '');
       if (!Number.isFinite(value)) { return; }
-      if (state.selectedAtomIds.length < 2) { return; }
+      if (selectionStore.selectedAtomIds.length < 2) { return; }
       vscode.postMessage({
         command: 'setBondLength',
-        atomIds: state.selectedAtomIds.slice(0, 2),
+        atomIds: selectionStore.selectedAtomIds.slice(0, 2),
         length: value,
       });
     };
@@ -57,8 +60,8 @@ export function setup(callbacks: AppCallbacks): void {
 
   if (btnCreateBond) {
     btnCreateBond.onclick = () => {
-      if (!state.selectedAtomIds || state.selectedAtomIds.length < 2) { return; }
-      vscode.postMessage({ command: 'createBond', atomIds: state.selectedAtomIds.slice(-2) });
+      if (!selectionStore.selectedAtomIds || selectionStore.selectedAtomIds.length < 2) { return; }
+      vscode.postMessage({ command: 'createBond', atomIds: selectionStore.selectedAtomIds.slice(-2) });
     };
   }
 
@@ -69,8 +72,8 @@ export function setup(callbacks: AppCallbacks): void {
         vscode.postMessage({ command: 'deleteBond', bondKeys: selectedBondKeys });
         return;
       }
-      if (state.selectedAtomIds && state.selectedAtomIds.length >= 2) {
-        vscode.postMessage({ command: 'deleteBond', atomIds: state.selectedAtomIds.slice(-2) });
+      if (selectionStore.selectedAtomIds && selectionStore.selectedAtomIds.length >= 2) {
+        vscode.postMessage({ command: 'deleteBond', atomIds: selectionStore.selectedAtomIds.slice(-2) });
       }
     };
   }
@@ -90,7 +93,7 @@ export function setup(callbacks: AppCallbacks): void {
   const rotInput = document.getElementById('rotation-input') as HTMLInputElement | null;
 
   const setAxis = (axis: string) => {
-    state.rotationAxis = axis;
+    interactionStore.rotationAxis = axis;
     rotX?.classList.toggle('selected', axis === 'x');
     rotY?.classList.toggle('selected', axis === 'y');
     rotZ?.classList.toggle('selected', axis === 'z');
@@ -101,7 +104,7 @@ export function setup(callbacks: AppCallbacks): void {
   if (rotX) rotX.onclick = () => { setAxis('x'); };
   if (rotY) rotY.onclick = () => { setAxis('y'); };
   if (rotZ) rotZ.onclick = () => { setAxis('z'); };
-  setAxis(state.rotationAxis || 'z');
+  setAxis(interactionStore.rotationAxis || 'z');
 
   if (rotSlider) {
     rotSlider.addEventListener('input', (event: Event) => {

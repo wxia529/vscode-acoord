@@ -7,7 +7,7 @@
  *
  * setup(callbacks) must be called once during app initialisation.
  */
-import { state } from './state';
+import { trajectoryStore } from './state';
 import type { VsCodeApi } from './types';
 
 let _vscode: VsCodeApi | null = null;
@@ -21,8 +21,8 @@ export function updateUI(frameIndex: number, frameCount: number): void {
   const current = Number.isFinite(frameIndex)
     ? Math.max(0, Math.min(total - 1, Math.floor(frameIndex)))
     : 0;
-  state.trajectoryFrameIndex = current;
-  state.trajectoryFrameCount = total;
+  trajectoryStore.trajectoryFrameIndex = current;
+  trajectoryStore.trajectoryFrameCount = total;
 
   const statusFrame = document.getElementById('status-traj-frame') as HTMLElement | null;
   const firstBtn = document.getElementById('btn-first-frame') as HTMLButtonElement | null;
@@ -49,19 +49,19 @@ export function updateUI(frameIndex: number, frameCount: number): void {
   const playBtn = document.getElementById('btn-play-trajectory') as HTMLButtonElement | null;
   const speedSlider = document.getElementById('traj-speed-slider') as HTMLInputElement | null;
   const speedValue = document.getElementById('traj-speed-value') as HTMLElement | null;
-  if (total <= 1 && state.trajectoryPlaying) {
+  if (total <= 1 && trajectoryStore.trajectoryPlaying) {
     setPlaying(false);
   }
   if (playBtn) {
-    playBtn.textContent = state.trajectoryPlaying ? 'Pause' : 'Play';
+    playBtn.textContent = trajectoryStore.trajectoryPlaying ? 'Pause' : 'Play';
     playBtn.disabled = total <= 1;
   }
   if (speedSlider) {
-    speedSlider.value = String(state.trajectoryPlaybackFps || 8);
+    speedSlider.value = String(trajectoryStore.trajectoryPlaybackFps || 8);
     speedSlider.disabled = total <= 1;
   }
   if (speedValue) {
-    speedValue.textContent = `${state.trajectoryPlaybackFps || 8} fps`;
+    speedValue.textContent = `${trajectoryStore.trajectoryPlaybackFps || 8} fps`;
   }
 }
 
@@ -72,21 +72,21 @@ function requestTrajectoryFrame(frameIndex: number, force?: boolean): void {
 }
 
 export function jumpToFrame(frameIndex: number): void {
-  const total = Math.max(1, Math.floor(state.trajectoryFrameCount || 1));
+  const total = Math.max(1, Math.floor(trajectoryStore.trajectoryFrameCount || 1));
   const nextIndex = Math.max(0, Math.min(total - 1, Math.floor(frameIndex)));
-  if (nextIndex === state.trajectoryFrameIndex) {
-    updateUI(state.trajectoryFrameIndex, state.trajectoryFrameCount);
+  if (nextIndex === trajectoryStore.trajectoryFrameIndex) {
+    updateUI(trajectoryStore.trajectoryFrameIndex, trajectoryStore.trajectoryFrameCount);
     return;
   }
   requestTrajectoryFrame(nextIndex, true);
 }
 
 function stepTrajectoryFrame(): void {
-  if (state.trajectoryFrameCount <= 1) { return; }
+  if (trajectoryStore.trajectoryFrameCount <= 1) { return; }
   const nextIndex =
-    state.trajectoryFrameIndex + 1 >= state.trajectoryFrameCount
+    trajectoryStore.trajectoryFrameIndex + 1 >= trajectoryStore.trajectoryFrameCount
       ? 0
-      : state.trajectoryFrameIndex + 1;
+      : trajectoryStore.trajectoryFrameIndex + 1;
   requestTrajectoryFrame(nextIndex);
 }
 
@@ -95,11 +95,11 @@ function restartTrajectoryPlaybackTimer(): void {
     clearInterval(trajectoryPlaybackTimer);
     trajectoryPlaybackTimer = null;
   }
-  if (!state.trajectoryPlaying || state.trajectoryFrameCount <= 1) { return; }
-  const fps = Math.max(1, Math.floor(state.trajectoryPlaybackFps || 8));
+  if (!trajectoryStore.trajectoryPlaying || trajectoryStore.trajectoryFrameCount <= 1) { return; }
+  const fps = Math.max(1, Math.floor(trajectoryStore.trajectoryPlaybackFps || 8));
   const intervalMs = Math.max(16, Math.round(1000 / fps));
   trajectoryPlaybackTimer = setInterval(() => {
-    if (state.trajectoryFrameCount <= 1) {
+    if (trajectoryStore.trajectoryFrameCount <= 1) {
       setPlaying(false);
       return;
     }
@@ -108,9 +108,9 @@ function restartTrajectoryPlaybackTimer(): void {
 }
 
 export function setPlaying(playing: boolean): void {
-  state.trajectoryPlaying = !!playing && state.trajectoryFrameCount > 1;
+  trajectoryStore.trajectoryPlaying = !!playing && trajectoryStore.trajectoryFrameCount > 1;
   restartTrajectoryPlaybackTimer();
-  updateUI(state.trajectoryFrameIndex, state.trajectoryFrameCount);
+  updateUI(trajectoryStore.trajectoryFrameIndex, trajectoryStore.trajectoryFrameCount);
 }
 
 export function clearPending(): void {
@@ -134,23 +134,23 @@ export function setup(vscode: VsCodeApi): void {
     firstFrameBtn.onclick = () => { jumpToFrame(0); };
   }
   if (prevFrameBtn) {
-    prevFrameBtn.onclick = () => { jumpToFrame(state.trajectoryFrameIndex - 1); };
+    prevFrameBtn.onclick = () => { jumpToFrame(trajectoryStore.trajectoryFrameIndex - 1); };
   }
   if (nextFrameBtn) {
-    nextFrameBtn.onclick = () => { jumpToFrame(state.trajectoryFrameIndex + 1); };
+    nextFrameBtn.onclick = () => { jumpToFrame(trajectoryStore.trajectoryFrameIndex + 1); };
   }
   if (lastFrameBtn) {
-    lastFrameBtn.onclick = () => { jumpToFrame(state.trajectoryFrameCount - 1); };
+    lastFrameBtn.onclick = () => { jumpToFrame(trajectoryStore.trajectoryFrameCount - 1); };
   }
   if (playTrajectoryBtn) {
-    playTrajectoryBtn.onclick = () => { setPlaying(!state.trajectoryPlaying); };
+    playTrajectoryBtn.onclick = () => { setPlaying(!trajectoryStore.trajectoryPlaying); };
   }
   if (frameInput) {
     const commitFrameInput = () => {
-      const total = Math.max(1, Math.floor(state.trajectoryFrameCount || 1));
+      const total = Math.max(1, Math.floor(trajectoryStore.trajectoryFrameCount || 1));
       const parsed = Number.parseInt(frameInput.value, 10);
       if (!Number.isFinite(parsed)) {
-        updateUI(state.trajectoryFrameIndex, total);
+        updateUI(trajectoryStore.trajectoryFrameIndex, total);
         return;
       }
       jumpToFrame(parsed - 1);
@@ -166,15 +166,15 @@ export function setup(vscode: VsCodeApi): void {
     speedSlider.addEventListener('input', (event: Event) => {
       const target = event.target as HTMLInputElement;
       const nextFps = Math.max(1, Math.min(30, Math.floor(Number(target.value) || 8)));
-      state.trajectoryPlaybackFps = nextFps;
-      if (state.trajectoryPlaying) {
+      trajectoryStore.trajectoryPlaybackFps = nextFps;
+      if (trajectoryStore.trajectoryPlaying) {
         restartTrajectoryPlaybackTimer();
       }
-      updateUI(state.trajectoryFrameIndex, state.trajectoryFrameCount);
+      updateUI(trajectoryStore.trajectoryFrameIndex, trajectoryStore.trajectoryFrameCount);
     });
   }
 
-  updateUI(state.trajectoryFrameIndex, state.trajectoryFrameCount);
+  updateUI(trajectoryStore.trajectoryFrameIndex, trajectoryStore.trajectoryFrameCount);
 }
 
 // ── Cleanup ────────────────────────────────────────────────────────────────────
