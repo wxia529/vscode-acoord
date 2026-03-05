@@ -14,7 +14,7 @@ import { UnitCellService } from '../services/unitCellService.js';
 import { MessageRouter } from '../services/messageRouter.js';
 import { DisplayConfigService } from '../services/displayConfigService.js';
 import { DocumentService } from '../services/documentService.js';
-import type { WebviewToExtensionMessage, WireDisplaySettings } from '../shared/protocol.js';
+import type { WebviewToExtensionMessage } from '../shared/protocol.js';
 
 export class StructureDocument implements vscode.CustomDocument {
   /** Frames restored from a hot-exit backup, if one was present at open time. */
@@ -164,8 +164,8 @@ export class StructureEditorProvider implements vscode.CustomEditorProvider<Stru
       () => selectionService.clearSelection(),
     );
 
-    // Set messageRouter in session (hacky but necessary)
-    (session as any).messageRouter = messageRouter;
+    // Set messageRouter in session after construction (messageRouter depends on session callbacks)
+    session.messageRouter = messageRouter;
 
     this.sessions.set(key, session);
 
@@ -264,38 +264,18 @@ export class StructureEditorProvider implements vscode.CustomEditorProvider<Stru
 
   private undoLastEdit(session: EditorSession) {
     const { renderer, trajectoryManager: traj, undoManager: undo, selectionService } = session;
-    if (undo.isEmpty) {
-      return;
+    const applied = undo.applyUndo(traj, renderer, () => selectionService.clearSelection());
+    if (applied) {
+      this.renderStructure(session);
     }
-    const current = traj.activeStructure;
-    const previous = undo.pop();
-    if (!previous) {
-      return;
-    }
-    undo.pushToRedo(current);
-    traj.updateActiveFrame(previous);
-    renderer.setStructure(previous);
-    renderer.setShowUnitCell(!!previous.unitCell);
-    selectionService.clearSelection();
-    this.renderStructure(session);
   }
 
   private redoLastEdit(session: EditorSession) {
     const { renderer, trajectoryManager: traj, undoManager: undo, selectionService } = session;
-    if (!undo.canRedo) {
-      return;
+    const applied = undo.applyRedo(traj, renderer, () => selectionService.clearSelection());
+    if (applied) {
+      this.renderStructure(session);
     }
-    const current = traj.activeStructure;
-    const next = undo.redo();
-    if (!next) {
-      return;
-    }
-    undo.push(current);
-    traj.updateActiveFrame(next);
-    renderer.setStructure(next);
-    renderer.setShowUnitCell(!!next.unitCell);
-    selectionService.clearSelection();
-    this.renderStructure(session);
   }
 
   private renderStructure(session: EditorSession) {
@@ -304,8 +284,7 @@ export class StructureEditorProvider implements vscode.CustomEditorProvider<Stru
     const message = renderer.getRenderMessage();
 
     if (session.displaySettings) {
-      // TODO: Phase 8 - properly consolidate DisplaySettings and WireDisplaySettings types
-      message.displaySettings = session.displaySettings as unknown as WireDisplaySettings;
+      message.displaySettings = session.displaySettings;
     }
 
     webviewPanel.webview.postMessage(message);

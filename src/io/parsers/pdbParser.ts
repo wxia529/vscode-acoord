@@ -97,7 +97,7 @@ export class PDBParser extends BaseStructureParser {
       const charge = '  ';
 
       lines.push(
-        `ATOM  ${serial} ${name}${resName}${chainID}${resSeq}${iCode}   ${x}${y}${z}${occupancy.padStart(6)}${tempFactor.padStart(6)}            ${element}${charge}`
+        `ATOM  ${serial} ${name} ${resName} ${chainID}${resSeq}${iCode}   ${x}${y}${z}${occupancy.padStart(6)}${tempFactor.padStart(6)}          ${element}${charge}`
       );
       atomIndex++;
     }

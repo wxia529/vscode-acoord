@@ -1,4 +1,6 @@
 import { Structure } from '../models/structure.js';
+import { TrajectoryManager } from './trajectoryManager.js';
+import { RenderMessageBuilder } from '../renderers/renderMessageBuilder.js';
 
 const MAX_ATOMS_FOR_UNDO = 5000;
 const MAX_MEMORY_MB = 100;
@@ -115,5 +117,55 @@ export class UndoManager {
       0
     );
     return (undoBytes + redoBytes) / (1024 * 1024);
+  }
+
+  /**
+   * Apply undo: pop from undo stack, push current to redo stack, update traj and renderer.
+   * Returns true if an undo was applied.
+   */
+  applyUndo(
+    traj: TrajectoryManager,
+    renderer: RenderMessageBuilder,
+    clearSelection: () => void
+  ): boolean {
+    if (this.isEmpty) {
+      return false;
+    }
+    const current = traj.activeStructure;
+    const previous = this.pop();
+    if (!previous) {
+      return false;
+    }
+    this.pushToRedo(current);
+    traj.updateActiveFrame(previous);
+    renderer.setStructure(previous);
+    renderer.setShowUnitCell(!!previous.unitCell);
+    clearSelection();
+    return true;
+  }
+
+  /**
+   * Apply redo: pop from redo stack, push current to undo stack, update traj and renderer.
+   * Returns true if a redo was applied.
+   */
+  applyRedo(
+    traj: TrajectoryManager,
+    renderer: RenderMessageBuilder,
+    clearSelection: () => void
+  ): boolean {
+    if (!this.canRedo) {
+      return false;
+    }
+    const current = traj.activeStructure;
+    const next = this.redo();
+    if (!next) {
+      return false;
+    }
+    this.push(current);
+    traj.updateActiveFrame(next);
+    renderer.setStructure(next);
+    renderer.setShowUnitCell(!!next.unitCell);
+    clearSelection();
+    return true;
   }
 }

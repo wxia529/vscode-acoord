@@ -15,16 +15,6 @@ let _vscode: VsCodeApi | null = null;
 let trajectoryPlaybackTimer: ReturnType<typeof setInterval> | null = null;
 let trajectoryFrameRequestPending = false;
 
-// Debounced version of requestTrajectoryFrame for slider input (16ms = 60fps)
-const debouncedRequestTrajectoryFrame = debounce(
-  function (frameIndex: number): void {
-    if (trajectoryFrameRequestPending) { return; }
-    trajectoryFrameRequestPending = true;
-    _vscode?.postMessage({ command: 'setTrajectoryFrame', frameIndex });
-  },
-  16
-);
-
 // ── Core logic ─────────────────────────────────────────────────────────────────
 
 export function updateUI(frameIndex: number, frameCount: number): void {
@@ -180,14 +170,18 @@ export function setup(vscode: VsCodeApi): void {
     });
   }
   if (speedSlider) {
-    speedSlider.addEventListener('input', (event: Event) => {
-      const target = event.target as HTMLInputElement;
-      const nextFps = Math.max(1, Math.min(30, Math.floor(Number(target.value) || 8)));
-      trajectoryStore.trajectoryPlaybackFps = nextFps;
+    const debouncedSpeedChange = debounce((fps: number) => {
+      trajectoryStore.trajectoryPlaybackFps = fps;
       if (trajectoryStore.trajectoryPlaying) {
         restartTrajectoryPlaybackTimer();
       }
       updateUI(trajectoryStore.trajectoryFrameIndex, trajectoryStore.trajectoryFrameCount);
+    }, 50);
+
+    speedSlider.addEventListener('input', (event: Event) => {
+      const target = event.target as HTMLInputElement;
+      const nextFps = Math.max(1, Math.min(30, Math.floor(Number(target.value) || 8)));
+      debouncedSpeedChange(nextFps);
     });
   }
 

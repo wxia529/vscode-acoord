@@ -4,6 +4,8 @@ import { Structure } from '../models/structure.js';
 import { FileManager } from '../io/fileManager.js';
 import { StructureDocumentManager } from '../providers/structureDocumentManager.js';
 import { TrajectoryManager } from '../providers/trajectoryManager.js';
+import { UndoManager } from '../providers/undoManager.js';
+import { RenderMessageBuilder } from '../renderers/renderMessageBuilder.js';
 
 export class DocumentService {
   async saveStructure(key: string, activeStructure: Structure, frames: Structure[]): Promise<void> {
@@ -151,8 +153,8 @@ export class DocumentService {
   async reloadStructure(
     key: string,
     traj: TrajectoryManager,
-    undoManager: any,
-    renderer: any
+    undoManager: UndoManager,
+    renderer: RenderMessageBuilder
   ): Promise<void> {
     try {
       const fileContent = await vscode.workspace.fs.readFile(vscode.Uri.file(key));

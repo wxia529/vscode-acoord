@@ -1,0 +1,23 @@
+&CONTROL
+  calculation = 'scf',
+/
+&SYSTEM
+  ibrav = 0,
+  nat = 3,
+  ntyp = 2,
+/
+&ELECTRONS
+/
+ATOMIC_SPECIES
+  O  15.999  O.pbe-n-kjpaw_psl.0.1.UPF
+  H   1.008  H.pbe-kjpaw_psl.0.1.UPF
+
+CELL_PARAMETERS angstrom
+  10.000000   0.000000   0.000000
+   0.000000  10.000000   0.000000
+   0.000000   0.000000  10.000000
+
+ATOMIC_POSITIONS angstrom
+  O   0.000000  0.000000  0.000000
+  H   0.757000  0.586000  0.000000
+  H  -0.757000  0.586000  0.000000

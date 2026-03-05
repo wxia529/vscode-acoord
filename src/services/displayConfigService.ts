@@ -1,9 +1,9 @@
 import * as vscode from 'vscode';
 import { ConfigManager } from '../config/configManager.js';
-import { DisplaySettings } from '../config/types.js';
-import type { WireDisplaySettings } from '../shared/protocol.js';
+import { DisplayConfig, DisplaySettings, ConfigMeta } from '../config/types.js';
+import type { WireDisplaySettings, ExtensionToWebviewMessage } from '../shared/protocol.js';
 
-export type PostMessageCallback = (message: any) => void;
+export type PostMessageCallback = (message: ExtensionToWebviewMessage) => void;
 export type SessionRef = { displaySettings?: DisplaySettings };
 
 export class DisplayConfigService {
@@ -17,11 +17,11 @@ export class DisplayConfigService {
     this.sessionRef = session;
   }
 
-  async listConfigs(): Promise<{ presets: any[]; user: any[] }> {
+  async listConfigs(): Promise<{ presets: ConfigMeta[]; user: ConfigMeta[] }> {
     return await this.configManager.listConfigs();
   }
 
-  async loadConfig(configId: string): Promise<any> {
+  async loadConfig(configId: string): Promise<DisplayConfig> {
     return await this.configManager.loadConfig(configId);
   }
 
@@ -30,7 +30,7 @@ export class DisplayConfigService {
     settings: DisplaySettings,
     description?: string,
     existingId?: string
-  ): Promise<any> {
+  ): Promise<DisplayConfig> {
     return await this.configManager.saveUserConfig(name, settings, description, existingId);
   }
 
@@ -48,8 +48,7 @@ export class DisplayConfigService {
 
   updateDisplaySettings(settings: WireDisplaySettings): void {
     if (this.sessionRef) {
-      // TODO: Phase 8 - properly consolidate DisplaySettings and WireDisplaySettings types
-      this.sessionRef.displaySettings = settings as unknown as DisplaySettings;
+      this.sessionRef.displaySettings = settings as DisplaySettings;
     }
   }
 
@@ -100,8 +99,7 @@ export class DisplayConfigService {
   ): Promise<boolean> {
     if (!this.postMessageCallback) { return false; }
     try {
-      // TODO: Phase 8 - properly consolidate DisplaySettings and WireDisplaySettings types
-      const config = await this.configManager.saveUserConfig(name, settings as unknown as DisplaySettings, description, existingId);
+      const config = await this.configManager.saveUserConfig(name, settings as DisplaySettings, description, existingId);
       this.postMessageCallback({
         command: 'displayConfigSaved',
         config: config
@@ -142,8 +140,7 @@ export class DisplayConfigService {
     try {
       const config = await this.configManager.saveUserConfig(
         name,
-        // TODO: Phase 8 - properly consolidate DisplaySettings and WireDisplaySettings types
-        displaySettings as unknown as DisplaySettings,
+        displaySettings as DisplaySettings,
         description || undefined
       );
       this.postMessageCallback({
@@ -262,7 +259,7 @@ export class DisplayConfigService {
   }
 
   // Legacy method for backward compatibility
-  async getCurrentDisplaySettingsFromSessions(sessions: Map<string, any>): Promise<DisplaySettings | null> {
+  async getCurrentDisplaySettingsFromSessions(sessions: Map<string, SessionRef>): Promise<DisplaySettings | null> {
     for (const session of sessions.values()) {
       if (session.displaySettings) {
         return session.displaySettings;

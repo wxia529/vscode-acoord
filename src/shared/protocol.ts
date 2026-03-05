@@ -72,16 +72,15 @@ export interface WireLightConfig {
  * Display settings as they appear on the wire.
  *
  * All fields are optional so that partial updates can be sent.
- * String union types (e.g. projectionMode) use plain `string` here to
- * avoid coupling the wire format to domain enums — each side narrows
- * as needed.
+ * This interface is the single source of truth for display settings;
+ * the extension-side DisplaySettings type is derived from this.
  */
 export interface WireDisplaySettings {
   showAxes?: boolean;
   backgroundColor?: string;
   unitCellColor?: string;
   unitCellThickness?: number;
-  unitCellLineStyle?: string;
+  unitCellLineStyle?: 'solid' | 'dashed';
   atomSizeUseDefaultSettings?: boolean;
   atomSizeGlobal?: number;
   atomSizeByElement?: Record<string, number>;
@@ -92,7 +91,7 @@ export interface WireDisplaySettings {
   bondThicknessScale?: number;
   viewZoom?: number;
   scaleAtomsWithLattice?: boolean;
-  projectionMode?: string;
+  projectionMode?: 'orthographic' | 'perspective';
   lightingEnabled?: boolean;
   ambientIntensity?: number;
   ambientColor?: string;

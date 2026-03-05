@@ -108,13 +108,13 @@ export class ConfigValidator {
   }
 
   normalizeSettings(settings: DisplaySettings): { settings: DisplaySettings; errors: string[]; warnings: string[]; changed: boolean } {
-    const input: Record<string, any> = settings && typeof settings === 'object' ? settings : {};
+    const input: Record<string, unknown> = settings && typeof settings === 'object' ? settings as Record<string, unknown> : {};
     const errors: string[] = [];
     const warnings: string[] = [];
     let changed = false;
 
     const normalizeNumber = (
-      value: any,
+      value: unknown,
       fallback: number,
       range: { min: number; max: number },
       label: string
@@ -132,7 +132,7 @@ export class ConfigValidator {
       return clamped;
     };
 
-    const normalizeBoolean = (value: any, fallback: boolean, label: string): boolean => {
+    const normalizeBoolean = (value: unknown, fallback: boolean, label: string): boolean => {
       if (typeof value !== 'boolean') {
         errors.push(`${label} must be a boolean`);
         changed = true;
@@ -141,7 +141,7 @@ export class ConfigValidator {
       return value;
     };
 
-    const normalizeColor = (value: any, fallback: string, label: string): string => {
+    const normalizeColor = (value: unknown, fallback: string, label: string): string => {
       if (typeof value !== 'string' || !ConfigValidator.colorPattern.test(value)) {
         errors.push(`${label} must be a hex color`);
         changed = true;
@@ -151,12 +151,12 @@ export class ConfigValidator {
     };
 
     const normalizeEnum = <T extends string>(
-      value: any,
+      value: unknown,
       allowed: T[],
       fallback: T,
       label: string
     ): T => {
-      if (!allowed.includes(value)) {
+      if (!allowed.includes(value as T)) {
         errors.push(`${label} must be one of ${allowed.join(', ')}`);
         changed = true;
         return fallback;
@@ -164,39 +164,40 @@ export class ConfigValidator {
       return value as T;
     };
 
-    const normalizeLight = (value: any, fallback: DisplaySettings['keyLight'], label: string) => {
+    const normalizeLight = (value: unknown, fallback: DisplaySettings['keyLight'], label: string) => {
       if (!value || typeof value !== 'object') {
         warnings.push(`${label} must be an object; using default.`);
         changed = true;
         return fallback;
       }
 
-      const position = value.position && typeof value.position === 'object'
-        ? value.position
-        : { x: value.x ?? fallback.x, y: value.y ?? fallback.y, z: value.z ?? fallback.z };
+      const v = value as Record<string, unknown>;
+      const position = v['position'] && typeof v['position'] === 'object'
+        ? v['position'] as Record<string, unknown>
+        : { x: v['x'] ?? fallback.x, y: v['y'] ?? fallback.y, z: v['z'] ?? fallback.z };
 
       return {
         intensity: normalizeNumber(
-          value.intensity,
+          v['intensity'],
           fallback.intensity,
           ConfigValidator.ranges.lightIntensity,
           `${label}.intensity`
         ),
-        color: normalizeColor(value.color, fallback.color, `${label}.color`),
+        color: normalizeColor(v['color'], fallback.color, `${label}.color`),
         x: normalizeNumber(
-          position.x,
+          position['x'],
           fallback.x,
           ConfigValidator.ranges.lightPosition,
           `${label}.x`
         ),
         y: normalizeNumber(
-          position.y,
+          position['y'],
           fallback.y,
           ConfigValidator.ranges.lightPosition,
           `${label}.y`
         ),
         z: normalizeNumber(
-          position.z,
+          position['z'],
           fallback.z,
           ConfigValidator.ranges.lightPosition,
           `${label}.z`
@@ -204,7 +205,7 @@ export class ConfigValidator {
       };
     };
 
-    const normalizeAtomSizeMap = (value: any, label: string, enforceElement: boolean) => {
+    const normalizeAtomSizeMap = (value: unknown, label: string, enforceElement: boolean) => {
       if (!value || typeof value !== 'object') {
         warnings.push(`${label} must be an object; using empty map.`);
         changed = true;
