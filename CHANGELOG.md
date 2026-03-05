@@ -4,8 +4,70 @@ All notable changes to this project will be documented in this file.
 
 ## 0.2.0
 
-- Major code refactoring for improved maintainability.
-- Added user configuration for Display settings.
+### Major Architecture Refactoring
+
+This release includes a complete architectural overhaul for improved maintainability, type safety, and testability. The changes span 32 commits since v0.1.11.
+
+#### Two-Process Architecture
+
+- **Separated Extension Host and Webview**: Implemented a strict two-process architecture with the extension host running in Node.js and the webview in a sandboxed browser environment.
+- **Protocol-First Design**: All messages between processes are defined in `src/shared/protocol.ts` with full TypeScript typing; no `any` types on message boundaries.
+- **Service Isolation**: Extracted domain logic into dedicated services:
+  - `AtomEditService` - atom manipulation (add, delete, move, copy, recolor)
+  - `BondService` - bond creation, deletion, and recalculation
+  - `SelectionService` - atom and bond selection state management
+  - `UnitCellService` - unit cell CRUD, supercell, and centering operations
+  - `DocumentService` - save, save-as, reload, and image export
+  - `DisplayConfigService` - display settings lifecycle
+- **Centralized Message Routing**: `MessageRouter` is the single dispatch point for all 37 webview-to-extension commands with typed handlers.
+
+#### Configuration System
+
+- **User Configuration Management**: Full configuration system with ConfigManager, ConfigStorage, and ConfigValidator.
+- **Display Settings Presets**: Built-in immutable presets (default, white) plus user-created custom configs.
+- **Import/Export**: Support for importing and exporting display configuration files.
+- **Schema Validation**: JSON schema validation for all user-created configurations.
+- **Versioned Migrations**: Automatic schema upgrades when stored config versions are outdated.
+
+#### Webview Modernization
+
+- **JavaScript to TypeScript Migration**: Complete rewrite of webview code from JS to TS with strict type checking.
+- **Modular Architecture**: Split monolithic app.js into focused modules:
+  - `app.ts` - bootstrap and message dispatch
+  - `renderer.ts` - Three.js scene management
+  - `state.ts` - reactive stores for UI state
+  - `interaction.ts` - mouse/keyboard/pointer event handling
+  - `appEdit.ts`, `appLattice.ts`, `appView.ts`, `appTools.ts`, `appTrajectory.ts` - UI panels
+- **Resource Management**: Proper disposal of all event listeners, `requestAnimationFrame` IDs, Three.js geometries, materials, and textures.
+- **Instanced Rendering**: Optimized rendering using `THREE.InstancedMesh` for atoms and bonds.
+
+#### Type Safety & Code Quality
+
+- **Strict TypeScript**: Enabled strict mode with `noImplicitAny`, `strictNullChecks`, `noUnusedLocals`, `noUnusedParameters`.
+- **Exhaustive Pattern Matching**: Message dispatch uses `_exhaustive: never` pattern to catch missing cases at compile time.
+- **Protocol Types**: All wire-format types (WireAtom, WireBond, WireDisplaySettings, etc.) are centrally defined.
+
+#### Testing Infrastructure
+
+- **Unit Test Framework**: Added Mocha-based unit test framework using `.mts` (ES Module TypeScript) files.
+- **Parser Tests**: Round-trip tests for all 11 supported file formats (XYZ, CIF, POSCAR, XDATCAR, OUTCAR, QE, PDB, GJF, ORCA, STRU).
+- **Service Tests**: Unit tests for AtomEditService, BondService, SelectionService, MessageRouter, and UndoManager.
+- **Model Tests**: Unit tests for Structure and UnitCell models.
+- **Test Fixtures**: Added representative test files for each supported format.
+
+#### Documentation
+
+- **DEVELOPMENT.md**: Comprehensive 1200+ line developer guide documenting the actual architecture, design principles, directory structure, and common pitfalls.
+- **CURRENT_ISSUES.md**: Tracking document for known bugs and architectural issues.
+
+### Performance Improvements
+
+- **Drag Preview Optimization**: Local preview updates during atom dragging without round-tripping to the extension host.
+- **Debounced Controls**: Trajectory slider and display settings sliders are debounced to avoid flooding the extension host.
+- **Optimized Bond Detection**: Spatial hash-based bond detection for O(n) amortized performance.
+- **Display Settings Optimization**: Improved performance of display settings updates.
+
+### Bug Fixes
 
 ## 0.1.11
 
