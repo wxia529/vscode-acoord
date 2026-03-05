@@ -1,7 +1,13 @@
 import { expect } from 'chai';
+import { readFileSync } from 'fs';
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
 import { Structure } from '../../../models/structure.js';
 import { UnitCell } from '../../../models/unitCell.js';
 import { OUTCARParser } from '../../../io/parsers/outcarParser.js';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const FIXTURES = join(__dirname, '../../fixtures');
 
 describe('OUTCAR Parser', () => {
   const parser = new OUTCARParser();
@@ -42,5 +48,31 @@ describe('OUTCAR Parser', () => {
   it('should throw on serialize (read-only format)', () => {
     const structure = parser.parse(OUTCAR_CONTENT);
     expect(() => parser.serialize(structure)).to.throw(/not supported/i);
+  });
+
+  describe('fixture file round-trip (water.outcar)', () => {
+    const fixtureContent = readFileSync(join(FIXTURES, 'water.outcar'), 'utf-8');
+
+    it('should parse correct atom count and elements', () => {
+      const structure = parser.parse(fixtureContent);
+      expect(structure.atoms).to.have.lengthOf(3);
+      const elements = structure.atoms.map(a => a.element);
+      expect(elements).to.include('O');
+      expect(elements).to.include('H');
+    });
+
+    it('should parse lattice vectors', () => {
+      const structure = parser.parse(fixtureContent);
+      expect(structure.isCrystal).to.be.true;
+      expect(structure.unitCell).to.be.instanceOf(UnitCell);
+      expect(structure.unitCell!.a).to.be.closeTo(10.0, 1e-3);
+    });
+
+    it('should parse positions within tolerance', () => {
+      const structure = parser.parse(fixtureContent);
+      const o = structure.atoms.find(a => a.element === 'O')!;
+      expect(o.x).to.be.closeTo(0.0, 1e-3);
+      expect(o.y).to.be.closeTo(0.0, 1e-3);
+    });
   });
 });

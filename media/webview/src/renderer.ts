@@ -594,21 +594,26 @@ function renderStructure(data: Structure, uiHooks?: Partial<UiHooks>, options?: 
       }
     }
 
-    // Non-selectable atoms (e.g. ghost/extra atoms) — kept as individual meshes
-    // since they are typically few and don't need selection/drag support.
-    for (const atom of nonSelectableAtoms) {
-      const configuredRadius = getConfiguredAtomRadius(atom, baseAtomsById);
-      const sphereRadius = Math.max(configuredRadius * sizeScale, 0.12);
-      const geometry = new THREE.SphereGeometry(sphereRadius, 16, 12);
-      const material = new THREE.MeshPhongMaterial({
-        color: new THREE.Color(atom.color),
-        specular: new THREE.Color(0x333333),
-        shininess: surfaceShininess,
-      });
-      const mesh = new THREE.Mesh(geometry, material);
-      mesh.position.set(atom.position[0] * scale, atom.position[1] * scale, atom.position[2] * scale);
-      rendererState.scene!.add(mesh);
-      rendererState.extraMeshes.push(mesh);
+    // Non-selectable atoms (e.g. ghost/extra atoms) — individual meshes since
+    // they don't need selection/drag support.  A single shared unit-sphere
+    // geometry (radius = 1) is reused for every atom; each mesh is scaled to
+    // the desired radius.  This satisfies §6.1: no separate geometry per atom.
+    if (nonSelectableAtoms.length > 0) {
+      const sharedGhostGeo = new THREE.SphereGeometry(1, 16, 12);
+      for (const atom of nonSelectableAtoms) {
+        const configuredRadius = getConfiguredAtomRadius(atom, baseAtomsById);
+        const sphereRadius = Math.max(configuredRadius * sizeScale, 0.12);
+        const material = new THREE.MeshPhongMaterial({
+          color: new THREE.Color(atom.color),
+          specular: new THREE.Color(0x333333),
+          shininess: surfaceShininess,
+        });
+        const mesh = new THREE.Mesh(sharedGhostGeo, material);
+        mesh.scale.set(sphereRadius, sphereRadius, sphereRadius);
+        mesh.position.set(atom.position[0] * scale, atom.position[1] * scale, atom.position[2] * scale);
+        rendererState.scene!.add(mesh);
+        rendererState.extraMeshes.push(mesh);
+      }
     }
   }
 

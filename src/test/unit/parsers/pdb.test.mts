@@ -1,8 +1,14 @@
 import { expect } from 'chai';
+import { readFileSync } from 'fs';
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
 import { Structure } from '../../../models/structure.js';
 import { UnitCell } from '../../../models/unitCell.js';
 import { Atom } from '../../../models/atom.js';
 import { PDBParser } from '../../../io/parsers/pdbParser.js';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const FIXTURES = join(__dirname, '../../fixtures');
 
 describe('PDB Parser', () => {
   const parser = new PDBParser();
@@ -84,6 +90,44 @@ END`;
       const atomLine = serialized.split('\n').find(l => l.startsWith('ATOM'));
       expect(atomLine).to.not.be.undefined;
       expect(atomLine!.length).to.equal(80);
+    });
+  });
+
+  describe('fixture file round-trip (water.pdb)', () => {
+    const fixtureContent = readFileSync(join(FIXTURES, 'water.pdb'), 'utf-8');
+
+    it('should parse correct atom count and elements', () => {
+      const structure = parser.parse(fixtureContent);
+      expect(structure.atoms).to.have.lengthOf(3);
+      expect(structure.atoms[0].element).to.equal('O');
+      expect(structure.atoms[1].element).to.equal('H');
+      expect(structure.atoms[2].element).to.equal('H');
+    });
+
+    it('should parse unit cell from CRYST1', () => {
+      const structure = parser.parse(fixtureContent);
+      expect(structure.isCrystal).to.be.true;
+      expect(structure.unitCell).to.be.instanceOf(UnitCell);
+      expect(structure.unitCell!.a).to.be.closeTo(10.0, 1e-3);
+      expect(structure.unitCell!.alpha).to.be.closeTo(90.0, 1e-3);
+    });
+
+    it('should parse positions within tolerance', () => {
+      const structure = parser.parse(fixtureContent);
+      expect(structure.atoms[0].x).to.be.closeTo(0.0, 1e-3);
+      expect(structure.atoms[1].x).to.be.closeTo(0.757, 1e-3);
+      expect(structure.atoms[2].x).to.be.closeTo(-0.757, 1e-3);
+    });
+
+    it('should serialize → re-parse to equivalent structure', () => {
+      const original = parser.parse(fixtureContent);
+      const serialized = parser.serialize(original);
+      const reparsed = parser.parse(serialized);
+
+      expect(reparsed.atoms).to.have.lengthOf(original.atoms.length);
+      expect(reparsed.atoms[0].element).to.equal(original.atoms[0].element);
+      expect(reparsed.atoms[0].x).to.be.closeTo(original.atoms[0].x, 1e-2);
+      expect(reparsed.unitCell!.a).to.be.closeTo(original.unitCell!.a, 1e-3);
     });
   });
 });
