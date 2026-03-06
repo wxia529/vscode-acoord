@@ -1,7 +1,7 @@
 import { expect } from 'chai';
 import { Structure } from '../../../models/structure.js';
 import { Atom } from '../../../models/atom.js';
-import { ClipboardManager } from '../../../services/clipboardManager.js';
+import { ClipboardService } from '../../../services/clipboardService.js';
 
 function makeStructure(): Structure {
   const s = new Structure('test');
@@ -11,11 +11,11 @@ function makeStructure(): Structure {
   return s;
 }
 
-describe('ClipboardManager', () => {
+describe('ClipboardService', () => {
   describe('copy', () => {
     it('should copy selected atoms to clipboard', () => {
       const structure = makeStructure();
-      const clipboard = new ClipboardManager();
+      const clipboard = new ClipboardService();
       const atomIds = [structure.atoms[0].id, structure.atoms[1].id];
       
       clipboard.copy(atomIds, structure, 'session_1', '/test/file.xyz');
@@ -27,7 +27,7 @@ describe('ClipboardManager', () => {
 
     it('should handle empty atomIds array', () => {
       const structure = makeStructure();
-      const clipboard = new ClipboardManager();
+      const clipboard = new ClipboardService();
       
       clipboard.copy([], structure, 'session_1', '/test/file.xyz');
       
@@ -36,7 +36,7 @@ describe('ClipboardManager', () => {
 
     it('should ignore invalid atom IDs', () => {
       const structure = makeStructure();
-      const clipboard = new ClipboardManager();
+      const clipboard = new ClipboardService();
       
       clipboard.copy(['invalid_id'], structure, 'session_1', '/test/file.xyz');
       
@@ -47,7 +47,7 @@ describe('ClipboardManager', () => {
   describe('paste', () => {
     it('should paste atoms with default offset', () => {
       const structure = makeStructure();
-      const clipboard = new ClipboardManager();
+      const clipboard = new ClipboardService();
       const atomIds = [structure.atoms[0].id];
       
       clipboard.copy(atomIds, structure, 'session_1', '/test/file.xyz');
@@ -65,7 +65,7 @@ describe('ClipboardManager', () => {
 
     it('should paste atoms with custom offset', () => {
       const structure = makeStructure();
-      const clipboard = new ClipboardManager();
+      const clipboard = new ClipboardService();
       
       clipboard.copy([structure.atoms[0].id], structure, 'session_1', '/test/file.xyz');
       
@@ -79,14 +79,14 @@ describe('ClipboardManager', () => {
 
     it('should throw error when clipboard is empty', () => {
       const structure = makeStructure();
-      const clipboard = new ClipboardManager();
+      const clipboard = new ClipboardService();
       
       expect(() => clipboard.paste(structure)).to.throw('Clipboard is empty');
     });
 
     it('should preserve atom element and color', () => {
       const structure = makeStructure();
-      const clipboard = new ClipboardManager();
+      const clipboard = new ClipboardService();
       
       clipboard.copy([structure.atoms[1].id], structure, 'session_1', '/test/file.xyz');
       
@@ -102,7 +102,7 @@ describe('ClipboardManager', () => {
     it('should allow paste from different session', () => {
       const structure1 = makeStructure();
       const structure2 = new Structure('test2');
-      const clipboard = new ClipboardManager();
+      const clipboard = new ClipboardService();
       
       clipboard.copy([structure1.atoms[0].id], structure1, 'session_1', '/test/file1.xyz');
       
@@ -116,7 +116,7 @@ describe('ClipboardManager', () => {
   describe('clear', () => {
     it('should clear clipboard content', () => {
       const structure = makeStructure();
-      const clipboard = new ClipboardManager();
+      const clipboard = new ClipboardService();
       
       clipboard.copy([structure.atoms[0].id], structure, 'session_1', '/test/file.xyz');
       expect(clipboard.hasContent()).to.be.true;

@@ -8,7 +8,7 @@ import { AtomEditService } from './atomEditService.js';
 import { UnitCellService } from './unitCellService.js';
 import { DocumentService } from './documentService.js';
 import { DisplayConfigService } from './displayConfigService.js';
-import { ClipboardManager } from './clipboardManager.js';
+import { ClipboardService } from './clipboardService.js';
 import type { WebviewToExtensionMessage, MessageByCommand } from '../shared/protocol.js';
 
 type AnyHandler = (message: unknown) => Promise<boolean> | boolean;
@@ -33,7 +33,7 @@ export class MessageRouter {
     private unitCellService: UnitCellService,
     private documentService: DocumentService,
     private displayConfigService: DisplayConfigService,
-    private clipboardManager: ClipboardManager,
+    private clipboardService: ClipboardService,
     private sessionKey: string,
     private documentUri: string,
     private webviewPanel: vscode.WebviewPanel,
@@ -298,7 +298,7 @@ export class MessageRouter {
   private registerDocumentCommands(): void {
     this.registerTyped('saveStructure', async () => {
       await this.documentService.saveStructure(
-        this.sessionKey,
+        this.documentUri,
         this.trajectoryManager.activeStructure,
         this.trajectoryManager.frames
       );
@@ -307,7 +307,7 @@ export class MessageRouter {
 
     this.registerTyped('saveStructureAs', async () => {
       await this.documentService.saveStructureAs(
-        this.sessionKey,
+        this.documentUri,
         this.trajectoryManager.activeStructure,
         this.trajectoryManager.frames,
         this.trajectoryManager
@@ -326,13 +326,13 @@ export class MessageRouter {
     });
 
     this.registerTyped('openSource', async () => {
-      await this.documentService.openSource(this.sessionKey);
+      await this.documentService.openSource(this.documentUri);
       return true;
     });
 
     this.registerTyped('reloadStructure', async () => {
       await this.documentService.reloadStructure(
-        this.sessionKey,
+        this.documentUri,
         this.trajectoryManager,
         this.undoManager,
         this.renderer
@@ -394,7 +394,7 @@ export class MessageRouter {
   private registerClipboardCommands(): void {
     this.registerTyped('copySelection', (message) => {
       const structure = this.trajectoryManager.activeStructure;
-      this.clipboardManager.copy(message.atomIds, structure, this.sessionKey, this.documentUri);
+      this.clipboardService.copy(message.atomIds, structure, this.sessionKey, this.documentUri);
       return true;
     });
 
@@ -402,7 +402,7 @@ export class MessageRouter {
       const structure = this.trajectoryManager.activeStructure;
       
       this.undoManager.push(structure);
-      const newAtomIds = this.clipboardManager.paste(structure, message.offset);
+      const newAtomIds = this.clipboardService.paste(structure, message.offset);
       
       this.selectionService.setSelection(newAtomIds);
       this.renderer.setStructure(structure);

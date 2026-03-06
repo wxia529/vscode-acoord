@@ -14,7 +14,7 @@ import { UnitCellService } from '../services/unitCellService.js';
 import { MessageRouter } from '../services/messageRouter.js';
 import { DisplayConfigService } from '../services/displayConfigService.js';
 import { DocumentService } from '../services/documentService.js';
-import { ClipboardManager } from '../services/clipboardManager.js';
+import { ClipboardService } from '../services/clipboardService.js';
 
 import type { WebviewToExtensionMessage } from '../shared/protocol.js';
 
@@ -45,7 +45,6 @@ class EditorSession {
     readonly unitCellService: UnitCellService,
     readonly documentService: DocumentService,
     readonly displayConfigService: DisplayConfigService,
-    readonly clipboardManager: ClipboardManager,
     displaySettings?: DisplaySettings
   ) {
     this.displaySettings = displaySettings;
@@ -62,11 +61,14 @@ export class StructureEditorProvider implements vscode.CustomEditorProvider<Stru
   readonly onDidChangeCustomDocument = this._onDidChangeCustomDocument.event;
   private sessions = new Map<string, EditorSession>();
   private nextSessionId = 0;
+  private readonly clipboardService: ClipboardService;
 
   constructor(
     private context: vscode.ExtensionContext,
     private configManager: ConfigManager
-  ) {}
+  ) {
+    this.clipboardService = new ClipboardService();
+  }
 
   async openCustomDocument(
     uri: vscode.Uri,
@@ -126,7 +128,6 @@ export class StructureEditorProvider implements vscode.CustomEditorProvider<Stru
     const displayConfigService = new DisplayConfigService(this.configManager);
     const defaultConfig = this.configManager.getCurrentConfig();
     const displaySettings = defaultConfig?.settings;
-    const clipboardManager = new ClipboardManager();
 
     // Create session without messageRouter first to avoid circular dependency
     const session = new EditorSession(
@@ -142,7 +143,6 @@ export class StructureEditorProvider implements vscode.CustomEditorProvider<Stru
       unitCellService,
       documentService,
       displayConfigService,
-      clipboardManager,
       displaySettings
     );
 
@@ -163,7 +163,7 @@ export class StructureEditorProvider implements vscode.CustomEditorProvider<Stru
       unitCellService,
       documentService,
       displayConfigService,
-      session.clipboardManager,
+      this.clipboardService,
       key,
       document.uri.fsPath,
       webviewPanel,

@@ -4,10 +4,10 @@ import { Structure } from '../models/structure.js';
 import { ELEMENT_DATA } from '../utils/elementData.js';
 
 /**
- * Global clipboard manager shared across all editor sessions.
+ * Global clipboard service shared across all editor sessions.
  * Enables cross-window copy/paste operations.
  */
-export class ClipboardManager {
+export class ClipboardService {
   private clipboard: WireClipboardData | null = null;
   private readonly MAX_ATOMS = 10000;
 
