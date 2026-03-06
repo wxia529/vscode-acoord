@@ -3,6 +3,7 @@ import { ConfigStorage } from './configStorage.js';
 import { MigrationManager } from './migrations/index.js';
 import { ConfigValidator } from './configValidator.js';
 import { BUILTIN_PRESETS } from './presets/index.js';
+import { ColorSchemeManager } from './colorSchemeManager.js';
 import {
   DisplayConfig,
   DisplaySettings,
@@ -18,6 +19,7 @@ export class ConfigManager {
   private storage: ConfigStorage;
   private migrationManager: MigrationManager;
   private validator: ConfigValidator;
+  private colorSchemeManager: ColorSchemeManager;
   private currentConfig: DisplayConfig | null = null;
   private _onConfigChange = new vscode.EventEmitter<ConfigChangeEvent>();
   
@@ -27,6 +29,7 @@ export class ConfigManager {
     this.storage = new ConfigStorage(context);
     this.migrationManager = new MigrationManager();
     this.validator = new ConfigValidator();
+    this.colorSchemeManager = new ColorSchemeManager(context);
   }
 
   /**
@@ -34,6 +37,7 @@ export class ConfigManager {
    */
   async initialize(): Promise<void> {
     await this.storage.initialize();
+    await this.colorSchemeManager.initialize();
     await this.initializePresets();
     await this.loadDefaultConfig();
   }
@@ -224,8 +228,23 @@ export class ConfigManager {
   /**
    * Export configurations to file
    */
-  async exportConfigs(configIds: string[]): Promise<void> {
+  async exportConfigs(configIds: string[], includeColorSchemes: boolean = true): Promise<void> {
     const packageData = await this.storage.exportConfigs(configIds);
+    
+    if (includeColorSchemes) {
+      const schemeIds = new Set<string>();
+      for (const configId of configIds) {
+        const config = await this.storage.loadConfig(configId);
+        if (config?.settings.atomColorSchemeId) {
+          schemeIds.add(config.settings.atomColorSchemeId);
+        }
+      }
+      
+      if (schemeIds.size > 0) {
+        const colorSchemePackage = await this.colorSchemeManager.exportSchemes(Array.from(schemeIds));
+        packageData.colorSchemes = colorSchemePackage.colorSchemes;
+      }
+    }
     
     const uri = await vscode.window.showSaveDialog({
       defaultUri: vscode.Uri.file(`acoord-configs-${new Date().toISOString().split('T')[0]}.json`),
@@ -257,8 +276,28 @@ export class ConfigManager {
     const content = await vscode.workspace.fs.readFile(uris[0]);
     const packageData = JSON.parse(content.toString());
     
+    // First import color schemes if present
+    const schemeIdMapping: Record<string, string> = {};
+    if (packageData.colorSchemes && Array.isArray(packageData.colorSchemes)) {
+      const importResult = await this.colorSchemeManager.importSchemes({
+        version: packageData.version,
+        exportedAt: packageData.exportedAt,
+        exportedFrom: packageData.exportedFrom,
+        colorSchemes: packageData.colorSchemes
+      });
+      
+      for (const [oldId, newId] of Object.entries(importResult.idMapping)) {
+        schemeIdMapping[oldId] = newId;
+      }
+    }
+    
     const importedResult = await this.storage.importConfigs(packageData, async (config) => {
       let processedConfig = config;
+      
+      // Update color scheme reference if it was remapped
+      if (config.settings.atomColorSchemeId && schemeIdMapping[config.settings.atomColorSchemeId]) {
+        config.settings.atomColorSchemeId = schemeIdMapping[config.settings.atomColorSchemeId];
+      }
       
       if (this.migrationManager.needsMigration(config)) {
         try {
@@ -306,6 +345,13 @@ export class ConfigManager {
    */
   getCurrentConfig(): DisplayConfig | null {
     return this.currentConfig;
+  }
+
+  /**
+   * Get the color scheme manager
+   */
+  getColorSchemeManager(): ColorSchemeManager {
+    return this.colorSchemeManager;
   }
 
   /**

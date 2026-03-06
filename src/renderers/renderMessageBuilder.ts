@@ -7,6 +7,9 @@ import type {
   WireUnitCellParams,
   RenderMessage,
 } from '../shared/protocol.js';
+import { ColorScheme } from '../shared/protocol.js';
+import { getColorForElement } from '../config/colorSchemeUtils.js';
+import { DisplaySettings } from '../config/types.js';
 
 /**
  * Interface for renderer state
@@ -22,13 +25,19 @@ export interface RendererState {
   trajectoryFrameCount: number;
 }
 
+export interface RenderMessageBuilderOptions {
+  displaySettings?: DisplaySettings;
+  colorScheme?: ColorScheme | null;
+}
+
 /**
  * Builds render message data for webview visualization
  */
 export class RenderMessageBuilder {
   private state: RendererState;
+  private options: RenderMessageBuilderOptions;
 
-  constructor(structure: Structure) {
+  constructor(structure: Structure, options?: RenderMessageBuilderOptions) {
     this.state = {
       structure,
       showUnitCell: !!structure.unitCell,
@@ -38,6 +47,14 @@ export class RenderMessageBuilder {
       trajectoryFrameIndex: 0,
       trajectoryFrameCount: 1,
     };
+    this.options = options || {};
+  }
+
+  /**
+   * Update options
+   */
+  setOptions(options: RenderMessageBuilderOptions): void {
+    this.options = { ...this.options, ...options };
   }
 
   /**
@@ -154,18 +171,24 @@ export class RenderMessageBuilder {
    * Generate atom geometry data for webview
    */
   private getAtomGeometry(): WireAtom[] {
+    const settings = this.options.displaySettings;
+    const colorScheme = this.options.colorScheme || null;
+    
     return this.state.structure.atoms.map((atom) => {
       const symbol = parseElement(atom.element) || atom.element;
       const info = ELEMENT_DATA[symbol];
       const baseRadius = info?.covalentRadius || 0.3;
       const radius = Math.max(baseRadius * 0.35, 0.1);
+      const color = settings 
+        ? getColorForElement(atom, symbol, settings, colorScheme)
+        : (atom.color || info?.color || '#C0C0C0');
 
       return {
         id: atom.id,
         element: symbol,
         position: [atom.x, atom.y, atom.z] as [number, number, number],
         radius: radius,
-        color: atom.color || info?.color || '#C0C0C0',
+        color: color,
         selected: atom.selected,
       };
     });
@@ -181,6 +204,8 @@ export class RenderMessageBuilder {
 
     const structureBonds = this.state.structure.getBonds();
     const wireBonds: WireBond[] = [];
+    const settings = this.options.displaySettings;
+    const colorScheme = this.options.colorScheme || null;
 
     for (const bondInfo of structureBonds) {
       const atom1 = this.state.structure.getAtom(bondInfo.atomId1);
@@ -192,8 +217,13 @@ export class RenderMessageBuilder {
 
       const symbol1 = parseElement(atom1.element) || atom1.element;
       const symbol2 = parseElement(atom2.element) || atom2.element;
-      const info1 = ELEMENT_DATA[symbol1];
-      const info2 = ELEMENT_DATA[symbol2];
+      
+      const color1 = settings 
+        ? getColorForElement(atom1, symbol1, settings, colorScheme)
+        : (atom1.color || ELEMENT_DATA[symbol1]?.color || '#C0C0C0');
+      const color2 = settings
+        ? getColorForElement(atom2, symbol2, settings, colorScheme)
+        : (atom2.color || ELEMENT_DATA[symbol2]?.color || '#C0C0C0');
 
       wireBonds.push({
         key: Structure.bondKey(atom1.id, atom2.id),
@@ -203,8 +233,8 @@ export class RenderMessageBuilder {
         end: [atom2.x, atom2.y, atom2.z] as [number, number, number],
         radius: 0.04,
         color: '#C0C0C0',
-        color1: atom1.color || info1?.color || '#C0C0C0',
-        color2: atom2.color || info2?.color || '#C0C0C0',
+        color1: color1,
+        color2: color2,
         selected: this.state.selectedBondKeys.includes(Structure.bondKey(atom1.id, atom2.id)),
       });
     }
@@ -219,6 +249,9 @@ export class RenderMessageBuilder {
       return [];
     }
 
+    const settings = this.options.displaySettings;
+    const colorScheme = this.options.colorScheme || null;
+
     // Use optimized spatial hash implementation from Structure
     const periodicBonds = structure.getPeriodicBonds();
     const bonds: WireBond[] = [];
@@ -230,8 +263,6 @@ export class RenderMessageBuilder {
 
       const symbolA = parseElement(atom1.element) || atom1.element;
       const symbolB = parseElement(atom2.element) || atom2.element;
-      const infoA = ELEMENT_DATA[symbolA];
-      const infoB = ELEMENT_DATA[symbolB];
 
       // Calculate end position based on periodic image
       let endPos: [number, number, number];
@@ -247,8 +278,12 @@ export class RenderMessageBuilder {
 
       const bondKey = Structure.bondKey(bond.atomId1, bond.atomId2);
       const isSelected = this.state.selectedBondKeys.includes(bondKey);
-      const colorA = atom1.color || infoA?.color || '#C0C0C0';
-      const colorB = atom2.color || infoB?.color || '#C0C0C0';
+      const colorA = settings
+        ? getColorForElement(atom1, symbolA, settings, colorScheme)
+        : (atom1.color || ELEMENT_DATA[symbolA]?.color || '#C0C0C0');
+      const colorB = settings
+        ? getColorForElement(atom2, symbolB, settings, colorScheme)
+        : (atom2.color || ELEMENT_DATA[symbolB]?.color || '#C0C0C0');
 
       const isCrossBoundary = bond.image && (bond.image[0] !== 0 || bond.image[1] !== 0 || bond.image[2] !== 0);
       if (isCrossBoundary) {

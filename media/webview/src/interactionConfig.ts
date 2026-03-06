@@ -1,5 +1,6 @@
-import { configStore, extractDisplaySettings } from './state';
+import { configStore, colorSchemeStore, displayStore, extractDisplaySettings } from './state';
 import * as configHandler from './configHandler';
+import * as colorSchemeHandler from './colorSchemeHandler';
 import type { VsCodeApi } from './types';
 
 let _vscode: VsCodeApi | null = null;
@@ -71,6 +72,68 @@ export function init(): void {
         command: 'confirmDeleteDisplayConfig',
         configId,
       });
+    });
+  }
+
+  // Color scheme selector
+  const colorSchemeSelect = document.getElementById('color-scheme-select') as HTMLSelectElement | null;
+  const btnRefreshSchemes = document.getElementById('btn-refresh-schemes') as HTMLButtonElement | null;
+  const btnSaveScheme = document.getElementById('btn-save-scheme') as HTMLButtonElement | null;
+  const btnExportScheme = document.getElementById('btn-export-scheme') as HTMLButtonElement | null;
+  const btnImportScheme = document.getElementById('btn-import-scheme') as HTMLButtonElement | null;
+  const btnDeleteScheme = document.getElementById('btn-delete-scheme') as HTMLButtonElement | null;
+
+  if (colorSchemeSelect) {
+    colorSchemeSelect.addEventListener('change', () => {
+      const schemeId = colorSchemeSelect.value;
+      if (schemeId) {
+        colorSchemeHandler.loadScheme(schemeId);
+      }
+    });
+  }
+
+  if (btnRefreshSchemes) {
+    btnRefreshSchemes.addEventListener('click', () => {
+      colorSchemeHandler.requestSchemeList();
+    });
+  }
+
+  if (btnSaveScheme) {
+    btnSaveScheme.addEventListener('click', () => {
+      const name = window.prompt('Enter color scheme name:');
+      if (!name) return;
+      const colors: Record<string, string> = { ...displayStore.atomColorByElement };
+      if (Object.keys(colors).length === 0) {
+        window.alert('No custom atom colors set. Set some atom colors first using the Atom Color picker.');
+        return;
+      }
+      colorSchemeHandler.saveScheme(name, colors);
+    });
+  }
+
+  if (btnExportScheme) {
+    btnExportScheme.addEventListener('click', () => {
+      const schemeId = colorSchemeSelect ? colorSchemeSelect.value : null;
+      if (!schemeId) {
+        window.alert('Please select a color scheme to export.');
+        return;
+      }
+      colorSchemeHandler.exportScheme(schemeId);
+    });
+  }
+
+  if (btnImportScheme) {
+    btnImportScheme.addEventListener('click', () => {
+      colorSchemeHandler.importScheme();
+    });
+  }
+
+  if (btnDeleteScheme) {
+    btnDeleteScheme.addEventListener('click', () => {
+      const schemeId = colorSchemeSelect ? colorSchemeSelect.value : null;
+      if (!schemeId) { return; }
+      if (!window.confirm('Are you sure you want to delete this color scheme?')) { return; }
+      colorSchemeHandler.deleteScheme(schemeId);
     });
   }
 

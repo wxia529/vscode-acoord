@@ -1,9 +1,9 @@
 import { DisplayConfig } from '../types.js';
 
-export const WHITE_PRESET: DisplayConfig = {
-  id: 'preset-white',
-  name: 'White',
-  description: 'Bright background optimized for light environments',
+export const WHITE2_PRESET: DisplayConfig = {
+  id: 'preset-white2',
+  name: 'White 2',
+  description: 'Bright background with bright atom colors and black lattice',
   isPreset: true,
   isReadOnly: true,
   version: 1,
@@ -13,7 +13,7 @@ export const WHITE_PRESET: DisplayConfig = {
   settings: {
     showAxes: true,
     backgroundColor: '#ffffff',
-    unitCellColor: '#FF6600',
+    unitCellColor: '#000000',
     unitCellThickness: 1,
     unitCellLineStyle: 'solid',
     atomSizeUseDefaultSettings: false,
@@ -52,7 +52,7 @@ export const WHITE_PRESET: DisplayConfig = {
       y: 5,
       z: -10
     },
-    atomColorSchemeId: 'preset-jmol-default',
+    atomColorSchemeId: 'preset-bright',
     atomColorByElement: {}
   }
 };

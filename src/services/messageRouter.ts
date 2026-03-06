@@ -9,7 +9,8 @@ import { UnitCellService } from './unitCellService.js';
 import { DocumentService } from './documentService.js';
 import { DisplayConfigService } from './displayConfigService.js';
 import { ClipboardService } from './clipboardService.js';
-import type { WebviewToExtensionMessage, MessageByCommand } from '../shared/protocol.js';
+import { ColorSchemeManager } from '../config/colorSchemeManager.js';
+import type { WebviewToExtensionMessage, MessageByCommand, WireColorScheme } from '../shared/protocol.js';
 
 type AnyHandler = (message: unknown) => Promise<boolean> | boolean;
 
@@ -34,6 +35,7 @@ export class MessageRouter {
     private documentService: DocumentService,
     private displayConfigService: DisplayConfigService,
     private clipboardService: ClipboardService,
+    private colorSchemeManager: ColorSchemeManager,
     private sessionKey: string,
     private documentUri: string,
     private webviewPanel: vscode.WebviewPanel,
@@ -47,6 +49,7 @@ export class MessageRouter {
     this.registerUnitCellCommands();
     this.registerDocumentCommands();
     this.registerDisplayConfigCommands();
+    this.registerColorSchemeCommands();
     this.registerClipboardCommands();
   }
 
@@ -349,7 +352,19 @@ export class MessageRouter {
     });
 
     this.registerTyped('loadDisplayConfig', async (message) => {
-      return await this.displayConfigService.handleLoadDisplayConfig(message.configId);
+      const result = await this.displayConfigService.handleLoadDisplayConfig(message.configId);
+      // Sync the renderer's color scheme so subsequent renders use the new scheme.
+      // handleLoadDisplayConfig posts 'colorSchemeLoaded' to the webview but does
+      // not update the RenderMessageBuilder — mirror what loadColorScheme does.
+      const settings = this.displayConfigService.getSessionDisplaySettings();
+      if (settings?.atomColorSchemeId) {
+        const scheme = await this.colorSchemeManager.getScheme(settings.atomColorSchemeId);
+        if (scheme) {
+          this.renderer.setOptions({ colorScheme: scheme });
+        }
+      }
+      this.onRenderRequired();
+      return result;
     });
 
     this.registerTyped('promptSaveDisplayConfig', async (message) => {
@@ -388,6 +403,154 @@ export class MessageRouter {
 
     this.registerTyped('deleteDisplayConfig', async (message) => {
       return await this.displayConfigService.handleDeleteDisplayConfig(message.configId);
+    });
+  }
+
+  private registerColorSchemeCommands(): void {
+    this.registerTyped('getColorSchemes', async () => {
+      const schemes = await this.colorSchemeManager.listSchemes();
+      const presets = schemes.filter((s) => s.isPreset);
+      const user = schemes.filter((s) => !s.isPreset);
+      await this.webviewPanel.webview.postMessage({
+        command: 'colorSchemesLoaded',
+        presets,
+        user,
+      });
+      return true;
+    });
+
+    this.registerTyped('loadColorScheme', async (message) => {
+      try {
+        const scheme = await this.colorSchemeManager.getScheme(message.schemeId);
+        if (scheme) {
+          this.renderer.setOptions({ colorScheme: scheme });
+          // Update session displaySettings to reflect the new color scheme.
+          // Clear atomColorByElement so stale per-element overrides from a
+          // previous scheme don't shadow the new scheme's colors in the
+          // getColorForElement() fallback chain.
+          const current = this.displayConfigService.getSessionDisplaySettings();
+          if (current) {
+            current.atomColorSchemeId = scheme.id;
+            current.atomColorByElement = {};
+          }
+          this.onRenderRequired();
+        }
+        await this.webviewPanel.webview.postMessage({
+          command: 'colorSchemeLoaded',
+          scheme: scheme || null,
+        });
+      } catch (error) {
+        await this.webviewPanel.webview.postMessage({
+          command: 'colorSchemeError',
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+      return true;
+    });
+
+    this.registerTyped('saveColorScheme', async (message) => {
+      try {
+        const scheme = await this.colorSchemeManager.saveScheme(
+          message.name,
+          message.colors,
+          message.description
+        );
+        await this.webviewPanel.webview.postMessage({
+          command: 'colorSchemeSaved',
+          scheme: { id: scheme.id, name: scheme.name },
+        });
+      } catch (error) {
+        await this.webviewPanel.webview.postMessage({
+          command: 'colorSchemeError',
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+      return true;
+    });
+
+    this.registerTyped('deleteColorScheme', async (message) => {
+      try {
+        await this.colorSchemeManager.deleteScheme(message.schemeId);
+        await this.webviewPanel.webview.postMessage({
+          command: 'colorSchemeSaved',
+          scheme: null,
+        });
+      } catch (error) {
+        await this.webviewPanel.webview.postMessage({
+          command: 'colorSchemeError',
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+      return true;
+    });
+
+    this.registerTyped('exportColorScheme', async (message) => {
+      try {
+        const packageData = await this.colorSchemeManager.exportSchemes([message.schemeId]);
+        const workspacePath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+        const defaultUri = workspacePath
+          ? vscode.Uri.joinPath(vscode.Uri.file(workspacePath), `${message.schemeId}.acoord-colors.json`)
+          : vscode.Uri.file(`${message.schemeId}.acoord-colors.json`);
+        const uri = await vscode.window.showSaveDialog({
+          defaultUri,
+          filters: { 'ACoord Color Scheme': ['json'] },
+        });
+        if (!uri) {
+          return true;
+        }
+        const content = JSON.stringify(packageData, null, 2);
+        await vscode.workspace.fs.writeFile(uri, Buffer.from(content, 'utf8'));
+        vscode.window.showInformationMessage(`Color scheme exported to ${uri.fsPath}`);
+      } catch (error) {
+        vscode.window.showErrorMessage(
+          `Failed to export color scheme: ${error instanceof Error ? error.message : String(error)}`
+        );
+      }
+      return true;
+    });
+
+    this.registerTyped('importColorScheme', async () => {
+      try {
+        const uris = await vscode.window.showOpenDialog({
+          canSelectMany: false,
+          openLabel: 'Import',
+          filters: { 'ACoord Color Scheme': ['json'] },
+        });
+        if (!uris || uris.length === 0) {
+          return true;
+        }
+        const content = await vscode.workspace.fs.readFile(uris[0]);
+        const packageData = JSON.parse(content.toString());
+        if (!packageData.colorSchemes || !Array.isArray(packageData.colorSchemes)) {
+          throw new Error('Invalid color scheme package format');
+        }
+        const wireSchemes: WireColorScheme[] = packageData.colorSchemes.map((s: WireColorScheme) => ({
+          id: s.id,
+          name: s.name,
+          description: s.description,
+          colors: s.colors
+        }));
+        await this.colorSchemeManager.importSchemes({
+          version: packageData.version || '1',
+          exportedAt: packageData.exportedAt || new Date().toISOString(),
+          exportedFrom: packageData.exportedFrom || 'unknown',
+          colorSchemes: wireSchemes
+        });
+        vscode.window.showInformationMessage(`Imported ${packageData.colorSchemes.length} color scheme(s)`);
+        const schemes = await this.colorSchemeManager.listSchemes();
+        const presets = schemes.filter((s) => s.isPreset);
+        const user = schemes.filter((s) => !s.isPreset);
+        await this.webviewPanel.webview.postMessage({
+          command: 'colorSchemesLoaded',
+          presets,
+          user,
+        });
+      } catch (error) {
+        vscode.window.showErrorMessage(
+          `Failed to import color scheme: ${error instanceof Error ? error.message : String(error)}`
+        );
+      }
+      return true;
     });
   }
 

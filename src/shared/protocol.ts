@@ -78,6 +78,30 @@ export interface WireUnitCellParams {
   gamma: number;
 }
 
+/**
+ * Atom color scheme as it appears on the wire.
+ *
+ * Used for import/export and manager communication.
+ */
+export interface WireColorScheme {
+  id: string;
+  name: string;
+  description?: string;
+  colors: Record<string, string>;
+}
+
+/**
+ * Full color scheme with metadata (extension-side only).
+ */
+export interface ColorScheme extends WireColorScheme {
+  isPreset: boolean;
+  isReadOnly?: boolean;
+  version: number;
+  schemaVersion: number;
+  createdAt: number;
+  updatedAt: number;
+}
+
 export interface WireLightConfig {
   intensity: number;
   color: string;
@@ -118,6 +142,8 @@ export interface WireDisplaySettings {
   keyLight?: WireLightConfig;
   fillLight?: WireLightConfig;
   rimLight?: WireLightConfig;
+  atomColorSchemeId?: string;
+  atomColorByElement?: Record<string, string>;
 }
 
 export interface WireConfigEntry {
@@ -211,6 +237,30 @@ export interface ImageSaveFailedMessage {
   };
 }
 
+export interface ColorSchemesLoadedMessage {
+  command: 'colorSchemesLoaded';
+  presets: Array<{ id: string; name: string; description?: string }>;
+  user: Array<{ id: string; name: string; description?: string }>;
+}
+
+export interface ColorSchemeLoadedMessage {
+  command: 'colorSchemeLoaded';
+  scheme: WireColorScheme | null;
+}
+
+export interface ColorSchemeSavedMessage {
+  command: 'colorSchemeSaved';
+  scheme: {
+    id: string;
+    name: string;
+  } | null;
+}
+
+export interface ColorSchemeErrorMessage {
+  command: 'colorSchemeError';
+  error: string;
+}
+
 /**
  * All messages sent from extension to webview.
  */
@@ -223,7 +273,11 @@ export type ExtensionToWebviewMessage =
   | CurrentDisplaySettingsMessage
   | DisplayConfigErrorMessage
   | ImageSavedMessage
-  | ImageSaveFailedMessage;
+  | ImageSaveFailedMessage
+  | ColorSchemesLoadedMessage
+  | ColorSchemeLoadedMessage
+  | ColorSchemeSavedMessage
+  | ColorSchemeErrorMessage;
 
 // ============================================================================
 // Webview -> Extension Messages
@@ -487,6 +541,36 @@ export interface DeleteDisplayConfigMessage {
   configId: string;
 }
 
+export interface GetColorSchemesMessage {
+  command: 'getColorSchemes';
+}
+
+export interface LoadColorSchemeMessage {
+  command: 'loadColorScheme';
+  schemeId: string;
+}
+
+export interface SaveColorSchemeMessage {
+  command: 'saveColorScheme';
+  name: string;
+  colors: Record<string, string>;
+  description?: string;
+}
+
+export interface DeleteColorSchemeMessage {
+  command: 'deleteColorScheme';
+  schemeId: string;
+}
+
+export interface ExportColorSchemeMessage {
+  command: 'exportColorScheme';
+  schemeId: string;
+}
+
+export interface ImportColorSchemeMessage {
+  command: 'importColorScheme';
+}
+
 /**
  * All messages sent from webview to extension.
  */
@@ -536,7 +620,13 @@ export type WebviewToExtensionMessage =
   | ExportDisplayConfigsMessage
   | ImportDisplayConfigsMessage
   | ConfirmDeleteDisplayConfigMessage
-  | DeleteDisplayConfigMessage;
+  | DeleteDisplayConfigMessage
+  | GetColorSchemesMessage
+  | LoadColorSchemeMessage
+  | SaveColorSchemeMessage
+  | DeleteColorSchemeMessage
+  | ExportColorSchemeMessage
+  | ImportColorSchemeMessage;
 
 // ============================================================================
 // Utility types

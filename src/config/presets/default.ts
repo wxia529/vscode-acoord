@@ -7,7 +7,7 @@ export const DEFAULT_PRESET: DisplayConfig = {
   isPreset: true,
   isReadOnly: true,
   version: 1,
-  schemaVersion: 2,
+  schemaVersion: 4,
   createdAt: 0,
   updatedAt: 0,
   settings: {
@@ -51,6 +51,8 @@ export const DEFAULT_PRESET: DisplayConfig = {
       x: 0,
       y: 5,
       z: -10
-    }
+    },
+    atomColorSchemeId: 'preset-jmol-default',
+    atomColorByElement: {}
   }
 };

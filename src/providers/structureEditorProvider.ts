@@ -125,7 +125,7 @@ export class StructureEditorProvider implements vscode.CustomEditorProvider<Stru
     const atomEditService = new AtomEditService(renderer, traj, undoManager);
     const unitCellService = new UnitCellService(renderer, traj, undoManager);
     const documentService = new DocumentService();
-    const displayConfigService = new DisplayConfigService(this.configManager);
+    const displayConfigService = new DisplayConfigService(this.configManager, this.configManager.getColorSchemeManager());
     const defaultConfig = this.configManager.getCurrentConfig();
     const displaySettings = defaultConfig?.settings;
 
@@ -164,6 +164,7 @@ export class StructureEditorProvider implements vscode.CustomEditorProvider<Stru
       documentService,
       displayConfigService,
       this.clipboardService,
+      this.configManager.getColorSchemeManager(),
       key,
       document.uri.fsPath,
       webviewPanel,
@@ -301,6 +302,13 @@ export class StructureEditorProvider implements vscode.CustomEditorProvider<Stru
   private renderStructure(session: EditorSession) {
     const { renderer, trajectoryManager: traj, webviewPanel } = session;
     renderer.setTrajectoryFrameInfo(traj.activeIndex, traj.frameCount);
+
+    // Sync display settings to the renderer so getAtomGeometry/getBondGeometry
+    // can use them for color resolution via getColorForElement().
+    if (session.displaySettings) {
+      renderer.setOptions({ displaySettings: session.displaySettings });
+    }
+
     const message = renderer.getRenderMessage();
 
     if (session.displaySettings) {

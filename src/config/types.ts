@@ -5,7 +5,7 @@
 // This is the extension-side runtime type that extends the wire type.
 // WireDisplaySettings is the single source of truth; DisplaySettings makes
 // all fields required so the extension always works with a complete config.
-import type { WireDisplaySettings, WireLightConfig } from '../shared/protocol.js';
+import type { WireDisplaySettings, WireLightConfig, WireColorScheme } from '../shared/protocol.js';
 
 export type { WireLightConfig };
 
@@ -48,6 +48,7 @@ export interface ConfigExportPackage {
   exportedAt: string;
   exportedFrom: string;
   configs: DisplayConfig[];
+  colorSchemes?: WireColorScheme[];
 }
 
 // Configuration Change Event

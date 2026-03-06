@@ -40,7 +40,7 @@ export interface DisplayState {
   backgroundColor: string;
   unitCellColor: string;
   unitCellThickness: number;
-  unitCellLineStyle: string;
+  unitCellLineStyle: 'solid' | 'dashed';
   atomSizeUseDefaultSettings: boolean;
   atomSizeGlobal: number;
   atomSizeByElement: Record<string, number>;
@@ -53,9 +53,11 @@ export interface DisplayState {
   bondThicknessScale: number;
   viewZoom: number;
   scaleAtomsWithLattice: boolean;
-  projectionMode: string;
+  projectionMode: 'orthographic' | 'perspective';
   supercell: [number, number, number];
   unitCellEditing: boolean;
+  atomColorSchemeId: string;
+  atomColorByElement: Record<string, string>;
 }
 
 export const displayStore: DisplayState = {
@@ -79,6 +81,8 @@ export const displayStore: DisplayState = {
   projectionMode: 'orthographic',
   supercell: [1, 1, 1],
   unitCellEditing: false,
+  atomColorSchemeId: '',
+  atomColorByElement: {},
 };
 
 /** Default display settings used when a loaded config omits a field. */
@@ -106,6 +110,8 @@ const DISPLAY_DEFAULTS: Required<DisplaySettings> = {
   keyLight: { intensity: 0.7, x: 0, y: 0, z: 10, color: '#CCCCCC' },
   fillLight: { intensity: 0, x: -10, y: -5, z: 5, color: '#ffffff' },
   rimLight: { intensity: 0, x: 0, y: 5, z: -10, color: '#ffffff' },
+  atomColorSchemeId: '',
+  atomColorByElement: {},
 };
 
 function flattenLight(light: LightConfig | { intensity: number; color: string; position: { x: number; y: number; z: number } }): LightConfig {
@@ -148,6 +154,8 @@ export function extractDisplaySettings(): DisplaySettings {
     keyLight: flattenToSettings(lightingStore.keyLight),
     fillLight: flattenToSettings(lightingStore.fillLight),
     rimLight: flattenToSettings(lightingStore.rimLight),
+    atomColorSchemeId: displayStore.atomColorSchemeId,
+    atomColorByElement: displayStore.atomColorByElement,
   };
 }
 
@@ -173,6 +181,8 @@ export function applyDisplaySettings(settings: DisplaySettings): void {
   displayStore.scaleAtomsWithLattice = settings.scaleAtomsWithLattice ?? d.scaleAtomsWithLattice;
   displayStore.projectionMode = settings.projectionMode ?? d.projectionMode;
   displayStore.shininess = settings.shininess ?? d.shininess;
+  displayStore.atomColorSchemeId = settings.atomColorSchemeId ?? d.atomColorSchemeId;
+  displayStore.atomColorByElement = settings.atomColorByElement ?? d.atomColorByElement;
   
   lightingStore.lightingEnabled = settings.lightingEnabled ?? d.lightingEnabled;
   lightingStore.ambientIntensity = settings.ambientIntensity ?? d.ambientIntensity;
@@ -287,6 +297,35 @@ export const configStore: ConfigState = {
   currentConfigName: 'Default',
   availableConfigs: { presets: [], user: [] },
   isLoadingConfig: false,
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Color Scheme Store - 颜色方案管理
+// ─────────────────────────────────────────────────────────────────────────────
+export interface ColorSchemeEntry {
+  id: string;
+  name: string;
+  description?: string;
+  colors?: Record<string, string>;
+}
+
+export interface AvailableColorSchemes {
+  presets: ColorSchemeEntry[];
+  user: ColorSchemeEntry[];
+}
+
+export interface ColorSchemeState {
+  currentSchemeId: string;
+  currentSchemeName: string;
+  availableSchemes: AvailableColorSchemes;
+  isLoadingScheme: boolean;
+}
+
+export const colorSchemeStore: ColorSchemeState = {
+  currentSchemeId: '',
+  currentSchemeName: '',
+  availableSchemes: { presets: [], user: [] },
+  isLoadingScheme: false,
 };
 
 // =============================================================================

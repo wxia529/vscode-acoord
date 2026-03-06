@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import { ConfigManager } from '../config/configManager.js';
+import { ColorSchemeManager } from '../config/colorSchemeManager.js';
 import { DisplayConfig, DisplaySettings, ConfigMeta } from '../config/types.js';
 import type { WireDisplaySettings, ExtensionToWebviewMessage } from '../shared/protocol.js';
 
@@ -10,7 +11,7 @@ export class DisplayConfigService {
   private postMessageCallback?: PostMessageCallback;
   private sessionRef?: SessionRef;
 
-  constructor(private configManager: ConfigManager) {}
+  constructor(private configManager: ConfigManager, private colorSchemeManager: ColorSchemeManager) {}
 
   setCallbacks(postMessage: PostMessageCallback, session: SessionRef): void {
     this.postMessageCallback = postMessage;
@@ -52,6 +53,10 @@ export class DisplayConfigService {
     }
   }
 
+  getSessionDisplaySettings(): DisplaySettings | undefined {
+    return this.sessionRef?.displaySettings;
+  }
+
   // Handler methods for display config commands
   async handleGetDisplayConfigs(): Promise<boolean> {
     if (!this.postMessageCallback) { return false; }
@@ -81,6 +86,18 @@ export class DisplayConfigService {
         command: 'displayConfigLoaded',
         config: config
       });
+      
+      // Load the color scheme specified in the config
+      if (config.settings.atomColorSchemeId) {
+        const scheme = await this.colorSchemeManager.getScheme(config.settings.atomColorSchemeId);
+        if (scheme) {
+          this.postMessageCallback({
+            command: 'colorSchemeLoaded',
+            scheme: scheme
+          });
+        }
+      }
+      
       return true;
     } catch (error) {
       this.postMessageCallback({

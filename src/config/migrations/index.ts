@@ -4,7 +4,7 @@ import { DisplayConfig, Migration } from '../types.js';
  * Manages configuration migrations between schema versions
  */
 export class MigrationManager {
-  private currentSchemaVersion = 3;
+  private currentSchemaVersion = 4;
   private migrations: Migration[] = [];
 
   constructor() {
@@ -49,6 +49,24 @@ export class MigrationManager {
           ...config,
           schemaVersion: 3,
           settings: rest as DisplayConfig['settings'],
+        };
+      },
+    });
+
+    // v3 → v4: Add color scheme support with atomColorSchemeId and atomColorByElement
+    this.migrations.push({
+      fromVersion: 3,
+      toVersion: 4,
+      migrate: async (config) => {
+        const settings = config.settings || ({} as DisplayConfig['settings']);
+        return {
+          ...config,
+          schemaVersion: 4,
+          settings: {
+            ...settings,
+            atomColorSchemeId: 'preset-jmol-default',
+            atomColorByElement: {}
+          },
         };
       },
     });

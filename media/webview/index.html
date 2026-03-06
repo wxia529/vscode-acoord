@@ -231,6 +231,26 @@
           </div>
 
           <div class="panel">
+            <div class="panel-title">Atom Color Scheme</div>
+            <div class="input-group">
+              <label>Color Scheme</label>
+              <div class="config-selector-row" style="display:flex;gap:6px;align-items:center;">
+                <select id="color-scheme-select" style="flex:1;">
+                  <option value="">Loading...</option>
+                </select>
+                <button id="btn-refresh-schemes" type="button" title="Refresh list">↻</button>
+              </div>
+            </div>
+            <div class="input-group" style="display:flex;gap:6px;flex-wrap:wrap;">
+              <button id="btn-save-scheme" type="button">Save As...</button>
+              <button id="btn-export-scheme" type="button">Export</button>
+              <button id="btn-import-scheme" type="button">Import</button>
+              <button id="btn-delete-scheme" type="button" class="danger">Delete</button>
+            </div>
+            <div id="color-scheme-info" style="font-size:11px;color:#888;margin-top:6px;"></div>
+          </div>
+
+          <div class="panel">
             <div class="panel-title">Atom Color</div>
             <div class="input-group">
               <label>Color</label>

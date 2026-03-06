@@ -47,7 +47,9 @@ export class ConfigValidator {
       x: 0,
       y: 5,
       z: -10
-    }
+    },
+    atomColorSchemeId: 'preset-jmol-default',
+    atomColorByElement: {}
   };
 
   private static readonly ranges = {
@@ -243,6 +245,30 @@ export class ConfigValidator {
       return output;
     };
 
+    const normalizeColorSchemeId = (value: unknown): string => {
+      if (typeof value !== 'string' || !value) {
+        changed = true;
+        return defaults.atomColorSchemeId;
+      }
+      return value;
+    };
+
+    const normalizeAtomColorByElement = (value: unknown): Record<string, string> => {
+      if (!value || typeof value !== 'object') {
+        changed = true;
+        return {};
+      }
+      const output: Record<string, string> = {};
+      for (const [key, val] of Object.entries(value)) {
+        if (typeof val === 'string' && ConfigValidator.colorPattern.test(val)) {
+          output[key] = val;
+        } else {
+          changed = true;
+        }
+      }
+      return output;
+    };
+
     const defaults = ConfigValidator.defaults;
 
     const normalized: DisplaySettings = {
@@ -342,7 +368,9 @@ export class ConfigValidator {
       ),
       keyLight: normalizeLight(input.keyLight, defaults.keyLight, 'settings.keyLight'),
       fillLight: normalizeLight(input.fillLight, defaults.fillLight, 'settings.fillLight'),
-      rimLight: normalizeLight(input.rimLight, defaults.rimLight, 'settings.rimLight')
+      rimLight: normalizeLight(input.rimLight, defaults.rimLight, 'settings.rimLight'),
+      atomColorSchemeId: normalizeColorSchemeId(input.atomColorSchemeId),
+      atomColorByElement: normalizeAtomColorByElement(input.atomColorByElement)
     };
 
     return { settings: normalized, errors, warnings, changed };

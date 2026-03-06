@@ -10,6 +10,7 @@ import { Atom } from './models/atom.js';
 import { UnitCell } from './models/unitCell.js';
 import { FileManager } from './io/fileManager.js';
 import { ConfigManager } from './config/configManager.js';
+import { ColorSchemeManager } from './config/colorSchemeManager.js';
 
 /**
  * Extension activation
@@ -19,6 +20,7 @@ export function activate(context: vscode.ExtensionContext) {
 
   // Initialize config manager
   const configManager = new ConfigManager(context);
+  const colorSchemeManager = new ColorSchemeManager(context);
   
   // Register custom editor provider
   const editorProvider = new StructureEditorProvider(context, configManager);
@@ -34,6 +36,15 @@ export function activate(context: vscode.ExtensionContext) {
       }
     )
   );
+  
+  // Initialize managers
+  configManager.initialize().catch(console.error);
+  colorSchemeManager.initialize().catch(console.error);
+  
+  // Dispose color scheme manager on extension deactivate
+  context.subscriptions.push({
+    dispose: () => colorSchemeManager.dispose()
+  });
 
   // Command: Create new molecule
   context.subscriptions.push(
@@ -398,7 +409,7 @@ export function activate(context: vscode.ExtensionContext) {
       
       if (selected && selected.id) {
         const confirm = await vscode.window.showWarningMessage(
-          `Are you sure you want to delete "${selected.label}"?`,
+          `Are you sure you delete "${selected.label}"?`,
           { modal: true },
           'Delete'
         );
@@ -410,6 +421,154 @@ export function activate(context: vscode.ExtensionContext) {
           } catch (error) {
             vscode.window.showErrorMessage(`Failed to delete: ${error}`);
           }
+        }
+      }
+    })
+  );
+
+  // Command: Export color scheme
+  context.subscriptions.push(
+    vscode.commands.registerCommand('acoord.exportColorScheme', async () => {
+      await colorSchemeManager.initialize();
+      const schemes = await colorSchemeManager.listSchemes();
+      
+      const userSchemes = schemes.filter(s => !s.isPreset);
+      if (userSchemes.length === 0) {
+        vscode.window.showInformationMessage('No user color schemes to export');
+        return;
+      }
+      
+      const items = userSchemes.map(s => ({
+        label: s.name,
+        description: s.id,
+        picked: true
+      }));
+      
+      const selected = await vscode.window.showQuickPick(items, {
+        placeHolder: 'Select color schemes to export',
+        canPickMany: true
+      });
+      
+      if (!selected || selected.length === 0) {
+        return;
+      }
+      
+      const schemeIds = selected.map(s => s.description!);
+      const packageData = await colorSchemeManager.exportSchemes(schemeIds);
+      
+      const uri = await vscode.window.showSaveDialog({
+        defaultUri: vscode.Uri.file(`acoord-color-schemes-${new Date().toISOString().split('T')[0]}.json`),
+        filters: {
+          'ACoord Color Schemes': ['json']
+        }
+      });
+      
+      if (uri) {
+        await vscode.workspace.fs.writeFile(uri, Buffer.from(JSON.stringify(packageData, null, 2)));
+        vscode.window.showInformationMessage(`Exported ${schemeIds.length} color scheme(s)`);
+      }
+    })
+  );
+
+  // Command: Import color scheme
+  context.subscriptions.push(
+    vscode.commands.registerCommand('acoord.importColorScheme', async () => {
+      const uris = await vscode.window.showOpenDialog({
+        canSelectMany: false,
+        filters: {
+          'ACoord Color Schemes': ['json']
+        }
+      });
+      
+      if (!uris || uris.length === 0) {
+        return;
+      }
+      
+      const content = await vscode.workspace.fs.readFile(uris[0]);
+      const packageData = JSON.parse(content.toString());
+      
+      if (!packageData.colorSchemes || !Array.isArray(packageData.colorSchemes)) {
+        vscode.window.showErrorMessage('Invalid color scheme file');
+        return;
+      }
+      
+      await colorSchemeManager.importSchemes({
+        version: packageData.version,
+        exportedAt: packageData.exportedAt,
+        exportedFrom: packageData.exportedFrom,
+        colorSchemes: packageData.colorSchemes
+      });
+      
+      vscode.window.showInformationMessage(`Imported ${packageData.colorSchemes.length} color scheme(s)`);
+    })
+  );
+
+  // Command: Manage color schemes
+  context.subscriptions.push(
+    vscode.commands.registerCommand('acoord.manageColorSchemes', async () => {
+      await colorSchemeManager.initialize();
+      const schemes = await colorSchemeManager.listSchemes();
+      
+      interface SchemeItem extends vscode.QuickPickItem {
+        id: string;
+        isPreset: boolean;
+      }
+      
+      const items: SchemeItem[] = schemes.map(s => ({
+        label: s.name,
+        description: s.isPreset ? 'Preset' : 'User',
+        id: s.id,
+        isPreset: s.isPreset
+      }));
+      
+      const selected = await vscode.window.showQuickPick(items, {
+        placeHolder: 'Select a color scheme to manage'
+      });
+      
+      if (!selected) {
+        return;
+      }
+      
+      if (selected.isPreset) {
+        vscode.window.showInformationMessage(`"${selected.label}" is a read-only preset`);
+        return;
+      }
+      
+      const action = await vscode.window.showQuickPick([
+        { label: 'Delete', description: 'Delete this color scheme' },
+        { label: 'Export', description: 'Export this color scheme' }
+      ], {
+        placeHolder: 'Select action'
+      });
+      
+      if (action?.label === 'Delete') {
+        const confirm = await vscode.window.showWarningMessage(
+          `Delete "${selected.label}"?`,
+          { modal: true },
+          'Delete'
+        );
+        
+        if (confirm === 'Delete') {
+          try {
+            await colorSchemeManager.deleteScheme(selected.id);
+            vscode.window.showInformationMessage(`Deleted: ${selected.label}`);
+          } catch (error) {
+            vscode.window.showErrorMessage(`Failed to delete: ${error}`);
+          }
+        }
+      } else if (action?.label === 'Export') {
+        const packageData = await colorSchemeManager.exportSchemes([selected.id]);
+        
+        const uri = await vscode.window.showSaveDialog({
+          defaultUri: vscode.Uri.file(`${selected.label.replace(/\s+/g, '_')}.json`),
+          filters: {
+            'ACoord Color Schemes': ['json']
+          }
+        });
+        
+        if (uri) {
+          await vscode.workspace.fs.writeFile(uri, Buffer.from(JSON.stringify(packageData, null, 2)));
+          vscode.window.showInformationMessage(`Exported: ${selected.label}`);
         }
       }
     })

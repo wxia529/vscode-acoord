@@ -1,6 +1,7 @@
 import { structureStore, selectionStore, displayStore, adsorptionStore, interactionStore, applyDisplaySettings } from './state';
 import { renderer } from './renderer';
 import * as configHandler from './configHandler';
+import * as colorSchemeHandler from './colorSchemeHandler';
 import * as appTrajectory from './appTrajectory';
 import { setup as setupEdit } from './appEdit';
 import { setup as setupLattice, updateLatticeUI, updateAtomSizePanel } from './appLattice';
@@ -297,6 +298,7 @@ function start(): void {
   const canvas = document.getElementById('canvas') as HTMLCanvasElement;
 
   configHandler.init(vscode, setStatus, updateConfigSelector, rerenderCurrentStructure);
+  colorSchemeHandler.init(vscode, setStatus, updateColorSchemeSelector);
   initInteractionConfigVscode(vscode);
   renderer.init(canvas, { setError, setStatus });
 
@@ -305,6 +307,7 @@ function start(): void {
   setupInlineSliderValueEditing();
 
   configHandler.requestConfigList();
+  colorSchemeHandler.requestSchemeList();
   configHandler.getCurrentSettings();
   vscode.postMessage({ command: 'getState' });
 
@@ -312,6 +315,10 @@ function start(): void {
     syncStatusSelectionLock();
     if (!statusSelectionLock) updateStatusBar(true);
   });
+}
+
+function updateColorSchemeSelector(): void {
+  colorSchemeHandler.updateColorSchemeSelector();
 }
 
 // Message handlers
@@ -431,6 +438,13 @@ window.addEventListener('message', (event: MessageEvent<ExtensionToWebviewMessag
     case 'currentDisplaySettings':
     case 'displayConfigError':
       configHandler.handleMessage(message);
+      break;
+
+    case 'colorSchemesLoaded':
+    case 'colorSchemeLoaded':
+    case 'colorSchemeSaved':
+    case 'colorSchemeError':
+      colorSchemeHandler.handleMessage(message);
       break;
 
     default: {
