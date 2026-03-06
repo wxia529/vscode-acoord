@@ -1,9 +1,9 @@
 # ACoord
 
-**Version:** 0.2.0  
+**Version:** 0.2.2  
 **License:** GPL-3.0-only
 
-Atomic Coordinate Toolkit (ACoord) is a VS Code extension for 3D visualization and editing of atomic, molecular, and crystal structures. It supports 11 file formats and provides interactive 3D rendering via Three.js inside VS Code's Custom Editor API.
+Atomic Coordinate Toolkit (ACoord) is a VS Code extension for 3D visualization and editing of atomic, molecular, and crystal structures. It supports 12 file formats and provides interactive 3D rendering via Three.js inside VS Code's Custom Editor API.
 
 ## Features
 
@@ -19,14 +19,18 @@ Atomic Coordinate Toolkit (ACoord) is a VS Code extension for 3D visualization a
 - Format conversion through Save As.
 - HD PNG export from the current 3D view (custom file name/location).
 - Display settings configuration with import/export, presets, and migrations.
+- Atom color schemes with custom color editing and preset/user scheme management.
+- Clipboard operations (Ctrl+C/V) for copying and pasting atomic selections across sessions.
+- Extended keyboard shortcuts: Delete/Backspace (delete), Ctrl+Z (undo), Ctrl+Y (redo), Ctrl+S (save), Ctrl+Shift+S (save as), Ctrl+C (copy), Ctrl+V (paste), A (focus add atom form).
+- Format preservation on save for GJF, XYZ, ORCA, QE input/output, and ABACUS STRU files.
 
 ## Supported Formats
 
 Input and output:
 
-- XYZ
+- XYZ / extxyz (trajectory support)
 - CIF
-- POSCAR / VASP (Selective dynamics preserved via fixed flags).
+- POSCAR / VASP / CONTCAR (Selective dynamics preserved via fixed flags)
 - XDATCAR trajectory (.xdatcar / XDATCAR)
 - OUTCAR trajectory read (.outcar / OUTCAR)
 - PDB (basic CRYST1 + ATOM/HETATM)
@@ -53,6 +57,7 @@ Input and output:
   - `#P`
   - blank line
   - `Gaussian input`
+- Format preservation: GJF, XYZ, ORCA, QE, and STRU files preserve original content (headers, keywords, pseudopotentials) with only coordinate data updated on save.
 
 ## Usage
 
@@ -70,12 +75,22 @@ Input and output:
 - Rotate selection: pick axis (X/Y/Z) and move the angle slider (0-360).
 - Change element: use the Selected Atom panel and click Apply.
 - Add or delete atoms: use the Add Atom panel or Delete button.
-- Keyboard shortcuts: Delete/Backspace (delete selected atom(s)), Ctrl/Cmd+Z (undo), Ctrl/Cmd+S (save), Ctrl/Cmd+Shift+S (save as).
+- Keyboard shortcuts: 
+  - Delete/Backspace: delete selected atom(s)
+  - Ctrl/Cmd+Z: undo
+  - Ctrl/Cmd+Y: redo
+  - Ctrl/Cmd+S: save
+  - Ctrl/Cmd+Shift+S: save as
+  - Ctrl/Cmd+C: copy selected atoms
+  - Ctrl/Cmd+V: paste atoms
+  - A: focus add atom form
 - Measure: select 2 atoms for bond length, 3 atoms for bond angle.
 - Adjust Distance: select at least two atoms; the last selected is the reference, and the rest move together along the reference-to-nearest-adsorbate direction to the target distance.
 - Scale: enable Auto scale or adjust Manual scale and Atom size.
 - Lighting: adjust ambient/key/fill/rim intensity and color, tune surface shininess, or click "Pick in Canvas" under Key/Fill/Rim and drag in viewport to set light direction.
 - Slider values: double-click the numeric value label, type a number, and press Enter to apply.
+- Color schemes: apply preset or custom color schemes, create custom schemes, import/export schemes.
+- Display configs: save custom display configurations, import/export configs, apply presets.
 
 
 ## Development

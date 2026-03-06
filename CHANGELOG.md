@@ -17,6 +17,7 @@ All notable changes to this project will be documented in this file.
 - **Camera Control During Drag**: Fixed issue where camera controls remained disabled after cancelled drag operations.
 - **Element Change Color Update**: Fixed bug where changing an atom's element did not immediately update its color to the new element's default. The `changeAtoms` method now clears the atom's custom color when the element changes.
 - **UI Cleanup**: Removed duplicate "Change Element" panel; element changes are now performed exclusively via the "Selected Atom" panel for a cleaner interface.
+- **ColorSchem**: Add ColorScheme
 
 ## 0.2.1
 
