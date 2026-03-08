@@ -91,6 +91,7 @@ const DISPLAY_DEFAULTS: Required<DisplaySettings> = {
   autoScaleEnabled: false,
   currentRadiusScale: 1,
   bondThicknessScale: 1,
+  bondScheme: 'all',
   viewZoom: 1,
   scaleAtomsWithLattice: false,
   projectionMode: 'orthographic',
@@ -117,7 +118,9 @@ function flattenLight(light: LightConfig | { intensity: number; color: string; p
 /** Extract display settings from displayStore */
 export function extractDisplaySettings(): DisplaySettings {
   const flattenToSettings = (light: LightConfig | undefined): LightConfig => {
-    if (!light) return { intensity: 0, color: '#ffffff', x: 0, y: 0, z: 0 };
+    if (!light) {
+      return { intensity: 0, color: '#ffffff', x: 0, y: 0, z: 0 };
+    }
     return { intensity: light.intensity, color: light.color, x: light.x, y: light.y, z: light.z };
   };
 
@@ -148,7 +151,9 @@ export function extractDisplaySettings(): DisplaySettings {
 
 /** Apply display settings to displayStore and lightingStore */
 export function applyDisplaySettings(settings: DisplaySettings): void {
-  if (!settings) return;
+  if (!settings) {
+    return;
+  }
   const d = DISPLAY_DEFAULTS;
   
   displayStore.showAxes = settings.showAxes ?? d.showAxes;
@@ -201,7 +206,7 @@ export const lightingStore: LightingState = {
 // ─────────────────────────────────────────────────────────────────────────────
 export type BoxSelectionMode = 'atoms' | 'bonds' | 'both';
 
-export type ToolType = 'select' | 'move' | 'box' | 'add' | 'delete';
+export type ToolType = 'select' | 'add' | 'delete';
 
 export interface InteractionState {
   isDragging: boolean;
@@ -216,6 +221,13 @@ export interface InteractionState {
   addingAtomElement: string | null;
   boxSelectionMode: BoxSelectionMode;
   currentTool: ToolType;
+  rightDragType: 'none' | 'camera' | 'rotate' | 'move';
+  rightDragStart: { x: number; y: number } | null;
+  rightDragMoved: boolean;
+  rightDragRotationBase: { id: string; pos: [number, number, number] }[] | null;
+  rightDragRotationPivot: [number, number, number] | null;
+  rightDragRotationAccumulatedDelta: { x: number; y: number } | null;
+  rightDragLastDelta: { x: number; y: number } | null;
 }
 
 export const interactionStore: InteractionState = {
@@ -231,6 +243,13 @@ export const interactionStore: InteractionState = {
   addingAtomElement: null,
   boxSelectionMode: 'atoms',
   currentTool: 'select',
+  rightDragType: 'none',
+  rightDragStart: null,
+  rightDragMoved: false,
+  rightDragRotationBase: null,
+  rightDragRotationPivot: null,
+  rightDragRotationAccumulatedDelta: null,
+  rightDragLastDelta: null,
 };
 
 // ─────────────────────────────────────────────────────────────────────────────

@@ -724,83 +724,90 @@ export function setupContextMenu(
 ): void {
   canvas.addEventListener('contextmenu', (event: MouseEvent) => {
     event.preventDefault();
+  });
+}
 
-    const raycaster = renderer.getRaycaster();
-    const mouse = renderer.getMouse();
-    const camera = renderer.getCamera();
-    
-    if (!raycaster || !mouse || !camera) {
+export function showContextMenuAt(
+  canvas: HTMLCanvasElement,
+  clientX: number,
+  clientY: number,
+  handlers: ContextMenuHandlers,
+): void {
+  const raycaster = renderer.getRaycaster();
+  const mouse = renderer.getMouse();
+  const camera = renderer.getCamera();
+  
+  if (!raycaster || !mouse || !camera) {
+    return;
+  }
+
+  const rect = canvas.getBoundingClientRect();
+  mouse.x = ((clientX - rect.left) / rect.width) * 2 - 1;
+  mouse.y = -((clientY - rect.top) / rect.height) * 2 + 1;
+  raycaster.setFromCamera(mouse, camera);
+
+  const meshes = Array.from(renderer.getAtomMeshes().values());
+  const bondMeshes = renderer.getBondMeshes ? renderer.getBondMeshes() : [];
+
+  const atomHits = meshes.length > 0 ? raycaster.intersectObjects(meshes) : [];
+  if (atomHits.length > 0) {
+    const hit = atomHits[0];
+    const atomId = hit.object.userData && (hit.object.userData as Record<string, unknown>).atomId as string | undefined;
+    if (atomId) {
+      let selectedIds = selectionStore.selectedAtomIds;
+      if (!selectedIds.includes(atomId)) {
+        selectedIds = [atomId];
+      }
+      showContextMenu({
+        x: clientX,
+        y: clientY,
+        items: createAtomContextMenu(selectedIds, handlers),
+      });
       return;
     }
+  }
 
-    const rect = canvas.getBoundingClientRect();
-    mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
-    mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
-    raycaster.setFromCamera(mouse, camera);
-
-    const meshes = Array.from(renderer.getAtomMeshes().values());
-    const bondMeshes = renderer.getBondMeshes ? renderer.getBondMeshes() : [];
-
-    const atomHits = meshes.length > 0 ? raycaster.intersectObjects(meshes) : [];
-    if (atomHits.length > 0) {
-      const hit = atomHits[0];
-      const atomId = hit.object.userData && (hit.object.userData as Record<string, unknown>).atomId as string | undefined;
-      if (atomId) {
-        let selectedIds = selectionStore.selectedAtomIds;
-        if (!selectedIds.includes(atomId)) {
-          selectedIds = [atomId];
+  if (bondMeshes.length > 0) {
+    const bondHits = raycaster.intersectObjects(bondMeshes);
+    if (bondHits.length > 0) {
+      const hit = bondHits[0];
+      const bondKey = hit.object.userData && (hit.object.userData as Record<string, unknown>).bondKey as string | undefined;
+      if (bondKey) {
+        let selectedKeys = selectionStore.selectedBondKeys;
+        if (!selectedKeys.includes(bondKey)) {
+          selectedKeys = [bondKey];
         }
         showContextMenu({
-          x: event.clientX,
-          y: event.clientY,
-          items: createAtomContextMenu(selectedIds, handlers),
+          x: clientX,
+          y: clientY,
+          items: createBondContextMenu(selectedKeys, handlers),
         });
         return;
       }
     }
+  }
 
-    if (bondMeshes.length > 0) {
-      const bondHits = raycaster.intersectObjects(bondMeshes);
-      if (bondHits.length > 0) {
-        const hit = bondHits[0];
-        const bondKey = hit.object.userData && (hit.object.userData as Record<string, unknown>).bondKey as string | undefined;
-        if (bondKey) {
-          let selectedKeys = selectionStore.selectedBondKeys;
-          if (!selectedKeys.includes(bondKey)) {
-            selectedKeys = [bondKey];
-          }
-          showContextMenu({
-            x: event.clientX,
-            y: event.clientY,
-            items: createBondContextMenu(selectedKeys, handlers),
-          });
-          return;
-        }
-      }
-    }
+  const dragPlane = new Plane();
+  const planeNormal = new Vector3();
+  camera.getWorldDirection(planeNormal);
+  dragPlane.setFromNormalAndCoplanarPoint(planeNormal, new Vector3(0, 0, 0));
+  const intersection = new Vector3();
+  raycaster.ray.intersectPlane(dragPlane, intersection);
 
-    const dragPlane = new Plane();
-    const planeNormal = new Vector3();
-    camera.getWorldDirection(planeNormal);
-    dragPlane.setFromNormalAndCoplanarPoint(planeNormal, new Vector3(0, 0, 0));
-    const intersection = new Vector3();
-    raycaster.ray.intersectPlane(dragPlane, intersection);
+  let clickPosition: { x: number; y: number; z: number } | null = null;
+  if (intersection) {
+    const scale = renderer.getScale();
+    const invScale = scale ? 1 / scale : 1;
+    clickPosition = {
+      x: intersection.x * invScale,
+      y: intersection.y * invScale,
+      z: intersection.z * invScale,
+    };
+  }
 
-    let clickPosition: { x: number; y: number; z: number } | null = null;
-    if (intersection) {
-      const scale = renderer.getScale();
-      const invScale = scale ? 1 / scale : 1;
-      clickPosition = {
-        x: intersection.x * invScale,
-        y: intersection.y * invScale,
-        z: intersection.z * invScale,
-      };
-    }
-
-    showContextMenu({
-      x: event.clientX,
-      y: event.clientY,
-      items: createEmptySpaceContextMenu(clickPosition, handlers),
-    });
+  showContextMenu({
+    x: clientX,
+    y: clientY,
+    items: createEmptySpaceContextMenu(clickPosition, handlers),
   });
 }

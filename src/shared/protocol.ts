@@ -336,6 +336,15 @@ export interface MoveGroupMessage {
   preview?: boolean;
 }
 
+export interface RotateGroupMessage {
+  command: 'rotateGroup';
+  atomIds: string[];
+  pivot: [number, number, number];
+  axis: [number, number, number];
+  angle: number;
+  preview?: boolean;
+}
+
 export interface SetAtomsPositionsMessage {
   command: 'setAtomsPositions';
   atomPositions: Array<{
@@ -525,6 +534,7 @@ export type WebviewToExtensionMessage =
   | DeleteAtomsMessage
   | MoveAtomMessage
   | MoveGroupMessage
+  | RotateGroupMessage
   | SetAtomsPositionsMessage
   | CopyAtomsMessage
   | CopySelectionMessage

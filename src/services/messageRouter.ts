@@ -195,8 +195,19 @@ export class MessageRouter {
       return true;
     });
 
+    this.registerTyped('rotateGroup', (message) => {
+      this.atomEditService.rotateGroup(
+        message.atomIds,
+        message.pivot,
+        message.axis,
+        message.angle,
+        message.preview
+      );
+      return true;
+    });
+
     this.registerTyped('setAtomsPositions', (message) => {
-      this.atomEditService.setAtomPositions(message.atomPositions, message.preview);
+      this.atomEditService.setAtomPositions(message.atomPositions);
       return true;
     });
 

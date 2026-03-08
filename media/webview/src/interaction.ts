@@ -1,10 +1,10 @@
-import { selectionStore, interactionStore, type ToolType } from './state';
+import { selectionStore, interactionStore, structureStore, type ToolType } from './state';
 import { renderer } from './renderer';
-import { Vector3, Plane } from 'three';
+import { Vector3, Plane, Matrix4, Quaternion } from 'three';
 import * as interactionLighting from './interactionLighting';
 import { init as initDisplay } from './interactionDisplay';
 import { init as initConfig } from './interactionConfig';
-import { setupContextMenu, type ContextMenuHandlers } from './components/contextMenu';
+import { setupContextMenu, showContextMenuAt, type ContextMenuHandlers } from './components/contextMenu';
 import { updateToolButtons, updateStatusBar } from './ui/statusBar';
 
 const SINGLE_LETTER_ELEMENTS = new Set(['H', 'B', 'C', 'N', 'O', 'F', 'P', 'S', 'K', 'V', 'Y', 'I', 'W', 'U']);
@@ -20,6 +20,9 @@ const TWO_LETTER_ELEMENTS = new Set([
 ]);
 
 const ALL_ELEMENTS = new Set([...SINGLE_LETTER_ELEMENTS, ...TWO_LETTER_ELEMENTS]);
+
+const RIGHT_DRAG_THRESHOLD = 1;
+const ROTATION_SENSITIVITY = 0.015;
 
 function isValidElement(symbol: string): boolean {
   return ALL_ELEMENTS.has(symbol);
@@ -65,6 +68,57 @@ export interface InteractionHandlers {
 let controller: AbortController | null = null;
 let elementInputTimeout: ReturnType<typeof setTimeout> | null = null;
 
+function getSelectedCentroid(): Vector3 | null {
+  const ids = selectionStore.selectedAtomIds;
+  if (!ids || ids.length === 0) return null;
+  
+  let cx = 0, cy = 0, cz = 0, count = 0;
+  for (const id of ids) {
+    const mesh = renderer.getAtomMeshes().get(id);
+    if (mesh) {
+      cx += mesh.position.x;
+      cy += mesh.position.y;
+      cz += mesh.position.z;
+      count++;
+    }
+  }
+  if (count === 0) return null;
+  return new Vector3(cx / count, cy / count, cz / count);
+}
+
+function captureRightDragRotationBase(): { id: string; pos: [number, number, number] }[] {
+  const ids = selectionStore.selectedAtomIds;
+  const base: { id: string; pos: [number, number, number] }[] = [];
+  for (const id of ids) {
+    const mesh = renderer.getAtomMeshes().get(id);
+    if (mesh) {
+      base.push({
+        id,
+        pos: [mesh.position.x, mesh.position.y, mesh.position.z],
+      });
+    }
+  }
+  return base;
+}
+
+function rotatePointAroundAxis(
+  point: [number, number, number],
+  pivot: [number, number, number],
+  axis: [number, number, number],
+  angle: number
+): [number, number, number] {
+  const [px, py, pz] = [point[0] - pivot[0], point[1] - pivot[1], point[2] - pivot[2]];
+  const [ax, ay, az] = axis;
+  const cos = Math.cos(angle);
+  const sin = Math.sin(angle);
+  const dot = px * ax + py * ay + pz * az;
+  return [
+    px * cos + (ay * pz - az * py) * sin + ax * dot * (1 - cos) + pivot[0],
+    py * cos + (az * px - ax * pz) * sin + ay * dot * (1 - cos) + pivot[1],
+    pz * cos + (ax * py - ay * px) * sin + az * dot * (1 - cos) + pivot[2],
+  ];
+}
+
 function setTool(tool: ToolType, canvas: HTMLCanvasElement, handlers: InteractionHandlers): void {
   interactionStore.currentTool = tool;
   updateToolButtons();
@@ -81,12 +135,8 @@ function setTool(tool: ToolType, canvas: HTMLCanvasElement, handlers: Interactio
     canvas.style.cursor = 'default';
   }
   
-  if (tool === 'move') {
-    canvas.style.cursor = 'grab';
-  } else if (tool === 'delete') {
+  if (tool === 'delete') {
     canvas.style.cursor = 'not-allowed';
-  } else if (tool === 'box') {
-    canvas.style.cursor = 'crosshair';
   } else {
     canvas.style.cursor = 'default';
   }
@@ -131,6 +181,94 @@ export function init(canvas: HTMLCanvasElement, handlers: InteractionHandlers): 
   const pickerState = interactionLighting.pickerState;
   
   setupLeftToolbar(canvas, handlers);
+  
+  renderer.setOnCameraMove(() => {
+    if (interactionStore.rightDragType === 'camera') {
+      interactionStore.rightDragMoved = true;
+    }
+  });
+
+  let lastRotationQuaternion: Quaternion | null = null;
+  
+  const handleRightDragRotation = (totalDx: number, totalDy: number): void => {
+    const base = interactionStore.rightDragRotationBase;
+    if (!base || base.length === 0) return;
+    
+    const pivot = interactionStore.rightDragRotationPivot;
+    if (!pivot) return;
+    
+    const camera = renderer.getCamera();
+    if (!camera) return;
+    
+    // 忽略微小移动，避免零向量问题
+    const totalDragDist = Math.sqrt(totalDx * totalDx + totalDy * totalDy);
+    if (totalDragDist < 1) return;
+    
+    const totalAngle = totalDragDist * ROTATION_SENSITIVITY;
+    
+    // 使用总的鼠标移动方向计算旋转轴
+    const axisDir = new Vector3(-totalDy, totalDx, 0).normalize();
+    const cameraMatrix = new Matrix4().extractRotation(camera.matrixWorld);
+    axisDir.applyMatrix4(cameraMatrix);
+    axisDir.normalize();
+    
+    const axis: [number, number, number] = [axisDir.x, axisDir.y, axisDir.z];
+    const pivotArr: [number, number, number] = [pivot[0], pivot[1], pivot[2]];
+    
+    for (const entry of base) {
+      const newPos = rotatePointAroundAxis(entry.pos, pivotArr, axis, totalAngle);
+      renderer.updateAtomPosition(entry.id, new Vector3(newPos[0], newPos[1], newPos[2]));
+    }
+  };
+
+  const handleRightDragMove = (event: PointerEvent, canvas: HTMLCanvasElement): void => {
+    const raycaster = renderer.getRaycaster();
+    const mouse = renderer.getMouse();
+    const camera = renderer.getCamera();
+    if (!raycaster || !mouse || !camera) return;
+    
+    const rect = canvas.getBoundingClientRect();
+    mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+    mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+    raycaster.setFromCamera(mouse, camera);
+    
+    const hit = raycaster.ray.intersectPlane(renderer.getDragPlane(), _intersection);
+    if (!hit) return;
+    
+    const ids = selectionStore.selectedAtomIds;
+    if (ids.length === 0) return;
+    
+    const firstMesh = renderer.getAtomMeshes().get(ids[0]);
+    if (!firstMesh) return;
+    
+    const last = interactionStore.lastDragWorld instanceof Vector3 
+      ? interactionStore.lastDragWorld 
+      : firstMesh.position;
+    
+    _delta.subVectors(_intersection, last);
+    
+    const storedNormal = interactionStore.dragPlaneNormal instanceof Vector3
+      ? interactionStore.dragPlaneNormal
+      : camera.getWorldDirection(_normal);
+    _normalDelta.copy(storedNormal).multiplyScalar(_delta.dot(storedNormal));
+    _delta.sub(_normalDelta);
+    
+    if (_delta.length() > 0) {
+      for (const id of ids) {
+        const mesh = renderer.getAtomMeshes().get(id);
+        if (mesh) {
+          _newPos.copy(mesh.position).add(_delta);
+          renderer.updateAtomPosition(id, _newPos);
+        }
+      }
+      
+      if (handlers.onDragGroup) {
+        handlers.onDragGroup(_delta);
+      }
+    }
+    
+    interactionStore.lastDragWorld = _intersection.clone();
+  };
 
   canvas.addEventListener('pointerdown', (event: PointerEvent) => {
     canvas.focus();
@@ -139,6 +277,50 @@ export function init(canvas: HTMLCanvasElement, handlers: InteractionHandlers): 
       renderer.setControlsEnabled(false);
       interactionLighting.applyFromEvent(event, canvas);
       event.preventDefault();
+      return;
+    }
+
+    if (event.button === 2) {
+      interactionStore.rightDragStart = { x: event.clientX, y: event.clientY };
+      interactionStore.rightDragMoved = false;
+      
+      const hasSelection = selectionStore.selectedAtomIds.length > 0;
+      
+      if (event.shiftKey && hasSelection) {
+        event.preventDefault();
+        renderer.setControlsEnabled(false);
+        
+        if (event.altKey) {
+          interactionStore.rightDragType = 'move';
+          canvas.style.cursor = 'grabbing';
+          
+          const raycaster = renderer.getRaycaster();
+          const mouse = renderer.getMouse();
+          const camera = renderer.getCamera();
+          if (raycaster && mouse && camera) {
+            const rect = canvas.getBoundingClientRect();
+            mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+            mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+            raycaster.setFromCamera(mouse, camera);
+            camera.getWorldDirection(_normal);
+            const pivot = getSelectedCentroid();
+            if (pivot) {
+              renderer.getDragPlane().setFromNormalAndCoplanarPoint(_normal, pivot);
+              interactionStore.dragPlaneNormal = _normal.clone();
+              interactionStore.lastDragWorld = pivot.clone();
+            }
+          }
+        } else {
+          interactionStore.rightDragType = 'rotate';
+          interactionStore.rightDragRotationBase = captureRightDragRotationBase();
+          const initialPivot = getSelectedCentroid();
+          interactionStore.rightDragRotationPivot = initialPivot ? [initialPivot.x, initialPivot.y, initialPivot.z] : null;
+          canvas.style.cursor = 'crosshair';
+        }
+        return;
+      }
+      
+      interactionStore.rightDragType = 'camera';
       return;
     }
 
@@ -212,29 +394,6 @@ export function init(canvas: HTMLCanvasElement, handlers: InteractionHandlers): 
           return;
         }
         
-        const canDrag = currentTool === 'move' || (event.shiftKey && event.altKey);
-        if (canDrag) {
-          const isSelected = selectionStore.selectedAtomIds && selectionStore.selectedAtomIds.includes(atomId);
-          if (isSelected) {
-            pendingDrag = {
-              atomId,
-              hitPoint: hit.point.clone(),
-              startX: event.clientX,
-              startY: event.clientY,
-            };
-            renderer.setControlsEnabled(false);
-          } else {
-            handlers.onSelectAtom(atomId, false, false);
-            pendingDrag = {
-              atomId,
-              hitPoint: hit.point.clone(),
-              startX: event.clientX,
-              startY: event.clientY,
-            };
-            renderer.setControlsEnabled(false);
-          }
-          return;
-        }
         handlers.onSelectAtom(atomId, event.ctrlKey || event.metaKey, false);
         return;
       }
@@ -259,7 +418,7 @@ export function init(canvas: HTMLCanvasElement, handlers: InteractionHandlers): 
       }
     }
 
-    if (currentTool === 'box' || currentTool === 'select') {
+    if (currentTool === 'select') {
       const localX = event.clientX - rect.left;
       const localY = event.clientY - rect.top;
       boxSelect = {
@@ -283,6 +442,40 @@ export function init(canvas: HTMLCanvasElement, handlers: InteractionHandlers): 
       interactionLighting.applyFromEvent(event, canvas);
       return;
     }
+    
+    if (interactionStore.rightDragType === 'camera') {
+      return;
+    }
+    
+    if (interactionStore.rightDragType !== 'none' && (event.buttons & 2)) {
+      const start = interactionStore.rightDragStart;
+      if (!start) return;
+      
+      const dx = event.clientX - start.x;
+      const dy = event.clientY - start.y;
+      
+      if (!interactionStore.rightDragMoved && Math.hypot(dx, dy) > RIGHT_DRAG_THRESHOLD) {
+        interactionStore.rightDragMoved = true;
+        interactionStore.rightDragLastDelta = { x: 0, y: 0 };
+        
+        if (interactionStore.rightDragType === 'rotate' || interactionStore.rightDragType === 'move') {
+          if (handlers.onBeginDrag) {
+            handlers.onBeginDrag(selectionStore.selectedAtomIds[0]);
+          }
+        }
+      }
+      
+      if (interactionStore.rightDragMoved) {
+        if (interactionStore.rightDragType === 'rotate') {
+          handleRightDragRotation(dx, dy);
+          interactionStore.rightDragLastDelta = { x: dx, y: dy };
+        } else if (interactionStore.rightDragType === 'move') {
+          handleRightDragMove(event, canvas);
+        }
+      }
+      return;
+    }
+    
     const raycaster = renderer.getRaycaster();
     const mouse = renderer.getMouse();
     const camera = renderer.getCamera();
@@ -376,6 +569,68 @@ export function init(canvas: HTMLCanvasElement, handlers: InteractionHandlers): 
       renderer.setControlsEnabled(!pickerState.activeLightPicker);
       return;
     }
+    
+    if (event.button === 2 && interactionStore.rightDragType !== 'none') {
+      const wasMoved = interactionStore.rightDragMoved;
+      
+      if (wasMoved) {
+        if (interactionStore.rightDragType === 'rotate') {
+          const updated = selectionStore.selectedAtomIds.map(id => {
+            const mesh = renderer.getAtomMeshes().get(id);
+            return mesh ? { id, x: mesh.position.x, y: mesh.position.y, z: mesh.position.z } : null;
+          }).filter((e): e is { id: string; x: number; y: number; z: number } => e !== null);
+          
+          const vscode = (window as unknown as { vscode?: { postMessage: (msg: unknown) => void } }).vscode;
+          if (vscode && updated.length > 0) {
+            vscode.postMessage({ command: 'setAtomsPositions', atomPositions: updated, preview: false });
+          }
+          if (handlers.onEndDrag) {
+            handlers.onEndDrag();
+          }
+          renderer.setControlsEnabled(true);
+          canvas.style.cursor = 'default';
+        } else if (interactionStore.rightDragType === 'move') {
+          if (handlers.onEndDrag) {
+            handlers.onEndDrag();
+          }
+          renderer.setControlsEnabled(true);
+          canvas.style.cursor = 'default';
+        }
+      } else {
+        const contextMenuHandlers: ContextMenuHandlers = {
+          onDeleteAtom: handlers.onDeleteAtoms,
+          onDeleteBond: handlers.onDeleteBonds,
+          onChangeElement: handlers.onChangeElement,
+          onCopy: handlers.onCopy,
+          onPaste: handlers.onPaste,
+          onSetAtomColor: handlers.onSetAtomColor,
+          onSetAtomRadius: handlers.onSetAtomRadius,
+          onCreateBond: handlers.onCreateBond,
+          onSetBondLength: handlers.onSetBondLength,
+          onCalculateBonds: handlers.onCalculateBonds,
+          onClearBonds: handlers.onClearBonds,
+          onAddAtom: handlers.onAddAtom,
+          onUndo: handlers.onUndo,
+          onRedo: handlers.onRedo,
+          onSelectAll: handlers.onSelectAll,
+          onClearSelection: handlers.onClearSelection,
+          onSave: handlers.onSave,
+          onSaveAs: handlers.onSaveAs,
+          onExportImage: handlers.onExportImage,
+          onSetStatus: handlers.onSetStatus,
+        };
+        showContextMenuAt(canvas, event.clientX, event.clientY, contextMenuHandlers);
+      }
+      
+      interactionStore.rightDragType = 'none';
+      interactionStore.rightDragStart = null;
+      interactionStore.rightDragMoved = false;
+      interactionStore.rightDragRotationBase = null;
+      interactionStore.rightDragRotationPivot = null;
+      interactionStore.rightDragLastDelta = null;
+      return;
+    }
+    
     if (pendingDrag && !interactionStore.isDragging) {
       renderer.setControlsEnabled(true);
     }
@@ -510,16 +765,6 @@ export function init(canvas: HTMLCanvasElement, handlers: InteractionHandlers): 
       
       if (letter === 'V') {
         setTool('select', canvas, handlers);
-        event.preventDefault();
-        return;
-      }
-      if (letter === 'M') {
-        setTool('move', canvas, handlers);
-        event.preventDefault();
-        return;
-      }
-      if (letter === 'B') {
-        setTool('box', canvas, handlers);
         event.preventDefault();
         return;
       }

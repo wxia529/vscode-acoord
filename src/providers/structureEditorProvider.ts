@@ -255,12 +255,14 @@ export class StructureEditorProvider implements vscode.CustomEditorProvider<Stru
 
     if (handled) {
       if (message.command === 'endDrag') {
-        // A drag sequence is complete: re-render and notify dirty if an undo
-        // entry was pushed during beginDrag.
-        this.renderStructure(session);
-        if (session.undoManager.depth > undoDepthBefore) {
+        // A drag sequence is complete. Do NOT call renderStructure() here
+      // because setAtomsPositions (sent just before endDrag from the webview)
+      // has already updated the model. Calling renderStructure() would send
+      // the full render message back and overwrite the positions we just set.
+      if (session.undoManager.depth > undoDepthBefore) {
           this.notifyDocumentChanged(session, 'Drag');
         }
+        return;
       } else if (message.command !== 'beginDrag') {
         // Preview drag messages update the extension model but must NOT trigger
         // a renderStructure() round-trip back to the webview.  The webview

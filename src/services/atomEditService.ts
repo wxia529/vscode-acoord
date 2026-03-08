@@ -150,7 +150,52 @@ export class AtomEditService {
     }
   }
 
-  setAtomPositions(updates: PositionUpdate[], preview: boolean = false): void {
+  rotateGroup(
+    atomIds: string[],
+    pivot: [number, number, number],
+    axis: [number, number, number],
+    angle: number,
+    preview: boolean = false
+  ): void {
+    if (atomIds.length === 0) {
+      return;
+    }
+
+    if (!this.trajectoryManager.isEditing) {
+      this.trajectoryManager.beginEdit();
+    }
+    const editStructure = this.trajectoryManager.activeStructure;
+    
+    const cos = Math.cos(angle);
+    const sin = Math.sin(angle);
+    const [ax, ay, az] = axis;
+    const [px, py, pz] = pivot;
+    
+    for (const id of atomIds) {
+      const atom = editStructure.getAtom(id);
+      if (!atom) {
+        continue;
+      }
+      
+      const vx = atom.x - px;
+      const vy = atom.y - py;
+      const vz = atom.z - pz;
+      
+      const dot = vx * ax + vy * ay + vz * az;
+      const newX = vx * cos + (ay * vz - az * vy) * sin + ax * dot * (1 - cos);
+      const newY = vy * cos + (az * vx - ax * vz) * sin + ay * dot * (1 - cos);
+      const newZ = vz * cos + (ax * vy - ay * vx) * sin + az * dot * (1 - cos);
+      
+      atom.setPosition(newX + px, newY + py, newZ + pz);
+    }
+    
+    this.renderer.setStructure(editStructure);
+    if (!preview) {
+      this.trajectoryManager.commitEdit();
+    }
+  }
+
+  setAtomPositions(updates: PositionUpdate[]): void {
     if (updates.length === 0) {
       return;
     }
@@ -167,9 +212,6 @@ export class AtomEditService {
       }
     }
     this.renderer.setStructure(editStructure);
-    if (!preview) {
-      this.trajectoryManager.commitEdit();
-    }
   }
 
   copyAtoms(atomIds: string[], offset: CopyOffset): void {

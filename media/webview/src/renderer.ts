@@ -5,6 +5,8 @@ import type { Atom, Bond, Structure, UiHooks, UnitCellEdge } from './types';
 import { debounce } from './utils/performance';
 import * as axisIndicator from './axisIndicator';
 
+const MOUSE = THREE.MOUSE;
+
 // Camera auto-scaling constants
 const CAMERA_TARGET_DIMENSION = 30;
 const CAMERA_SCALE_MIN = 0.05;
@@ -19,9 +21,9 @@ THREE.ColorManagement.enabled = false;
 
 export interface RendererApi {
   init(canvas: HTMLCanvasElement, handlers: { setError: (m: string) => void; setStatus: (m: string) => void }): void;
-  renderStructure(data: Structure, uiHooks?: Partial<UiHooks>, options?: { fitCamera?: boolean }): void;
+  renderStructure(structure: Structure, hooks: UiHooks, options?: { fitCamera?: boolean }): void;
   fitCamera(): void;
-  setProjectionMode(mode: string): void;
+  setProjectionMode(mode: 'orthographic' | 'perspective'): void;
   snapCameraToAxis(axis: string): void;
   getScale(): number;
   getRaycaster(): THREE.Raycaster;
@@ -31,18 +33,13 @@ export interface RendererApi {
   getBondMeshes(): THREE.Mesh[];
   getDragPlane(): THREE.Plane;
   setControlsEnabled(enabled: boolean): void;
+  setOnCameraMove(callback: (() => void) | null): void;
   updateLighting(): void;
   updateDisplaySettings(): void;
   exportHighResolutionImage(options?: { scale?: number }): { dataUrl: string; width: number; height: number } | null;
-  /** Update an atom's visual position in both the hit-test mesh and InstancedMesh, and mark dirty. */
   updateAtomPosition(atomId: string, position: THREE.Vector3): void;
-  /** Mark the renderer dirty so the next animate() frame will re-render. */
   markDirty(): void;
-  /** Rotate the camera view by angleDeg around the given semantic axis.
-   *  axis: 'tiltUp' | 'tiltDown' | 'rotateLeft' | 'rotateRight' | 'rollCCW' | 'rollCW'
-   */
   rotateCameraBy(axis: string, angleDeg: number): void;
-  /** Clean up Three.js resources to prevent memory leaks when the webview closes. */
   dispose(): void;
 }
 
@@ -51,6 +48,7 @@ interface RendererState {
   camera: THREE.PerspectiveCamera | THREE.OrthographicCamera | null;
   renderer: THREE.WebGLRenderer | null;
   controls: TrackballControls | { update: () => void; enabled?: boolean; target?: THREE.Vector3; dispose?: () => void } | null;
+  onCameraMove: (() => void) | null;
   /** Invisible per-atom meshes used only for raycasting and drag interaction. */
   atomMeshes: Map<string, THREE.Mesh>;
   /** Instanced meshes that visually render atoms (one per radius group). */
@@ -120,6 +118,7 @@ const rendererState: RendererState = {
   camera: null,
   renderer: null,
   controls: null,
+  onCameraMove: null,
   atomMeshes: new Map(),
   atomInstancedMeshes: [],
   atomInstanceIndex: new Map(),
@@ -230,8 +229,17 @@ function applyControls(camera: THREE.Camera): void {
   controls.zoomSpeed = 1.2;
   controls.panSpeed = 0.8;
   controls.staticMoving = true;
-  // Re-render whenever the camera moves via controls.
-  controls.addEventListener('change', markDirty);
+  controls.mouseButtons = {
+    LEFT: MOUSE.PAN,
+    MIDDLE: MOUSE.DOLLY,
+    RIGHT: MOUSE.ROTATE,
+  };
+  controls.addEventListener('change', () => {
+    markDirty();
+    if (rendererState.onCameraMove) {
+      rendererState.onCameraMove();
+    }
+  });
   rendererState.controls = controls;
 }
 
@@ -1012,6 +1020,10 @@ function setControlsEnabled(enabled: boolean): void {
   }
 }
 
+function setOnCameraMove(callback: (() => void) | null): void {
+  rendererState.onCameraMove = callback;
+}
+
 function getScale(): number { return rendererState.lastScale || 1; }
 
 function updateLighting(): void {
@@ -1227,6 +1239,7 @@ export const renderer: RendererApi = {
   getBondMeshes,
   getDragPlane,
   setControlsEnabled,
+  setOnCameraMove,
   updateLighting,
   updateDisplaySettings,
   exportHighResolutionImage,
