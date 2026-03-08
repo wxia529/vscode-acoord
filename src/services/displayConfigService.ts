@@ -88,8 +88,8 @@ export class DisplayConfigService {
       });
       
       // Load the color scheme specified in the config
-      if (config.settings.atomColorSchemeId) {
-        const scheme = await this.colorSchemeManager.getScheme(config.settings.atomColorSchemeId);
+      if (config.settings.currentColorScheme) {
+        const scheme = await this.colorSchemeManager.getScheme(config.settings.currentColorScheme);
         if (scheme) {
           this.postMessageCallback({
             command: 'colorSchemeLoaded',

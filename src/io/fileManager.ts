@@ -10,6 +10,7 @@ import {
   OUTCARParser,
   PDBParser,
   STRUParser,
+  ACoordParser,
   StructureParser,
 } from './parsers/index.js';
 
@@ -31,6 +32,7 @@ const PARSER_MAP: Record<string, StructureParser> = {
   outcar: new OUTCARParser(),
   pdb: new PDBParser(),
   stru: new STRUParser(),
+  acoord: new ACoordParser(),
 };
 
 const READ_ONLY_FORMATS = new Set(['out', 'pwo', 'log', 'outcar']);

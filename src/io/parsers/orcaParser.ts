@@ -1,6 +1,6 @@
 import { Structure } from '../../models/structure.js';
 import { Atom } from '../../models/atom.js';
-import { parseElement } from '../../utils/elementData.js';
+import { parseElement, getDefaultAtomColor, getDefaultAtomRadius } from '../../utils/elementData.js';
 import { StructureParser } from './structureParser.js';
 
 /**
@@ -61,7 +61,10 @@ export class ORCAParser extends StructureParser {
       if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(z)) {
         continue;
       }
-      structure.addAtom(new Atom(element, x, y, z));
+      structure.addAtom(new Atom(element, x, y, z, undefined, {
+        color: getDefaultAtomColor(element),
+        radius: getDefaultAtomRadius(element),
+      }));
     }
 
     return structure;

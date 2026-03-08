@@ -16,13 +16,10 @@ export const WHITE2_PRESET: DisplayConfig = {
     unitCellColor: '#000000',
     unitCellThickness: 1,
     unitCellLineStyle: 'solid',
-    atomSizeUseDefaultSettings: false,
-    atomSizeGlobal: 0.3,
-    atomSizeByElement: {},
-    atomSizeByAtom: {},
+    currentRadiusByElement: {},
     manualScale: 1,
     autoScaleEnabled: false,
-    atomSizeScale: 1,
+    currentRadiusScale: 1,
     bondThicknessScale: 3,
     viewZoom: 1,
     scaleAtomsWithLattice: false,
@@ -52,7 +49,7 @@ export const WHITE2_PRESET: DisplayConfig = {
       y: 5,
       z: -10
     },
-    atomColorSchemeId: 'preset-bright',
-    atomColorByElement: {}
+    currentColorScheme: 'preset-bright',
+    currentColorByElement: {}
   }
 };

@@ -1,7 +1,7 @@
 import { Structure } from '../../models/structure.js';
 import { Atom } from '../../models/atom.js';
 import { UnitCell } from '../../models/unitCell.js';
-import { ELEMENT_DATA, parseElement } from '../../utils/elementData.js';
+import { ELEMENT_DATA, parseElement, getDefaultAtomColor, getDefaultAtomRadius } from '../../utils/elementData.js';
 import { BOHR_TO_ANGSTROM } from '../../utils/constants.js';
 import { fractionalToCartesian } from '../../utils/parserUtils.js';
 import { StructureParser } from './structureParser.js';
@@ -360,7 +360,10 @@ export class QEParser extends StructureParser {
     }
 
     for (const item of atoms) {
-      const atom = new Atom(item.element, item.position[0], item.position[1], item.position[2]);
+      const atom = new Atom(item.element, item.position[0], item.position[1], item.position[2], undefined, {
+        color: getDefaultAtomColor(item.element),
+        radius: getDefaultAtomRadius(item.element),
+      });
       atom.fixed = item.fixed;
       structure.addAtom(atom);
     }
@@ -446,7 +449,10 @@ export class QEParser extends StructureParser {
       structure.isCrystal = true;
     }
     for (const item of atoms) {
-      const atom = new Atom(item.element, item.position[0], item.position[1], item.position[2]);
+      const atom = new Atom(item.element, item.position[0], item.position[1], item.position[2], undefined, {
+        color: getDefaultAtomColor(item.element),
+        radius: getDefaultAtomRadius(item.element),
+      });
       atom.fixed = item.fixed;
       structure.addAtom(atom);
     }

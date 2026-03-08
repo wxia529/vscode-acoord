@@ -1,7 +1,7 @@
 import { Structure } from '../../models/structure.js';
 import { Atom } from '../../models/atom.js';
 import { UnitCell } from '../../models/unitCell.js';
-import { parseElement } from '../../utils/elementData.js';
+import { parseElement, getDefaultAtomColor, getDefaultAtomRadius } from '../../utils/elementData.js';
 import { expandElements, fractionalToCartesian } from '../../utils/parserUtils.js';
 import { StructureParser } from './structureParser.js';
 
@@ -252,7 +252,10 @@ export class XDATCARParser extends StructureParser {
       if (header.coordinateMode === 'direct') {
         [x, y, z] = fractionalToCartesian(x, y, z, header.latticeVectors);
       }
-      structure.addAtom(new Atom(expandedElements[i], x, y, z));
+      structure.addAtom(new Atom(expandedElements[i], x, y, z, undefined, {
+        color: getDefaultAtomColor(expandedElements[i]),
+        radius: getDefaultAtomRadius(expandedElements[i]),
+      }));
     }
 
     return structure;

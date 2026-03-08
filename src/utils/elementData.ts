@@ -229,3 +229,17 @@ export function parseElement(input: string): string | undefined {
   const title = normalized.charAt(0).toUpperCase() + normalized.slice(1).toLowerCase();
   return ELEMENT_DATA[title] ? title : undefined;
 }
+
+const DEFAULT_RADIUS = 1.0;
+
+export function getDefaultAtomColor(element: string): string {
+  return ELEMENT_DATA[element]?.color || DEFAULT_COLOR;
+}
+
+export function getDefaultAtomRadius(element: string): number {
+  const info = ELEMENT_DATA[element];
+  if (info?.covalentRadius) {
+    return Math.max(info.covalentRadius * 1.0, 0.3);
+  }
+  return DEFAULT_RADIUS;
+}

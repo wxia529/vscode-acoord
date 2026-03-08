@@ -165,16 +165,11 @@ export function updateUI(): void {
 
   setInput('lattice-line-style', displayStore.unitCellLineStyle);
 
-  setInput('atom-size-global-slider', displayStore.atomSizeGlobal);
-  setText('atom-size-global-value', displayStore.atomSizeGlobal.toFixed(2) + ' Å');
-
-  setChecked('atom-size-use-default', displayStore.atomSizeUseDefaultSettings);
-
   setInput('bond-size-slider', displayStore.bondThicknessScale);
   setText('bond-size-value', displayStore.bondThicknessScale.toFixed(1) + 'x');
 
-  setInput('size-slider', displayStore.atomSizeScale);
-  setText('size-value', displayStore.atomSizeScale.toFixed(2) + 'x');
+  setInput('size-slider', displayStore.currentRadiusScale);
+  setText('size-value', displayStore.currentRadiusScale.toFixed(2) + 'x');
 
   setChecked('lighting-enabled', lightingStore.lightingEnabled);
 

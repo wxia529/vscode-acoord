@@ -1,7 +1,7 @@
 import { Structure } from '../../models/structure.js';
 import { Atom } from '../../models/atom.js';
 import { UnitCell } from '../../models/unitCell.js';
-import { parseElement } from '../../utils/elementData.js';
+import { parseElement, getDefaultAtomColor, getDefaultAtomRadius } from '../../utils/elementData.js';
 import { StructureParser } from './structureParser.js';
 
 /**
@@ -157,7 +157,10 @@ export class CIFParser extends StructureParser {
         }
         seen.add(key);
         const [x, y, z] = structure.unitCell.fractionalToCartesian(nx, ny, nz);
-        expandedAtoms.push(new Atom(atom.element, x, y, z, undefined, atom.color));
+        expandedAtoms.push(new Atom(atom.element, x, y, z, undefined, {
+          color: atom.color,
+          radius: atom.radius,
+        }));
       }
     }
 
@@ -327,7 +330,10 @@ export class CIFParser extends StructureParser {
       }
 
       if (Number.isFinite(x) && Number.isFinite(y) && Number.isFinite(z)) {
-        structure.addAtom(new Atom(symbol, x, y, z));
+        structure.addAtom(new Atom(symbol, x, y, z, undefined, {
+          color: getDefaultAtomColor(symbol),
+          radius: getDefaultAtomRadius(symbol),
+        }));
       }
     }
   }

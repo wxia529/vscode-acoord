@@ -1,7 +1,7 @@
 import { Structure } from '../../models/structure.js';
 import { Atom } from '../../models/atom.js';
 import { UnitCell } from '../../models/unitCell.js';
-import { parseElement } from '../../utils/elementData.js';
+import { parseElement, getDefaultAtomColor, getDefaultAtomRadius } from '../../utils/elementData.js';
 import { expandElements, fractionalToCartesian } from '../../utils/parserUtils.js';
 import { StructureParser } from './structureParser.js';
 
@@ -57,7 +57,10 @@ export class POSCARParser extends StructureParser {
       }
 
       const element = orderedElements[atomIndex] || 'X';
-      const atom = new Atom(element, x, y, z);
+      const atom = new Atom(element, x, y, z, undefined, {
+        color: getDefaultAtomColor(element),
+        radius: getDefaultAtomRadius(element),
+      });
       if (header.hasSelectiveDynamics && parts.length >= 6) {
         const flags = parts.slice(3, 6).map((value) => value.toUpperCase());
         const selectiveDynamics: [boolean, boolean, boolean] = [

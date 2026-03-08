@@ -1,7 +1,7 @@
 # ACoord Developer Guide
 
-**Version:** 0.2.0  
-**Last Updated:** 2026-03-05  
+**Version:** 0.3.0  
+**Last Updated:** 2026-03-08  
 **License:** GPL-3.0-only
 
 This document is the authoritative reference for ACoord development. It
@@ -18,10 +18,13 @@ discrepancy in `CURRENT_ISSUES.md`.
 2. [Two-Process Architecture](#2-two-process-architecture)
 3. [Directory Structure](#3-directory-structure)
 4. [Shared Protocol — The Contract](#4-shared-protocol--the-contract)
+   - 4.5 [Atom Data Model](#45-atom-data-model)
 5. [Extension Host](#5-extension-host)
 6. [Webview](#6-webview)
 7. [I/O & Parsers](#7-io--parsers)
 8. [Configuration System](#8-configuration-system)
+   - 8.5 [.acoord Native File Format](#85-acoord-native-file-format)
+   - 8.6 [User Interaction Patterns](#86-user-interaction-patterns)
 9. [Build System](#9-build-system)
 10. [Type Safety & Code Quality](#10-type-safety--code-quality)
 11. [Testing](#11-testing)
@@ -29,16 +32,17 @@ discrepancy in `CURRENT_ISSUES.md`.
 13. [Error Handling](#13-error-handling)
 14. [How to Add New Features](#14-how-to-add-new-features)
 15. [Common Pitfalls & What Not to Do](#15-common-pitfalls--what-not-to-do)
+16. [Architecture Evolution Notes](#16-architecture-evolution-notes)
 
 ---
 
 ## 1. Project Overview
 
 ACoord (Atomic Coordinate Toolkit) is a VS Code extension for 3D visualization
-and editing of atomic, molecular, and crystal structures. It supports 11 file
+and editing of atomic, molecular, and crystal structures. It supports 12 file
 formats (XYZ, CIF, POSCAR, XDATCAR, OUTCAR, Quantum ESPRESSO, PDB, Gaussian
-`.gjf`, ORCA `.inp`, ABACUS STRU) and provides interactive 3D rendering via
-Three.js inside VS Code's Custom Editor API.
+`.gjf`, ORCA `.inp`, ABACUS STRU, `.acoord` native format) and provides
+interactive 3D rendering via Three.js inside VS Code's Custom Editor API.
 
 ### 1.1 Design Principles
 
@@ -62,6 +66,16 @@ Three.js inside VS Code's Custom Editor API.
 5. **No silent failures.** Operations that can fail must either throw a
    descriptive `Error` or return a typed error result. Never swallow errors
    and return a misleading `false` / empty object.
+
+6. **Extension owns all computation.** The extension host is responsible for
+   all calculations (color, radius, bond detection). The webview is a pure
+   rendering surface that receives pre-computed `WireAtom`/`WireBond` data
+   and displays it without modification.
+
+7. **DisplaySettings as "current brush".** DisplaySettings represents the
+   current "brush" configuration (color scheme, radius scale). It does not
+   automatically apply to existing atoms. Users must explicitly "apply" to
+   update atom properties. This is analogous to Photoshop's foreground color.
 
 ---
 
@@ -89,18 +103,24 @@ in `src/shared/protocol.ts`, which is the single source of truth for both sides.
 │          ├── SelectionService     │                  │    ├── appEdit / appLattice / ...       │
 │          ├── BondService          │                  │    └── state/selectionManager.ts       │
 │          ├── AtomEditService      │                  │                                        │
-│          ├── UnitCellService      │                  └──────────────────────────────────────┘
-│          ├── DocumentService      │
-│          └── DisplayConfigService │
-│                                   │
-│  ConfigManager  (global)          │
-│  FileManager    (stateless)       │
+│          ├── UnitCellService      │                  │  Responsibilities:                      │
+│          ├── DocumentService      │                  │    ✅ Render received data               │
+│          └── DisplayConfigService │                  │    ✅ Handle user input                  │
+│                                   │                  │    ✅ Send messages to extension         │
+│  ConfigManager  (global)          │                  │                                        │
+│  FileManager    (stateless)       │                  │  Does NOT:                              │
+│                                   │                  │    ❌ Compute colors/radii               │
+│  Computation Logic (exclusive):   │                  │    ❌ Override atom properties           │
+│    - Color calculation            │                  │    ❌ Store DisplaySettings copy          │
+│    - Radius calculation           │                  │                                        │
+│    - Bond detection               │                  └──────────────────────────────────────┘
 └───────────────────────────────────┘
 ```
 
-**The rule:** the extension host owns the authoritative model. The webview is
-a rendering and input surface — it sends user intent as messages and receives
-canonical data to display. The webview never modifies the model directly.
+**The rule:** the extension host owns the authoritative model and performs all
+computations. The webview is a pure rendering and input surface — it sends
+user intent as messages and receives canonical data to display. The webview
+never modifies model data or performs property calculations.
 
 ---
 
@@ -112,7 +132,7 @@ src/
   shared/
     protocol.ts                # ALL wire types and message unions (no imports)
   models/
-    atom.ts                    # Atom class (id, element, position, color, metadata)
+    atom.ts                    # Atom class (id, element, position, color, radius, metadata)
     structure.ts               # Structure class (atoms, bonds, unit cell, metadata)
     unitCell.ts                # UnitCell class (lattice parameters → vectors)
     index.ts                   # Barrel re-exports
@@ -131,28 +151,29 @@ src/
     displayConfigService.ts    # Display settings load / save / apply
   renderers/
     renderMessageBuilder.ts    # Build WireRenderData from a Structure snapshot
-  config/
-    configManager.ts           # Config lifecycle (load, save, import, export)
-    configStorage.ts           # Persistence via ExtensionContext.globalState
-    configValidator.ts         # JSON schema validation
-    types.ts                   # DisplaySettings = Required<WireDisplaySettings>
-    presets/                   # Built-in presets (default, white); immutable
-    migrations/                # Versioned schema migrations
-  io/
-    fileManager.ts             # Format detection, parser dispatch, serialize
-    parsers/
-      structureParser.ts       # Abstract base class
-      xyzParser.ts
-      cifParser.ts
-      poscarParser.ts
-      xdatcarParser.ts
-      outcarParser.ts
-      qeParser.ts
-      pdbParser.ts
-      gjfParser.ts
-      orcaParser.ts
-      struParser.ts
-      index.ts                 # Barrel re-exports
+   config/
+     configManager.ts           # Config lifecycle (load, save, import, export)
+     configStorage.ts           # Persistence via ExtensionContext.globalState
+     configValidator.ts         # JSON schema validation
+     types.ts                   # DisplaySettings = Required<WireDisplaySettings>
+     presets/                   # Built-in presets (default, white); immutable
+     migrations/                # Versioned schema migrations
+   io/
+     fileManager.ts             # Format detection, parser dispatch, serialize
+     parsers/
+       structureParser.ts       # Abstract base class
+       xyzParser.ts
+       cifParser.ts
+       poscarParser.ts
+       xdatcarParser.ts
+       outcarParser.ts
+       qeParser.ts
+       pdbParser.ts
+       gjfParser.ts
+       orcaParser.ts
+       struParser.ts
+       acoordParser.ts          # Native .acoord format (JSON)
+       index.ts                 # Barrel re-exports
   utils/
     elementData.ts             # Periodic table data (symbols, radii, colors)
     parserUtils.ts             # Shared parsing helpers
@@ -222,12 +243,12 @@ that crosses the extension↔webview boundary.
 
 | Type | Description |
 |---|---|
-| `WireAtom` | Serialized atom (id, element, color, position, radius, selected?) |
+| `WireAtom` | Serialized atom (id, element, color, position, radius, label?, fixed?, selectiveDynamics?, selected?) |
 | `WireBond` | Serialized bond (key, atomId1, atomId2, start, end, radius, color, selected?) |
 | `WireUnitCell` | Unit cell corners and edge geometry |
 | `WireUnitCellParams` | Lattice parameters (a, b, c, alpha, beta, gamma) |
 | `WireLightConfig` | Light position and intensity |
-| `WireDisplaySettings` | All rendering toggles and slider values (22 fields) |
+| `WireDisplaySettings` | Rendering settings: current brush (colorScheme, radiusScale) + global toggles |
 | `WireConfigEntry` | A named display config entry |
 | `WireRenderData` | Complete render payload (atoms, bonds, unit cell, selection state, trajectory info) |
 
@@ -238,6 +259,12 @@ Cartesian coordinates, Angstroms.
 sort, or compare IDs structurally.  
 **Optional fields:** use `?` for fields that may be absent. Never send
 `undefined` over the wire — omit the key instead.
+
+**WireAtom semantics:**
+- `color` and `radius` are **required** fields, always present with concrete values
+- These are the **current properties** of the atom, pre-computed by Extension
+- Webview receives and renders directly without any calculation
+- Extension computes these values during parsing or when user applies DisplaySettings
 
 ### 4.3 Message Unions
 
@@ -281,6 +308,109 @@ message inside a generic handler.
    **compile error** if you forget to add the case.
 5. The TypeScript compiler enforces that all fields are provided at send sites
    and all fields are available at receive sites.
+
+---
+
+## 4.5 Atom Data Model
+
+### 4.5.1 Core Principle: Required Properties
+
+Every `Atom` has **required** `color` and `radius` properties. These are not
+computed at render time — they are set when the atom is created or modified.
+
+```typescript
+// src/models/atom.ts
+export class Atom {
+  id: string;
+  element: string;
+  x: number;
+  y: number;
+  z: number;
+  
+  // Required — always have concrete values
+  color: string;      // CSS hex color: "#RRGGBB"
+  radius: number;     // Angstroms
+  
+  // Optional metadata
+  label?: string;
+  fixed: boolean = false;
+  selectiveDynamics?: [boolean, boolean, boolean];
+  
+  // Temporary state (not saved)
+  selected: boolean = false;
+}
+```
+
+**Why this design:**
+1. **No runtime computation** — webview renders directly without calculation
+2. **Explicit data** — atom's appearance is stored with the atom, not derived
+3. **Round-trip preservation** — saving to .acoord preserves user modifications
+4. **Multi-frontend support** — any frontend can render without reimplementing logic
+
+### 4.5.2 Atom Lifecycle
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                      Atom Lifecycle                              │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  [Creation]                                                     │
+│     │                                                           │
+│     ├─ Parser creates from file (XYZ/POSCAR/CIF/.acoord)       │
+│     │   └─ Sets: color = getColorForElement(element)           │
+│     │           radius = ELEMENT_DATA[element].covalentRadius  │
+│     │   OR (for .acoord): reads from file                      │
+│     │                                                           │
+│     └─ User adds new atom                                      │
+│         └─ Sets: color = DisplaySettings.currentColorScheme    │
+│                 radius = covalent * currentRadiusScale          │
+│                                                                 │
+│  [Modification]                                                 │
+│     │                                                           │
+│     ├─ User manually changes single atom                        │
+│     │   └─ Message: setAtomColor / setAtomRadius               │
+│     │                                                           │
+│     ├─ User applies DisplaySettings to selection               │
+│     │   └─ Message: applyDisplaySettings(atomIds)              │
+│     │       atom.color = currentColorScheme[element]            │
+│     │       atom.radius = covalent * currentRadiusScale         │
+│     │                                                           │
+│     └─ User changes color scheme setting                        │
+│         └─ Does NOT modify existing atoms                       │
+│             Only affects newly created atoms                    │
+│                                                                 │
+│  [Rendering]                                                    │
+│     │                                                           │
+│     └─ Extension sends WireAtom { color, radius }              │
+│         Webview uses directly — no calculation                  │
+│                                                                 │
+│  [Saving]                                                       │
+│     │                                                           │
+│     ├─ .acoord format: saves color, radius                      │
+│     └─ Other formats: may not support (loses on round-trip)     │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### 4.5.3 Color/Radius Priority
+
+When setting atom properties, use this priority:
+
+**For color:**
+1. User-specified color (via `setAtomColor` or loaded from .acoord)
+2. `DisplaySettings.currentColorByElement[element]` (when applying)
+3. Color from `DisplaySettings.currentColorScheme` (when applying)
+4. `ELEMENT_DATA[element].color` (fallback)
+
+**For radius:**
+1. User-specified radius (via `setAtomRadius` or loaded from .acoord)
+2. `DisplaySettings.currentRadiusByElement[element]` (when applying)
+3. `ELEMENT_DATA[element].covalentRadius * DisplaySettings.currentRadiusScale` (when applying)
+4. `ELEMENT_DATA[element].covalentRadius` (fallback)
+
+**Important:** These priorities are used when *applying* DisplaySettings or
+creating atoms. Once set, the atom's color/radius are fixed until explicitly
+changed again.
 
 ---
 
@@ -412,11 +542,14 @@ Transforms a `Structure` snapshot into `WireRenderData` for the webview.
 - Holds selection state (`selectedAtomId`, `selectedAtomIds`, `selectedBondKey`,
   `selectedBondKeys`). This is view-layer state, not domain state.
 - `getRenderMessage()` returns a fully typed `RenderMessage` (not `any`).
-- Applies per-element colors, covalent radii, and display settings when building
-  geometry.
+- **Does NOT compute color or radius** — these are already set on Atom instances.
+- Simply copies `atom.color` and `atom.radius` directly when building `WireAtom`.
 - `getPeriodicBondGeometry()` handles bonds across unit cell boundaries for
   periodic structures. **Known issue:** current implementation is O(n²×27) for
   periodic systems — see `CURRENT_ISSUES.md` for the fix plan.
+
+**Key principle:** RenderMessageBuilder is a pure data transformer. All
+computation happens elsewhere (parsers, services).
 
 ### 5.7 Document Lifecycle Contract
 
@@ -499,6 +632,11 @@ It disposes all existing meshes, rebuilds the instanced meshes from scratch,
 and fits the camera if requested. It is called once per committed edit, not
 during drag previews.
 
+**No property calculation in webview:**
+- `renderer.ts` uses `atom.color` and `atom.radius` directly from `WireAtom`
+- No color scheme lookups, no radius calculations, no fallback logic
+- All such computation happens in the Extension host
+
 ### 6.3 state.ts — Reactive Stores
 
 `state.ts` defines 8 plain mutable store objects:
@@ -507,7 +645,7 @@ during drag previews.
 |---|---|
 | `structureStore` | `currentStructure`, `currentSelectedAtom`, `currentSelectedBondKey` |
 | `selectionStore` | `selectedAtomIds[]`, `selectedBondKeys[]` |
-| `displayStore` | 18 display fields (background color, atom size scale, bond radii, etc.) |
+| `displayStore` | Global display fields (background color, show axes, bond thickness, etc.) — **NOT atom color/radius overrides** |
 | `lightingStore` | `lightingEnabled`, `ambientIntensity`, 3 named `WireLightConfig` objects |
 | `interactionStore` | Drag state, `shouldFitCamera`, `renderAtomOffsets` |
 | `trajectoryStore` | `frameIndex`, `frameCount`, `playing`, `fps` |
@@ -524,6 +662,12 @@ during drag previews.
   `displayStore` from a `WireDisplaySettings` wire message.
 - `extractDisplaySettings()` is the canonical way to read `displayStore` as
   `WireDisplaySettings` for sending back to the extension.
+
+**Important — No atom property overrides in displayStore:**
+- `displayStore` does NOT contain `atomSizeByAtom`, `atomColorByElement`, or similar override maps
+- Atom `color` and `radius` are stored on `Atom` instances in the extension host
+- When user wants to change atom properties, send `setAtomColor` or `applyDisplaySettings` messages
+- This keeps the webview pure: it only displays what the extension sends
 
 ### 6.4 interaction.ts — Input Handling
 
@@ -590,6 +734,18 @@ abstract class StructureParser {
 `parse()` always returns `Structure[]`. Single-structure formats return a
 one-element array. Trajectory formats return the full frame array.
 
+**Parser responsibility for atom properties:**
+- Parsers MUST set `atom.color` and `atom.radius` during parsing
+- Use the current color scheme (default: JMol) to determine colors
+- Use covalent radii from `ELEMENT_DATA` to determine radii
+- Example:
+  ```typescript
+  const color = getColorForElement(atom.element);  // JMol by default
+  const radius = ELEMENT_DATA[atom.element]?.covalentRadius ?? 0.3;
+  atom.color = color;
+  atom.radius = radius;
+  ```
+
 ### 7.2 Parser Contract
 
 Every parser must:
@@ -598,11 +754,13 @@ Every parser must:
 2. **Throw a descriptive `Error` for malformed input.** Include the parser
    name, line number, and what was expected. Never return an empty structure
    in place of an error.
-3. **Preserve format-specific metadata.** Store format-specific data
+3. **Set atom color and radius.** These are required fields, not optional.
+   Use default color scheme (JMol) and covalent radii.
+4. **Preserve format-specific metadata.** Store format-specific data
    (charge, multiplicity, comments, selective dynamics, etc.) in
    `structure.metadata` (a `Map<string, unknown>`). Serializers must read
    from metadata and fall back to defaults only if the key is absent.
-4. **Report errors with context.** `throw new Error('XYZParser line 3: expected atom count, got "foo"')`.
+5. **Report errors with context.** `throw new Error('XYZParser line 3: expected atom count, got "foo"')`.
 
 ### 7.3 Structure.metadata
 
@@ -677,7 +835,33 @@ extension side, `DisplaySettings` is just `Required<WireDisplaySettings>` —
 all fields are present, none optional. This eliminates the former
 dual-type problem where two interfaces had to be kept in sync manually.
 
-### 8.3 Rules
+### 8.3 DisplaySettings Semantics — "Current Brush"
+
+**Key conceptual change:** DisplaySettings represents the "current brush" —
+the settings that would be applied to new atoms or when the user explicitly
+applies them to selected atoms. It does NOT automatically affect existing atoms.
+
+**Fields are categorized as:**
+
+1. **Current brush settings** (affect new atoms, can be applied to selection):
+   - `currentColorScheme` — color scheme ID (e.g., "jmol", "cpk")
+   - `currentRadiusScale` — radius multiplier
+   - `currentColorByElement` — per-element color overrides
+   - `currentRadiusByElement` — per-element radius overrides
+
+2. **Global rendering settings** (affect entire scene immediately):
+   - `backgroundColor`, `showAxes`, `unitCellColor`, etc.
+   - Lighting settings (`lightingEnabled`, `ambientIntensity`, etc.)
+
+**User workflow:**
+1. User changes `currentColorScheme` from "jmol" to "cpk"
+2. Extension updates DisplaySettings
+3. **Existing atoms are NOT modified** — they keep their current colors
+4. User selects some atoms and clicks "Apply to Selection"
+5. Extension updates those atoms' `color` property using the new color scheme
+6. Extension sends `RenderMessage` with updated atoms
+
+### 8.4 Rules
 
 - User-created configs are validated against the JSON schema before storage.
 - Import rejects invalid files with a user-facing `showErrorMessage`.
@@ -686,6 +870,159 @@ dual-type problem where two interfaces had to be kept in sync manually.
 - Presets are immutable — they cannot be deleted or overwritten by users.
 - Migrations run on load if the stored config schema version is older than the
   current version.
+- **DisplaySettings is NOT saved to .acoord files** — it is a global user
+  preference, like a VS Code theme.
+
+---
+
+## 8.5 .acoord Native File Format
+
+ACoord has a native file format (`.acoord`) that preserves all atom properties,
+unlike interchange formats (XYZ, POSCAR, etc.) which only store element and position.
+
+### 8.5.1 File Structure
+
+```typescript
+interface ACoordFile {
+  version: "1.0";
+  atoms: ACoordAtom[];
+  unitCell?: ACoordUnitCell;
+  bonds?: ACoordBond[];
+}
+
+interface ACoordAtom {
+  id: string;
+  element: string;
+  x: number;
+  y: number;
+  z: number;
+  color: string;      // CSS hex color: "#RRGGBB" — required
+  radius: number;     // Angstroms — required
+  label?: string;
+  fixed?: boolean;
+  selectiveDynamics?: [boolean, boolean, boolean];
+}
+
+interface ACoordUnitCell {
+  a: number;
+  b: number;
+  c: number;
+  alpha: number;
+  beta: number;
+  gamma: number;
+}
+
+interface ACoordBond {
+  atomId1: string;
+  atomId2: string;
+}
+```
+
+### 8.5.2 What Gets Saved
+
+**Saved to .acoord:**
+- Atom data: element, position, **color**, **radius**, label, fixed, selectiveDynamics
+- Unit cell parameters
+- Bonds (atom ID pairs)
+
+**NOT saved to .acoord:**
+- DisplaySettings (global user preference)
+- Lighting settings (global user preference)
+- Temporary state (selected, etc.)
+
+### 8.5.3 Round-trip Guarantee
+
+When a user opens a .acoord file, modifies it, and saves:
+1. All atom colors and radii are preserved exactly
+2. User-specified labels, fixed flags, and selective dynamics are preserved
+3. DisplaySettings changes do NOT affect saved atom properties
+
+### 8.5.4 Import from Other Formats
+
+When opening XYZ, POSCAR, CIF, etc.:
+1. Parser sets default color (from current color scheme, typically JMol)
+2. Parser sets default radius (from covalent radii)
+3. User can modify these and save as .acoord to preserve changes
+
+---
+
+## 8.6 User Interaction Patterns
+
+### 8.6.1 DisplaySettings as "Current Brush"
+
+The DisplaySettings panel works like Photoshop's color picker:
+
+```
+┌─────────────────────────────────────┐
+│  Current Brush Settings              │
+│  ─────────────────────               │
+│  Color Scheme: [JMol ▼]              │
+│  Radius Scale: [1.0] ────○──────     │
+│  Element Override:                   │
+│    C: [#909090] [0.76]              │
+│    H: [#FFFFFF] [0.31]              │
+│                                      │
+│  [Apply to Selection (5)]            │
+│  [Apply to All (50)]                 │
+└─────────────────────────────────────┘
+```
+
+**Workflow:**
+1. User adjusts "Current Brush" settings (color scheme, radius scale)
+2. Existing atoms are **not affected** — their colors/radii stay the same
+3. User selects atoms and clicks "Apply to Selection"
+4. Extension updates selected atoms' `color` and `radius` properties
+5. Extension sends `RenderMessage` with updated data
+
+### 8.6.2 Scenario: Changing Color Scheme
+
+```
+User: Opens water.xyz with JMol colors
+      └─ O: #FF0D0D, H: #FFFFFF
+
+User: Changes color scheme to CPK
+      └─ DisplaySettings.currentColorScheme = "cpk"
+      └─ Atoms still have: O: #FF0D0D, H: #FFFFFF  (unchanged!)
+
+User: Selects all atoms → Clicks "Apply to All"
+      └─ Extension updates:
+         - O.color = CPK["O"] = "#FF0000"
+         - H.color = CPK["H"] = "#FFFFFF"
+      └─ RenderMessage sent to webview
+      └─ Webview displays new colors
+```
+
+### 8.6.3 Scenario: Per-Element Override
+
+```
+User: Wants all Carbon atoms to be blue
+      └─ In DisplaySettings panel:
+         - Element Override: C: [#0000FF] [0.76]
+      └─ DisplaySettings.currentColorByElement["C"] = "#0000FF"
+      └─ No atoms changed yet
+
+User: Selects 10 Carbon atoms → Clicks "Apply to Selection"
+      └─ Extension updates:
+         - For each selected C atom: atom.color = "#0000FF"
+      └─ RenderMessage sent
+      └─ Those 10 Carbon atoms are now blue
+```
+
+### 8.6.4 Scenario: Individual Atom Edit
+
+```
+User: Selects one Hydrogen atom
+      └─ Properties panel shows:
+         Element: H
+         Color: [#FFFFFF] ← color picker
+         Radius: [0.31]
+
+User: Changes color to #FF0000 via color picker
+      └─ Webview sends: setAtomColor(atomId, "#FF0000")
+      └─ Extension updates: atom.color = "#FF0000"
+      └─ RenderMessage sent
+      └─ That one Hydrogen is now red
+```
 
 ---
 
@@ -820,11 +1157,13 @@ put it in `extension.test.ts`, not under `unit/`.
 
 | What you added | Test required |
 |---|---|
-| New parser | Round-trip test: `parse(fixture)` → `serialize()` → `parse()` → same atoms/positions/metadata |
+| New parser | Round-trip test: `parse(fixture)` → `serialize()` → `parse()` → same atoms/positions/metadata/color/radius |
 | New service method | Unit test covering success, failure, and edge cases |
 | New structural edit command | Unit test for `AtomEditService` / `BondService` / `UnitCellService` |
 | New message type | Test in `messageRouter.test.mts` that `route()` dispatches correctly |
 | New `Structure` method | Unit test in `structure.test.mts` |
+| Color scheme change | Test that atoms are NOT modified, only DisplaySettings |
+| `applyDisplaySettings` | Test that selected atoms get new color/radius |
 
 ### 11.4 Parser Tests
 
@@ -834,9 +1173,14 @@ Each parser test must verify:
    positions (within `1e-6` Angstrom tolerance).
 2. `serialize(parsed[0])` → `parse(serialized)` produces an equivalent structure
    (round-trip identity).
-3. Format-specific metadata is preserved after round-trip.
-4. Empty input returns `[]` (no throw).
-5. Malformed input throws an `Error` with a descriptive message.
+3. **Atoms have valid color and radius** (not undefined, not null).
+4. Format-specific metadata is preserved after round-trip.
+5. Empty input returns `[]` (no throw).
+6. Malformed input throws an `Error` with a descriptive message.
+
+For `.acoord` parser, also verify:
+- Custom atom colors and radii are preserved
+- Labels, fixed flags, selective dynamics are preserved
 
 ### 11.5 Mocking VS Code Dependencies
 
@@ -1070,7 +1414,8 @@ in the tab and prompts "Save?" on close.
 
 ```typescript
 import { StructureParser } from './structureParser';
-import { Structure } from '../../models';
+import { Structure, Atom } from '../../models';
+import { ELEMENT_DATA, getColorForElement } from '../../utils/elementData';
 
 export class MyFormatParser extends StructureParser {
   readonly name = 'MyFormat';
@@ -1078,16 +1423,32 @@ export class MyFormatParser extends StructureParser {
 
   parse(content: string, fileName?: string): Structure[] {
     if (!content.trim()) { return []; }
-    // ... parse logic ...
+    // ... parse atom positions ...
+    
+    // IMPORTANT: Set color and radius for each atom
+    for (const atom of structure.atoms) {
+      const elementInfo = ELEMENT_DATA[atom.element];
+      atom.color = getColorForElement(atom.element);  // Uses current color scheme
+      atom.radius = elementInfo?.covalentRadius ?? 0.3;
+    }
+    
     // throw new Error(`MyFormatParser line ${n}: ...`) on malformed input
+    return [structure];
   }
 
   serialize(structure: Structure): string {
     // ... serialize logic ...
+    // Atom color/radius are already set on each atom, just serialize them
     // read metadata: const charge = (structure.metadata.get('charge') as number) ?? 0;
   }
 }
 ```
+
+**Key points for parsers:**
+- You MUST set `atom.color` and `atom.radius` for every atom during parsing
+- Use `getColorForElement(element)` to get the default color (JMol scheme)
+- Use `ELEMENT_DATA[element]?.covalentRadius ?? 0.3` for default radius
+- For .acoord format, read color/radius directly from the file
 
 **Step 2 — Register in `src/io/parsers/index.ts`:**
 
@@ -1121,40 +1482,101 @@ malformed input.
 
 ### 14.3 Adding a New Display Setting
 
+Display settings fall into two categories:
+
+1. **Current brush settings** — affect new atoms, can be applied to selection
+2. **Global rendering settings** — affect entire scene immediately
+
 **Step 1 — Add the field to `WireDisplaySettings` in `protocol.ts`:**
 
 ```typescript
 export interface WireDisplaySettings {
   // ... existing fields
-  showMyFeature?: boolean;
+  
+  // Example: Current brush setting
+  currentMyFeatureScale?: number;  // Affects new atoms / apply to selection
+  
+  // OR: Global rendering setting
+  showMyFeature?: boolean;         // Affects entire scene immediately
 }
 ```
 
 Because `DisplaySettings = Required<WireDisplaySettings>`, the extension-side
-type automatically gains `showMyFeature: boolean` — no separate update needed.
+type automatically gains the new field — no separate update needed.
 
-**Step 2 — Add to `displayStore` in `state.ts`:**
+**Step 2 — Categorize the setting:**
 
-```typescript
-export const displayStore: DisplayState = {
-  // ... existing fields
-  showMyFeature: false,
-};
-```
-
-Update `DisplayState` interface and both `applyDisplaySettings()` and
-`extractDisplaySettings()` functions.
+- **Current brush**: Add to `displayStore` and wire up "Apply to Selection" UI
+- **Global rendering**: Add to `displayStore`, takes effect immediately on render
 
 **Step 3 — Use in `renderer.ts`:**
 
 Read from `displayStore.showMyFeature` during `renderStructure()`.
 
-**Step 4 — Add UI control** in the appropriate `app*.ts` panel file.
+**Step 4 — For current brush settings, implement application logic:**
 
-**Step 5 — Serialize/deserialize** — the setting is automatically included in
+```typescript
+// In DisplayConfigService or AtomEditService
+applyCurrentBrushToAtoms(atomIds: string[]): void {
+  for (const atomId of atomIds) {
+    const atom = this.structure.getAtom(atomId);
+    if (!atom) continue;
+    // Apply current brush setting to atom
+    atom.myProperty = this.displaySettings.currentMyFeatureScale;
+  }
+}
+```
+
+**Step 5 — Add UI control** in the appropriate `app*.ts` panel file.
+
+**Step 6 — Serialize/deserialize** — the setting is automatically included in
 `WireDisplaySettings`, so the config system, presets, and migrations handle it
 automatically. Add a migration if a default value change would break existing
 stored configs.
+
+**Step 7 — For current brush settings, add "Apply" UI:**
+
+Provide buttons like "Apply to Selection" and "Apply to All" that call
+`applyDisplaySettings` message with the selected atom IDs.
+
+### 14.4 Applying DisplaySettings to Atoms
+
+When user wants to change atom properties (color, radius) using the current
+DisplaySettings:
+
+**Step 1 — Define the message in `protocol.ts`:**
+
+```typescript
+export interface ApplyDisplaySettingsMessage {
+  command: 'applyDisplaySettings';
+  atomIds: string[];  // Atoms to apply the current brush to
+}
+```
+
+**Step 2 — Implement in `DisplayConfigService` or `AtomEditService`:**
+
+```typescript
+applyDisplaySettings(message: MessageByCommand<'applyDisplaySettings'>): boolean {
+  const { currentColorScheme, currentRadiusScale, currentColorByElement, currentRadiusByElement } = this.displaySettings;
+  
+  for (const atomId of message.atomIds) {
+    const atom = this.structure.getAtom(atomId);
+    if (!atom) continue;
+    
+    // Apply color from current brush
+    atom.color = currentColorByElement?.[atom.element] 
+      ?? getColorFromScheme(atom.element, currentColorScheme);
+    
+    // Apply radius from current brush
+    const baseRadius = ELEMENT_DATA[atom.element]?.covalentRadius ?? 0.3;
+    atom.radius = (currentRadiusByElement?.[atom.element] ?? baseRadius) * currentRadiusScale;
+  }
+  
+  return true;
+}
+```
+
+**Step 3 — Register in MessageRouter and add test.**
 
 ### 14.4 Adding a New Extension Host Service
 
@@ -1224,7 +1646,40 @@ addAtom(message: AddAtomMessage): boolean {
   }
 ```
 
-### 15.5 Don't Store Runtime Objects in Structure.metadata
+### 15.5 Don't Calculate Atom Properties in Webview
+
+```typescript
+// WRONG — webview should not calculate colors/radii
+function getAtomColor(atom: WireAtom): string {
+  return displayStore.atomColorByElement?.[atom.element] 
+    ?? atom.color;
+}
+
+// CORRECT — use atom.color directly, it's already computed by extension
+function getAtomColor(atom: WireAtom): string {
+  return atom.color;  // Extension already set this
+}
+
+// WRONG — webview should not override atom properties
+if (displayStore.atomSizeByAtom?.[atomId]) {
+  radius = displayStore.atomSizeByAtom[atomId];  // Don't do this
+}
+
+// CORRECT — if user wants different radius, send message to extension
+vscode.postMessage({ 
+  command: 'setAtomRadius', 
+  atomIds: [atomId], 
+  radius: newRadius 
+});
+```
+
+**Why:** The webview is a pure rendering surface. All calculations belong in
+the extension host. This enables:
+- Consistent behavior across different frontends (Webview, Jupyter, etc.)
+- Easier testing (logic is in Node.js, not browser)
+- Clear separation of concerns
+
+### 15.6 Don't Store Runtime Objects in Structure.metadata
 
 `Structure.metadata` is serialized to JSON via `toJSON()`. Storing
 non-serializable objects (class instances, functions, `Buffer`s) will either
@@ -1240,7 +1695,7 @@ structure.metadata.set('comment', 'water molecule');
 structure.metadata.set('selectiveDynamics', [[true, true, false], [false, false, true]]);
 ```
 
-### 15.6 Don't Create Per-Atom Three.js Objects
+### 15.7 Don't Create Per-Atom Three.js Objects
 
 ```typescript
 // WRONG — O(n) geometry allocations, destroys performance
@@ -1287,6 +1742,83 @@ default: {
 `DisplaySettings` in `config/types.ts` is `Required<WireDisplaySettings>`.
 Never add a field to one without adding it to the other. In practice, just
 add it to `WireDisplaySettings` and everything else follows automatically.
+
+### 15.10 Don't Auto-Apply DisplaySettings to Existing Atoms
+
+```typescript
+// WRONG — changing color scheme should not modify existing atoms
+setColorScheme(schemeId: string): void {
+  this.displaySettings.currentColorScheme = schemeId;
+  // Don't do this:
+  for (const atom of this.structure.atoms) {
+    atom.color = getColorFromScheme(atom.element, schemeId);
+  }
+}
+
+// CORRECT — only update the setting, let user explicitly apply
+setColorScheme(schemeId: string): void {
+  this.displaySettings.currentColorScheme = schemeId;
+  // Atoms unchanged, user can apply via "Apply to Selection"
+}
+```
+
+**Rationale:** DisplaySettings is a "current brush" — it affects new atoms and
+can be applied to selection, but should not silently modify existing data.
+
+### 15.11 Don't Confuse "Atom Property" with "Display Setting"
+
+| Atom Property | Display Setting |
+|---|---|
+| Stored on `Atom` instance | Stored in `DisplaySettings` |
+| Saved to `.acoord` file | NOT saved to `.acoord` file |
+| Per-atom, can differ | Global, applies uniformly |
+| Set by: parser, `setAtomColor`, `applyDisplaySettings` | Set by: config UI, `setColorScheme`, etc. |
+| Example: `atom.color = "#FF0000"` | Example: `currentColorScheme = "jmol"` |
+
+---
+
+## 16. Architecture Evolution Notes
+
+### 16.1 Version 2.0 Changes (2026-03-08)
+
+**Major architectural refactoring** based on design principles from
+`docs/full-stack-refactor-plan.md`:
+
+**1. Atom model refactoring:**
+- `color` and `radius` changed from optional to **required** fields
+- Parsers now set these values during parsing (using default color scheme and covalent radii)
+- Webview no longer computes or overrides these values
+
+**2. DisplaySettings semantics:**
+- Reinterpreted as "current brush" — settings for new atoms
+- Does NOT automatically apply to existing atoms
+- User must explicitly "Apply to Selection" to update atom properties
+
+**3. Computation centralization:**
+- All color/radius calculation moved to extension host
+- Webview is now a pure rendering surface
+- Enables multi-frontend support (Webview, Jupyter, etc.)
+
+**4. New .acoord native format:**
+- JSON-based native format that preserves all atom properties
+- Supports labels, fixed flags, selective dynamics
+- Round-trip guarantee: save → load → save produces identical file
+
+**5. WireDisplaySettings field renaming:**
+- `atomColorSchemeId` → `currentColorScheme`
+- `atomSizeScale` → `currentRadiusScale`
+- `atomColorByElement` → `currentColorByElement`
+- `atomSizeByElement` → `currentRadiusByElement`
+- Removed: `atomSizeByAtom`, `atomSizeUseDefaultSettings`, `atomSizeGlobal`
+
+### 16.2 Migration Guide
+
+When updating existing code:
+
+1. **Parser changes:** Ensure all parsers set `atom.color` and `atom.radius`
+2. **Webview changes:** Remove any color/radius calculation logic
+3. **Service changes:** Add `applyDisplaySettings(atomIds)` method
+4. **Config migrations:** Add migration for renamed DisplaySettings fields
 
 ---
 

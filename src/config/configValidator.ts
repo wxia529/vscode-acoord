@@ -12,13 +12,10 @@ export class ConfigValidator {
     unitCellColor: '#FF6600',
     unitCellThickness: 1,
     unitCellLineStyle: 'solid',
-    atomSizeUseDefaultSettings: true,
-    atomSizeGlobal: 0.3,
-    atomSizeByElement: {},
-    atomSizeByAtom: {},
+    currentRadiusByElement: {},
     manualScale: 1,
     autoScaleEnabled: false,
-    atomSizeScale: 1,
+    currentRadiusScale: 1,
     bondThicknessScale: 1,
     viewZoom: 1,
     scaleAtomsWithLattice: false,
@@ -48,15 +45,14 @@ export class ConfigValidator {
       y: 5,
       z: -10
     },
-    atomColorSchemeId: 'preset-jmol-default',
-    atomColorByElement: {}
+    currentColorScheme: 'preset-jmol-default',
+    currentColorByElement: {}
   };
 
   private static readonly ranges = {
     unitCellThickness: { min: 0.1, max: 10 },
-    atomSizeGlobal: { min: 0.05, max: 5 },
     manualScale: { min: 0.1, max: 10 },
-    atomSizeScale: { min: 0.1, max: 5 },
+    currentRadiusScale: { min: 0.1, max: 5 },
     bondThicknessScale: { min: 0.1, max: 10 },
     viewZoom: { min: 0.1, max: 5 },
     ambientIntensity: { min: 0, max: 5 },
@@ -207,53 +203,15 @@ export class ConfigValidator {
       };
     };
 
-    const normalizeAtomSizeMap = (value: unknown, label: string, enforceElement: boolean) => {
-      if (!value || typeof value !== 'object') {
-        warnings.push(`${label} must be an object; using empty map.`);
-        changed = true;
-        return {} as Record<string, number>;
-      }
-
-      const output: Record<string, number> = {};
-      for (const [rawKey, rawValue] of Object.entries(value)) {
-        if (typeof rawKey !== 'string' || !rawKey.trim()) {
-          warnings.push(`${label} contains invalid key; entry removed.`);
-          changed = true;
-          continue;
-        }
-        const key = enforceElement ? parseElement(rawKey) : rawKey.trim();
-        if (!key) {
-          warnings.push(`${label} contains unknown element '${rawKey}'; entry removed.`);
-          changed = true;
-          continue;
-        }
-        if (typeof rawValue !== 'number' || !Number.isFinite(rawValue)) {
-          warnings.push(`${label}.${rawKey} must be a number; entry removed.`);
-          changed = true;
-          continue;
-        }
-        const clamped = Math.min(
-          ConfigValidator.ranges.atomSizeMap.max,
-          Math.max(ConfigValidator.ranges.atomSizeMap.min, rawValue)
-        );
-        if (clamped !== rawValue) {
-          warnings.push(`${label}.${rawKey} out of range; clamped.`);
-          changed = true;
-        }
-        output[key] = clamped;
-      }
-      return output;
-    };
-
     const normalizeColorSchemeId = (value: unknown): string => {
       if (typeof value !== 'string' || !value) {
         changed = true;
-        return defaults.atomColorSchemeId;
+        return defaults.currentColorScheme;
       }
       return value;
     };
 
-    const normalizeAtomColorByElement = (value: unknown): Record<string, string> => {
+    const normalizeColorByElement = (value: unknown): Record<string, string> => {
       if (!value || typeof value !== 'object') {
         changed = true;
         return {};
@@ -265,6 +223,38 @@ export class ConfigValidator {
         } else {
           changed = true;
         }
+      }
+      return output;
+    };
+
+    const normalizeRadiusByElement = (value: unknown): Record<string, number> => {
+      if (!value || typeof value !== 'object') {
+        changed = true;
+        return {};
+      }
+      const output: Record<string, number> = {};
+      for (const [key, val] of Object.entries(value)) {
+        if (typeof key !== 'string' || !key.trim()) {
+          changed = true;
+          continue;
+        }
+        const parsedKey = parseElement(key);
+        if (!parsedKey) {
+          changed = true;
+          continue;
+        }
+        if (typeof val !== 'number' || !Number.isFinite(val)) {
+          changed = true;
+          continue;
+        }
+        const clamped = Math.min(
+          ConfigValidator.ranges.atomSizeMap.max,
+          Math.max(ConfigValidator.ranges.atomSizeMap.min, val)
+        );
+        if (clamped !== val) {
+          changed = true;
+        }
+        output[parsedKey] = clamped;
       }
       return output;
     };
@@ -287,26 +277,8 @@ export class ConfigValidator {
         defaults.unitCellLineStyle,
         'settings.unitCellLineStyle'
       ),
-      atomSizeUseDefaultSettings: normalizeBoolean(
-        input.atomSizeUseDefaultSettings,
-        defaults.atomSizeUseDefaultSettings,
-        'settings.atomSizeUseDefaultSettings'
-      ),
-      atomSizeGlobal: normalizeNumber(
-        input.atomSizeGlobal,
-        defaults.atomSizeGlobal,
-        ConfigValidator.ranges.atomSizeGlobal,
-        'settings.atomSizeGlobal'
-      ),
-      atomSizeByElement: normalizeAtomSizeMap(
-        input.atomSizeByElement,
-        'settings.atomSizeByElement',
-        true
-      ),
-      atomSizeByAtom: normalizeAtomSizeMap(
-        input.atomSizeByAtom,
-        'settings.atomSizeByAtom',
-        false
+      currentRadiusByElement: normalizeRadiusByElement(
+        input.currentRadiusByElement
       ),
       manualScale: normalizeNumber(
         input.manualScale,
@@ -319,11 +291,11 @@ export class ConfigValidator {
         defaults.autoScaleEnabled,
         'settings.autoScaleEnabled'
       ),
-      atomSizeScale: normalizeNumber(
-        input.atomSizeScale,
-        defaults.atomSizeScale,
-        ConfigValidator.ranges.atomSizeScale,
-        'settings.atomSizeScale'
+      currentRadiusScale: normalizeNumber(
+        input.currentRadiusScale,
+        defaults.currentRadiusScale,
+        ConfigValidator.ranges.currentRadiusScale,
+        'settings.currentRadiusScale'
       ),
       bondThicknessScale: normalizeNumber(
         input.bondThicknessScale,
@@ -369,8 +341,8 @@ export class ConfigValidator {
       keyLight: normalizeLight(input.keyLight, defaults.keyLight, 'settings.keyLight'),
       fillLight: normalizeLight(input.fillLight, defaults.fillLight, 'settings.fillLight'),
       rimLight: normalizeLight(input.rimLight, defaults.rimLight, 'settings.rimLight'),
-      atomColorSchemeId: normalizeColorSchemeId(input.atomColorSchemeId),
-      atomColorByElement: normalizeAtomColorByElement(input.atomColorByElement)
+      currentColorScheme: normalizeColorSchemeId(input.currentColorScheme),
+      currentColorByElement: normalizeColorByElement(input.currentColorByElement)
     };
 
     return { settings: normalized, errors, warnings, changed };

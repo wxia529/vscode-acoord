@@ -1,4 +1,4 @@
-import { structureStore, selectionStore, displayStore, adsorptionStore, interactionStore, applyDisplaySettings } from './state';
+import { structureStore, selectionStore, displayStore, adsorptionStore, interactionStore, applyDisplaySettings, type BoxSelectionMode } from './state';
 import { renderer } from './renderer';
 import * as configHandler from './configHandler';
 import * as colorSchemeHandler from './colorSchemeHandler';
@@ -18,13 +18,15 @@ import {
   setStatus,
   updateStatusBar,
   syncStatusSelectionLock,
-  statusSelectionLock,
+  isStatusSelectionLocked,
 } from './ui/statusBar';
 import {
   setupInlineSliderValueEditing,
   updateCounts,
   getImageFileName,
   setupTabs,
+  setupCollapsiblePanels,
+  togglePanel,
 } from './ui/common';
 import {
   normalizeHexColor,
@@ -32,6 +34,7 @@ import {
   updateAtomColorPreview,
   updateAdsorptionUI,
   applySelectedAtomChanges,
+  updatePropertiesPanel,
 } from './ui/inputs';
 
 // Measurement utilities
@@ -89,6 +92,7 @@ const uiCallbacks = {
   updateAdsorptionUI,
   updateAtomSizePanel,
   updateStatusBar,
+  updatePropertiesPanel,
 };
 
 function rerenderCurrentStructure(): void {
@@ -131,31 +135,65 @@ const toolCallbacks = {
 
 function setupUI(): void {
   setupTabs();
+  setupCollapsiblePanels();
 
-  // Toolbar buttons
-  const buttons = {
-    unitCell: document.getElementById('btn-unit-cell') as HTMLButtonElement | null,
-    reset: document.getElementById('btn-reset') as HTMLButtonElement | null,
-    undo: document.getElementById('btn-undo') as HTMLButtonElement | null,
-    redo: document.getElementById('btn-redo') as HTMLButtonElement | null,
-    save: document.getElementById('btn-save') as HTMLButtonElement | null,
-    saveAs: document.getElementById('btn-save-as') as HTMLButtonElement | null,
-    exportImage: document.getElementById('btn-export-image') as HTMLButtonElement | null,
-    openSource: document.getElementById('btn-open-source') as HTMLButtonElement | null,
-    reload: document.getElementById('btn-reload') as HTMLButtonElement | null,
-  };
+  const canvas = document.getElementById('canvas') as HTMLCanvasElement;
 
-  if (buttons.unitCell) buttons.unitCell.addEventListener('click', () => vscode.postMessage({ command: 'toggleUnitCell' }));
-  if (buttons.reset) buttons.reset.addEventListener('click', () => renderer.fitCamera());
-  if (buttons.undo) buttons.undo.addEventListener('click', () => vscode.postMessage({ command: 'undo' }));
-  if (buttons.redo) buttons.redo.addEventListener('click', () => vscode.postMessage({ command: 'redo' }));
-  if (buttons.save) buttons.save.addEventListener('click', () => vscode.postMessage({ command: 'saveStructure' }));
-  if (buttons.saveAs) buttons.saveAs.addEventListener('click', () => vscode.postMessage({ command: 'saveStructureAs' }));
-  if (buttons.openSource) buttons.openSource.addEventListener('click', () => vscode.postMessage({ command: 'openSource' }));
-  if (buttons.reload) buttons.reload.addEventListener('click', () => vscode.postMessage({ command: 'reloadStructure' }));
+  const toolbarAddAtom = document.getElementById('toolbar-add-atom') as HTMLSelectElement | null;
+  const toolbarDelete = document.getElementById('toolbar-delete') as HTMLButtonElement | null;
+  const toolbarBoxMode = document.getElementById('toolbar-box-mode') as HTMLSelectElement | null;
+  const toolbarColorScheme = document.getElementById('toolbar-color-scheme') as HTMLSelectElement | null;
+  const btnReset = document.getElementById('btn-reset') as HTMLButtonElement | null;
+  const btnUndo = document.getElementById('btn-undo') as HTMLButtonElement | null;
+  const btnRedo = document.getElementById('btn-redo') as HTMLButtonElement | null;
+  const btnSave = document.getElementById('btn-save') as HTMLButtonElement | null;
+  const btnExportImage = document.getElementById('btn-export-image') as HTMLButtonElement | null;
 
-  if (buttons.exportImage) {
-    buttons.exportImage.addEventListener('click', () => {
+  if (toolbarAddAtom) {
+    toolbarAddAtom.addEventListener('change', () => {
+      const element = toolbarAddAtom.value;
+      if (element) {
+        interactionStore.addingAtomElement = element;
+        canvas.style.cursor = 'crosshair';
+        setStatus(`Adding ${element} atoms - Click to place, Esc to cancel`);
+        toolbarAddAtom.value = '';
+      }
+    });
+  }
+
+  if (toolbarDelete) {
+    toolbarDelete.addEventListener('click', () => {
+      if (selectionStore.selectedAtomIds.length > 0) {
+        vscode.postMessage({ command: 'deleteAtoms', atomIds: selectionStore.selectedAtomIds });
+      } else if (selectionStore.selectedBondKeys.length > 0) {
+        vscode.postMessage({ command: 'deleteBond', bondKey: selectionStore.selectedBondKeys[0] });
+      }
+    });
+  }
+
+  if (toolbarBoxMode) {
+    toolbarBoxMode.addEventListener('change', () => {
+      interactionStore.boxSelectionMode = toolbarBoxMode.value as BoxSelectionMode;
+    });
+    toolbarBoxMode.value = interactionStore.boxSelectionMode;
+  }
+
+  if (toolbarColorScheme) {
+    toolbarColorScheme.addEventListener('change', () => {
+      const schemeId = toolbarColorScheme.value;
+      if (schemeId) {
+        colorSchemeHandler.loadScheme(schemeId);
+      }
+    });
+  }
+
+  if (btnReset) btnReset.addEventListener('click', () => renderer.fitCamera());
+  if (btnUndo) btnUndo.addEventListener('click', () => vscode.postMessage({ command: 'undo' }));
+  if (btnRedo) btnRedo.addEventListener('click', () => vscode.postMessage({ command: 'redo' }));
+  if (btnSave) btnSave.addEventListener('click', () => vscode.postMessage({ command: 'saveStructure' }));
+
+  if (btnExportImage) {
+    btnExportImage.addEventListener('click', () => {
       if (!renderer.exportHighResolutionImage) {
         setError('HD image export is unavailable.');
         return;
@@ -291,6 +329,92 @@ function setupInteraction(): void {
     },
 
     onEndDrag: () => vscode.postMessage({ command: 'endDrag' }),
+
+    onDelete: () => {
+      if (selectionStore.selectedAtomIds.length > 0) {
+        vscode.postMessage({ command: 'deleteAtoms', atomIds: selectionStore.selectedAtomIds });
+      } else if (selectionStore.selectedBondKeys.length > 0) {
+        vscode.postMessage({ command: 'deleteBond', bondKey: selectionStore.selectedBondKeys[0] });
+      }
+    },
+
+    onSelectAll: () => {
+      if (!structureStore.currentStructure) return;
+      const allIds = structureStore.currentStructure.atoms.map((a) => a.id);
+      selectHandlers.applySelection(allIds, 'replace');
+    },
+
+    onInvertSelection: () => {
+      if (!structureStore.currentStructure) return;
+      const allIds = new Set(structureStore.currentStructure.atoms.map((a) => a.id));
+      const currentIds = new Set(selectionStore.selectedAtomIds);
+      const inverted = [...allIds].filter((id) => !currentIds.has(id));
+      selectHandlers.applySelection(inverted, 'replace');
+    },
+
+    onAddAtom: (element: string, x: number, y: number, z: number) => {
+      vscode.postMessage({ command: 'addAtom', element, x, y, z });
+    },
+
+    onCopy: (atomIds: string[]) => {
+      vscode.postMessage({ command: 'copySelection', atomIds });
+    },
+
+    onPaste: () => {
+      vscode.postMessage({ command: 'pasteSelection' });
+    },
+
+    onUndo: () => vscode.postMessage({ command: 'undo' }),
+    onRedo: () => vscode.postMessage({ command: 'redo' }),
+    onSave: () => vscode.postMessage({ command: 'saveStructure' }),
+    onExportImage: () => {
+      if (!renderer.exportHighResolutionImage) return;
+      const result = renderer.exportHighResolutionImage({ scale: 4 });
+      if (result?.dataUrl) {
+        vscode.postMessage({
+          command: 'saveRenderedImage',
+          dataUrl: result.dataUrl,
+          suggestedName: getImageFileName(),
+          width: result.width,
+          height: result.height,
+        });
+      }
+    },
+
+    onSetAtomColor: (atomIds: string[], color: string) => {
+      vscode.postMessage({ command: 'setAtomColor', atomIds, color });
+    },
+
+    onSetAtomRadius: (atomIds: string[], radius: number) => {
+      vscode.postMessage({ command: 'setAtomRadius', atomIds, radius });
+    },
+
+    onChangeElement: (atomIds: string[], element: string) => {
+      vscode.postMessage({ command: 'changeAtoms', atomIds, element });
+    },
+
+    onCreateBond: (atomIds: string[]) => {
+      vscode.postMessage({ command: 'createBond', atomIds });
+    },
+
+    onSetBondLength: (bondKeys: string[], length: number) => {
+      if (bondKeys.length === 0) return;
+      const bondKey = bondKeys[0];
+      const [atomId1, atomId2] = bondKey.split('-');
+      if (atomId1 && atomId2) {
+        vscode.postMessage({ command: 'setBondLength', atomIds: [atomId1, atomId2], length });
+      }
+    },
+
+    onDeleteAtoms: (atomIds: string[]) => {
+      vscode.postMessage({ command: 'deleteAtoms', atomIds });
+    },
+
+    onDeleteBonds: (bondKeys: string[]) => {
+      if (bondKeys.length > 0) {
+        vscode.postMessage({ command: 'deleteBond', bondKey: bondKeys[0] });
+      }
+    },
   });
 }
 
@@ -314,7 +438,7 @@ function start(): void {
 
   document.addEventListener('selectionchange', () => {
     syncStatusSelectionLock();
-    if (!statusSelectionLock) updateStatusBar(true);
+    if (!isStatusSelectionLocked()) updateStatusBar(true);
   });
 }
 
@@ -461,11 +585,13 @@ if (document.readyState === 'complete') {
   window.addEventListener('load', start);
 }
 
+(window as unknown as { togglePanel: (panelId: string) => void }).togglePanel = togglePanel;
+
 // Re-export for other modules
 export {
   setError,
   setStatus,
   updateStatusBar,
   syncStatusSelectionLock,
-  statusSelectionLock,
+  isStatusSelectionLocked,
 };

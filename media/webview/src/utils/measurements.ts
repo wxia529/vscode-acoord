@@ -97,10 +97,12 @@ export function getAtomById(atomId: string): Atom | null {
 
 export function updateMeasurements(): void {
   const lengthEl = getElementById<HTMLElement>('bond-length');
+  const lengthDisplayEl = getElementById<HTMLElement>('bond-length-display');
   const angleEl = getElementById<HTMLElement>('bond-angle');
   const selected = selectionStore.selectedAtomIds;
   if (selected.length < 2) {
     if (lengthEl) lengthEl.textContent = '--';
+    if (lengthDisplayEl) lengthDisplayEl.textContent = '--';
     if (angleEl) angleEl.textContent = '--';
     return;
   }
@@ -108,6 +110,7 @@ export function updateMeasurements(): void {
   const atomB = getAtomById(selected[1]);
   if (!atomA || !atomB) {
     if (lengthEl) lengthEl.textContent = '--';
+    if (lengthDisplayEl) lengthDisplayEl.textContent = '--';
     if (angleEl) angleEl.textContent = '--';
     return;
   }
@@ -116,6 +119,7 @@ export function updateMeasurements(): void {
   const dz = atomB.position[2] - atomA.position[2];
   const length = Math.sqrt(dx * dx + dy * dy + dz * dz);
   if (lengthEl) lengthEl.textContent = length.toFixed(4);
+  if (lengthDisplayEl) lengthDisplayEl.textContent = length.toFixed(4);
 
   if (selected.length < 3) {
     if (angleEl) angleEl.textContent = '--';

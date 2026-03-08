@@ -9,67 +9,83 @@
 </head>
 <body>
   <div id="toolbar">
-    <button id="btn-unit-cell">Unit Cell</button>
-    <button id="btn-reset">Reset</button>
-    <button id="btn-undo">Undo</button>
-    <button id="btn-redo">Redo</button>
-    <button id="btn-save">Save</button>
-    <button id="btn-save-as">Save As</button>
-    <button id="btn-export-image">Export HD PNG</button>
-    <button id="btn-open-source">Open Source</button>
-    <button id="btn-reload">Reload</button>
+    <div class="toolbar-group">
+      <select id="toolbar-add-atom" title="Add atom">
+        <option value="">Add Atom...</option>
+        <option value="C">Carbon (C)</option>
+        <option value="H">Hydrogen (H)</option>
+        <option value="O">Oxygen (O)</option>
+        <option value="N">Nitrogen (N)</option>
+        <option value="S">Sulfur (S)</option>
+        <option value="P">Phosphorus (P)</option>
+        <option value="Fe">Iron (Fe)</option>
+        <option value="Cu">Copper (Cu)</option>
+        <option value="Zn">Zinc (Zn)</option>
+        <option value="Al">Aluminum (Al)</option>
+        <option value="Mg">Magnesium (Mg)</option>
+        <option value="Na">Sodium (Na)</option>
+        <option value="Ca">Calcium (Ca)</option>
+        <option value="Ti">Titanium (Ti)</option>
+        <option value="Cr">Chromium (Cr)</option>
+        <option value="Mn">Manganese (Mn)</option>
+        <option value="Co">Cobalt (Co)</option>
+        <option value="Ni">Nickel (Ni)</option>
+        <option value="Ag">Silver (Ag)</option>
+        <option value="Au">Gold (Au)</option>
+      </select>
+      <button id="toolbar-delete" title="Delete selected (Delete)">Delete</button>
+    </div>
+    <div class="toolbar-separator"></div>
+    <div class="toolbar-group">
+      <label>Box:</label>
+      <select id="toolbar-box-mode" title="Box selection mode">
+        <option value="atoms">Atoms Only</option>
+        <option value="bonds">Bonds Only</option>
+        <option value="both">Atoms and Bonds</option>
+      </select>
+    </div>
+    <div class="toolbar-separator"></div>
+    <div class="toolbar-group">
+      <label>Color:</label>
+      <select id="toolbar-color-scheme" title="Color scheme">
+        <option value="">Loading...</option>
+      </select>
+    </div>
+    <div class="toolbar-spacer"></div>
+    <div class="toolbar-group toolbar-right">
+      <button id="btn-reset" title="Reset View">Reset</button>
+      <button id="btn-undo" title="Undo (Ctrl+Z)">↶</button>
+      <button id="btn-redo" title="Redo (Ctrl+Y)">↷</button>
+      <button id="btn-save" title="Save (Ctrl+S)">Save</button>
+      <button id="btn-export-image" title="Export PNG">Export</button>
+    </div>
   </div>
   <div id="error-banner"></div>
   <div id="status-banner"></div>
 
   <div id="container">
+    <div id="left-toolbar">
+      <button class="tool-btn active" data-tool="select" title="Select (V)">V</button>
+      <button class="tool-btn" data-tool="move" title="Move (Shift+Alt+drag)">M</button>
+      <button class="tool-btn" data-tool="box" title="Box Select (B)">B</button>
+      <button class="tool-btn" data-tool="add" title="Add Atom (A)">A</button>
+      <button class="tool-btn" data-tool="delete" title="Delete (D)">D</button>
+    </div>
     <div id="canvas-wrap">
       <canvas id="canvas"></canvas>
       <div id="selection-box"></div>
     </div>
     <div id="sidebar">
-      <div class="panel">
-        <div class="panel-title">Structure Info</div>
-        <div id="info">
-          <div>Atoms: <span id="atom-count">0</span></div>
-          <div>Bonds: <span id="bond-count">0</span></div>
+      <div class="collapsible-panel" data-panel="properties">
+        <div class="panel-header" onclick="togglePanel('properties')">
+          <span class="panel-title">Properties</span>
+          <span class="panel-toggle">▼</span>
         </div>
-      </div>
-
-      <div class="tab-nav" role="tablist" aria-label="Sidebar tabs">
-        <button class="tab-button active" data-tab-target="tab-edit" type="button">Edit</button>
-        <button class="tab-button" data-tab-target="tab-lattice" type="button">Lattice</button>
-        <button class="tab-button" data-tab-target="tab-view" type="button">View</button>
-        <button class="tab-button" data-tab-target="tab-display" type="button">Display</button>
-        <button class="tab-button" data-tab-target="tab-tools" type="button">Tools</button>
-        <button class="tab-button" data-tab-target="tab-trajectory" type="button">Trajectory</button>
-      </div>
-
-      <div class="tab-content">
-        <div class="tab-pane active" id="tab-edit">
-          <div class="panel">
-            <div class="panel-title">Quick Add</div>
-            <div class="input-group">
-              <label>Element</label>
-              <input type="text" id="element-input" placeholder="e.g., C, N, O" maxlength="3" />
-            </div>
-            <div class="input-group">
-              <label>X (A)</label>
-              <input type="number" id="pos-x" placeholder="0.0" step="0.1" />
-            </div>
-            <div class="input-group">
-              <label>Y (A)</label>
-              <input type="number" id="pos-y" placeholder="0.0" step="0.1" />
-            </div>
-            <div class="input-group">
-              <label>Z (A)</label>
-              <input type="number" id="pos-z" placeholder="0.0" step="0.1" />
-            </div>
-            <button id="btn-add-atom-form">Add</button>
+        <div class="panel-content" id="panel-properties">
+          <div id="properties-no-selection" class="properties-message">
+            Click an atom or bond to see properties
           </div>
-
-          <div class="panel">
-            <div class="panel-title">Selected Atom</div>
+          <div id="properties-single-atom" style="display:none;">
             <div class="input-group">
               <label>Element</label>
               <input type="text" id="sel-element" placeholder="Select an atom" maxlength="3" />
@@ -88,52 +104,138 @@
             </div>
             <button id="btn-apply-atom">Apply</button>
           </div>
-
-
-
-        </div>
-
-        <div class="tab-pane" id="tab-lattice">
-          <div class="panel">
-            <div class="panel-title">Lattice Params</div>
-            <div class="input-group">
-              <label>a (A)</label>
-              <input type="number" id="lattice-a" step="0.01" min="0" />
-            </div>
-            <div class="input-group">
-              <label>b (A)</label>
-              <input type="number" id="lattice-b" step="0.01" min="0" />
-            </div>
-            <div class="input-group">
-              <label>c (A)</label>
-              <input type="number" id="lattice-c" step="0.01" min="0" />
-            </div>
-            <div class="input-group">
-              <label>alpha (deg)</label>
-              <input type="number" id="lattice-alpha" step="0.1" min="0" max="180" />
-            </div>
-            <div class="input-group">
-              <label>beta (deg)</label>
-              <input type="number" id="lattice-beta" step="0.1" min="0" max="180" />
-            </div>
-            <div class="input-group">
-              <label>gamma (deg)</label>
-              <input type="number" id="lattice-gamma" step="0.1" min="0" max="180" />
-            </div>
-            <div class="input-group">
-              <label class="checkbox-row">
-                <input type="checkbox" id="lattice-scale" />
-                Scale atoms with lattice
-              </label>
-            </div>
-            <div class="input-group" style="display:flex;gap:6px;flex-direction:row;">
-              <button id="btn-lattice-apply" type="button">Apply Lattice</button>
-              <button id="btn-lattice-remove" type="button">Remove Lattice</button>
+          <div id="properties-multi-atom" style="display:none;">
+            <div class="properties-message">
+              <div>Selected: <span id="multi-atom-count">0</span> atoms</div>
+              <div id="multi-atom-breakdown"></div>
             </div>
           </div>
+          <div id="properties-single-bond" style="display:none;">
+            <div class="properties-message">
+              <div>Bond: <span id="bond-selected">--</span></div>
+              <div>Length: <span id="bond-length">--</span> A</div>
+            </div>
+            <div class="input-group">
+              <label>Set bond length (A)</label>
+              <input type="number" id="bond-length-input" step="0.01" />
+            </div>
+            <button id="btn-apply-bond">Apply Bond Length</button>
+          </div>
+          <div class="panel-section">
+            <div class="panel-section-title">Quick Add</div>
+            <div class="input-group">
+              <label>Element</label>
+              <input type="text" id="element-input" placeholder="e.g., C, N, O" maxlength="3" />
+            </div>
+            <div class="input-group">
+              <label>X (A)</label>
+              <input type="number" id="pos-x" placeholder="0.0" step="0.1" />
+            </div>
+            <div class="input-group">
+              <label>Y (A)</label>
+              <input type="number" id="pos-y" placeholder="0.0" step="0.1" />
+            </div>
+            <div class="input-group">
+              <label>Z (A)</label>
+              <input type="number" id="pos-z" placeholder="0.0" step="0.1" />
+            </div>
+            <button id="btn-add-atom-form">Add</button>
+          </div>
+        </div>
+      </div>
 
-          <div class="panel">
-            <div class="panel-title">Supercell</div>
+      <div class="collapsible-panel" data-panel="structure">
+        <div class="panel-header" onclick="togglePanel('structure')">
+          <span class="panel-title">Structure</span>
+          <span class="panel-toggle">▶</span>
+        </div>
+        <div class="panel-content collapsed" id="panel-structure">
+          <div id="structure-info">
+            <div>Atoms: <span id="atom-count">0</span></div>
+            <div>Bonds: <span id="bond-count">0</span></div>
+            <div>Formula: <span id="chemical-formula">--</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="collapsible-panel" data-panel="atom-list">
+        <div class="panel-header" onclick="togglePanel('atom-list')">
+          <span class="panel-title">Atom List</span>
+          <span class="panel-toggle">▶</span>
+        </div>
+        <div class="panel-content collapsed" id="panel-atom-list">
+          <div class="atom-list" id="atom-list"></div>
+        </div>
+      </div>
+
+      <div class="collapsible-panel" data-panel="measurements">
+        <div class="panel-header" onclick="togglePanel('measurements')">
+          <span class="panel-title">Measurements</span>
+          <span class="panel-toggle">▶</span>
+        </div>
+        <div class="panel-content collapsed" id="panel-measurements">
+          <div id="measurements">
+            <div>Bond length: <span id="bond-length-display">--</span> A</div>
+            <div>Bond angle: <span id="bond-angle">--</span> deg</div>
+          </div>
+          <div class="input-group">
+            <label>Set bond angle (deg)</label>
+            <input type="number" id="bond-angle-input" step="0.1" />
+          </div>
+          <button id="btn-apply-angle">Apply Bond Angle</button>
+          <div class="panel-section" style="margin-top:12px;">
+            <div class="panel-section-title">Bond Tools</div>
+            <div class="input-group" style="display:flex;gap:6px;flex-direction:row;">
+              <button id="btn-create-bond" type="button">Create Bond</button>
+              <button id="btn-delete-bond" type="button">Delete Bond</button>
+            </div>
+            <button id="btn-recalculate-bonds" type="button">Recalculate All Bonds</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="collapsible-panel" data-panel="lattice">
+        <div class="panel-header" onclick="togglePanel('lattice')">
+          <span class="panel-title">Lattice</span>
+          <span class="panel-toggle">▶</span>
+        </div>
+        <div class="panel-content collapsed" id="panel-lattice">
+          <div class="input-group">
+            <label>a (A)</label>
+            <input type="number" id="lattice-a" step="0.01" min="0" />
+          </div>
+          <div class="input-group">
+            <label>b (A)</label>
+            <input type="number" id="lattice-b" step="0.01" min="0" />
+          </div>
+          <div class="input-group">
+            <label>c (A)</label>
+            <input type="number" id="lattice-c" step="0.01" min="0" />
+          </div>
+          <div class="input-group">
+            <label>alpha (deg)</label>
+            <input type="number" id="lattice-alpha" step="0.1" min="0" max="180" />
+          </div>
+          <div class="input-group">
+            <label>beta (deg)</label>
+            <input type="number" id="lattice-beta" step="0.1" min="0" max="180" />
+          </div>
+          <div class="input-group">
+            <label>gamma (deg)</label>
+            <input type="number" id="lattice-gamma" step="0.1" min="0" max="180" />
+          </div>
+          <div class="input-group">
+            <label class="checkbox-row">
+              <input type="checkbox" id="lattice-scale" />
+              Scale atoms with lattice
+            </label>
+          </div>
+          <div class="input-group" style="display:flex;gap:6px;flex-direction:row;">
+            <button id="btn-lattice-apply" type="button">Apply Lattice</button>
+            <button id="btn-lattice-remove" type="button">Remove Lattice</button>
+          </div>
+          <div class="panel-section">
+            <div class="panel-section-title">Supercell</div>
             <div class="input-group">
               <label>Supercell (Nx, Ny, Nz)</label>
               <div style="display:flex;gap:6px;flex-wrap:wrap;">
@@ -144,52 +246,49 @@
             </div>
             <button id="btn-supercell-apply" type="button">Apply Supercell</button>
           </div>
-
-          <div class="panel">
-            <div class="panel-title">Center at Cell</div>
+          <div class="panel-section">
+            <div class="panel-section-title">Center at Cell</div>
             <button id="btn-center-cell" type="button">Center At Cell</button>
           </div>
         </div>
+      </div>
 
-        <div class="tab-pane" id="tab-view">
-          <div class="panel">
-            <div class="panel-title">Projection</div>
-            <div class="input-group">
-              <select id="proj-select">
-                <option value="perspective">Perspective</option>
-                <option value="orthographic">Orthographic</option>
-              </select>
+      <div class="collapsible-panel" data-panel="display">
+        <div class="panel-header" onclick="togglePanel('display')">
+          <span class="panel-title">Display</span>
+          <span class="panel-toggle">▶</span>
+        </div>
+        <div class="panel-content collapsed" id="panel-display">
+          <div class="input-group">
+            <label>Projection</label>
+            <select id="proj-select">
+              <option value="perspective">Perspective</option>
+              <option value="orthographic">Orthographic</option>
+            </select>
+          </div>
+          <div class="input-group">
+            <label>Axis Views</label>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;">
+              <button id="btn-view-a" class="axis-button" type="button" title="View along a-axis (+X)">a</button>
+              <button id="btn-view-b" class="axis-button" type="button" title="View along b-axis (+Y)">b</button>
+              <button id="btn-view-c" class="axis-button" type="button" title="View along c-axis (+Z)">c</button>
+              <button id="btn-view-na" class="axis-button" type="button" title="View along -a-axis (-X)">-a</button>
+              <button id="btn-view-nb" class="axis-button" type="button" title="View along -b-axis (-Y)">-b</button>
+              <button id="btn-view-nc" class="axis-button" type="button" title="View along -c-axis (-Z)">-c</button>
             </div>
           </div>
-
-          <div class="panel">
-            <div class="panel-title">Axis Views</div>
-            <div class="input-group">
-              <div style="display:flex;gap:6px;flex-wrap:wrap;">
-                <button id="btn-view-a" class="axis-button" type="button" title="View along a-axis (+X)">a</button>
-                <button id="btn-view-b" class="axis-button" type="button" title="View along b-axis (+Y)">b</button>
-                <button id="btn-view-c" class="axis-button" type="button" title="View along c-axis (+Z)">c</button>
-                <button id="btn-view-na" class="axis-button" type="button" title="View along -a-axis (-X)">-a</button>
-                <button id="btn-view-nb" class="axis-button" type="button" title="View along -b-axis (-Y)">-b</button>
-                <button id="btn-view-nc" class="axis-button" type="button" title="View along -c-axis (-Z)">-c</button>
-              </div>
-            </div>
-          </div>
-
-          <div class="panel">
-            <div class="panel-title">Rotation</div>
-            <div class="input-group">
-              <div class="rotation-grid">
-                <button id="btn-rot-roll-ccw"   class="rot-btn" type="button" title="Roll counter-clockwise">↺</button>
-                <button id="btn-rot-tilt-up"    class="rot-btn" type="button" title="Tilt up">↑</button>
-                <button id="btn-rot-roll-cw"    class="rot-btn" type="button" title="Roll clockwise">↻</button>
-                <button id="btn-rot-left"       class="rot-btn" type="button" title="Rotate left">←</button>
-                <span class="rot-center"></span>
-                <button id="btn-rot-right"      class="rot-btn" type="button" title="Rotate right">→</button>
-                <span class="rot-empty"></span>
-                <button id="btn-rot-tilt-down"  class="rot-btn" type="button" title="Tilt down">↓</button>
-                <span class="rot-empty"></span>
-              </div>
+          <div class="input-group">
+            <label>Rotation</label>
+            <div class="rotation-grid">
+              <button id="btn-rot-roll-ccw"   class="rot-btn" type="button" title="Roll counter-clockwise">↺</button>
+              <button id="btn-rot-tilt-up"    class="rot-btn" type="button" title="Tilt up">↑</button>
+              <button id="btn-rot-roll-cw"    class="rot-btn" type="button" title="Roll clockwise">↻</button>
+              <button id="btn-rot-left"       class="rot-btn" type="button" title="Rotate left">←</button>
+              <span class="rot-center"></span>
+              <button id="btn-rot-right"      class="rot-btn" type="button" title="Rotate right">→</button>
+              <span class="rot-empty"></span>
+              <button id="btn-rot-tilt-down"  class="rot-btn" type="button" title="Tilt down">↓</button>
+              <span class="rot-empty"></span>
             </div>
             <div class="input-group rotation-angle-row">
               <label>Angle:</label>
@@ -197,61 +296,46 @@
               <span>°</span>
             </div>
           </div>
+          <div class="input-group">
+            <label class="checkbox-row">
+              <input type="checkbox" id="show-axes" checked />
+              Show coordinate axes
+            </label>
+          </div>
+          <div class="input-group">
+            <label>Background Color</label>
+            <div style="display:flex;gap:8px;align-items:center;">
+              <input type="color" id="bg-color-picker" value="#0d1015" style="width:40px;height:32px;border:none;cursor:pointer;" />
+              <input type="text" id="bg-color-text" value="#0d1015" maxlength="7" style="flex:1;" placeholder="#0d1015" />
+            </div>
+          </div>
         </div>
+      </div>
 
-        <div class="tab-pane" id="tab-display">
-          <div class="panel">
-            <div class="panel-title">Configuration</div>
-            <div class="input-group">
-              <label>Current Config</label>
-              <div class="config-selector-row" style="display:flex;gap:6px;align-items:center;">
-                <select id="config-select" style="flex:1;">
-                  <option value="">Loading...</option>
-                </select>
-                <button id="btn-refresh-configs" type="button" title="Refresh list">↻</button>
-              </div>
-            </div>
-            <div class="input-group config-actions" style="display:flex;gap:6px;flex-wrap:wrap;">
-              <button id="btn-save-config" type="button">Save As...</button>
-              <button id="btn-export-config" type="button">Export</button>
-              <button id="btn-import-config" type="button">Import</button>
-              <button id="btn-delete-config" type="button" class="danger">Delete</button>
-            </div>
-            <div id="config-info" style="font-size:11px;color:#888;margin-top:6px;"></div>
-          </div>
-
-          <div class="panel">
-            <div class="panel-title">Display Options</div>
-            <div class="input-group">
-              <label class="checkbox-row">
-                <input type="checkbox" id="show-axes" checked />
-                Show coordinate axes
-              </label>
+      <div class="collapsible-panel" data-panel="colors">
+        <div class="panel-header" onclick="togglePanel('colors')">
+          <span class="panel-title">Colors</span>
+          <span class="panel-toggle">▶</span>
+        </div>
+        <div class="panel-content collapsed" id="panel-colors">
+          <div class="input-group">
+            <label>Color Scheme</label>
+            <div class="config-selector-row" style="display:flex;gap:6px;align-items:center;">
+              <select id="color-scheme-select" style="flex:1;">
+                <option value="">Loading...</option>
+              </select>
+              <button id="btn-refresh-schemes" type="button" title="Refresh list">↻</button>
             </div>
           </div>
-
-          <div class="panel">
-            <div class="panel-title">Atom Color Scheme</div>
-            <div class="input-group">
-              <label>Color Scheme</label>
-              <div class="config-selector-row" style="display:flex;gap:6px;align-items:center;">
-                <select id="color-scheme-select" style="flex:1;">
-                  <option value="">Loading...</option>
-                </select>
-                <button id="btn-refresh-schemes" type="button" title="Refresh list">↻</button>
-              </div>
-            </div>
-            <div class="input-group" style="display:flex;gap:6px;flex-wrap:wrap;">
-              <button id="btn-save-scheme" type="button">Save As...</button>
-              <button id="btn-export-scheme" type="button">Export</button>
-              <button id="btn-import-scheme" type="button">Import</button>
-              <button id="btn-delete-scheme" type="button" class="danger">Delete</button>
-            </div>
-            <div id="color-scheme-info" style="font-size:11px;color:#888;margin-top:6px;"></div>
+          <div class="input-group" style="display:flex;gap:6px;flex-wrap:wrap;">
+            <button id="btn-save-scheme" type="button">Save As...</button>
+            <button id="btn-export-scheme" type="button">Export</button>
+            <button id="btn-import-scheme" type="button">Import</button>
+            <button id="btn-delete-scheme" type="button" class="danger">Delete</button>
           </div>
-
-          <div class="panel">
-            <div class="panel-title">Atom Color</div>
+          <div id="color-scheme-info" style="font-size:11px;color:#888;margin-top:6px;"></div>
+          <div class="panel-section">
+            <div class="panel-section-title">Atom Color</div>
             <div class="input-group">
               <label>Color</label>
               <div style="display:flex;gap:8px;align-items:center;">
@@ -261,47 +345,44 @@
             </div>
             <button id="btn-apply-atom-color">Apply to Selected</button>
           </div>
+        </div>
+      </div>
 
-          <div class="panel">
-            <div class="panel-title">Atom & Bond Size</div>
-            <div class="input-group">
-              <label>Global size: <span id="atom-size-global-value">0.30 Å</span></label>
-              <input type="range" id="atom-size-global-slider" min="0.1" max="2.0" step="0.01" value="0.3" />
-            </div>
-            <div class="input-group">
-              <label class="checkbox-row">
-                <input type="checkbox" id="atom-size-use-default" checked />
-                Use default settings
-              </label>
-            </div>
-            <div class="input-group" id="atom-size-selected-section" style="display:none;">
-              <label>Selected (<span id="atom-size-selected-count">0</span>): <span id="atom-size-selected-value">0.30 Å</span></label>
-              <input type="range" id="atom-size-selected-slider" min="0.1" max="2.0" step="0.01" value="0.3" />
-              <button id="btn-atom-size-reset-selected" type="button">Reset to default</button>
-            </div>
-            <div class="input-group">
-              <label>Bond thickness: <span id="bond-size-value">1.0</span>x</label>
-              <input type="range" id="bond-size-slider" min="0.3" max="5" step="0.1" value="1" />
-            </div>
-            <div class="input-group">
-              <button id="atom-size-element-toggle" type="button" class="atom-size-element-toggle">By Element ▼</button>
-            </div>
-            <div id="atom-size-element-list" class="atom-size-element-list" style="display:none;"></div>
-            <div class="input-group">
-              <label>Atom scale: <span id="size-value">1.00</span>x</label>
-              <input type="range" id="size-slider" min="0.5" max="3" step="0.05" value="1" />
-            </div>
+      <div class="collapsible-panel" data-panel="size-style">
+        <div class="panel-header" onclick="togglePanel('size-style')">
+          <span class="panel-title">Size & Style</span>
+          <span class="panel-toggle">▶</span>
+        </div>
+        <div class="panel-content collapsed" id="panel-size-style">
+          <div class="input-group">
+            <label>Global size: <span id="atom-size-global-value">0.30 Å</span></label>
+            <input type="range" id="atom-size-global-slider" min="0.1" max="2.0" step="0.01" value="0.3" />
           </div>
-
-          <div class="panel">
-            <div class="panel-title">Display Settings</div>
-            <div class="input-group">
-              <label>Background Color</label>
-              <div style="display:flex;gap:8px;align-items:center;">
-                <input type="color" id="bg-color-picker" value="#0d1015" style="width:40px;height:32px;border:none;cursor:pointer;" />
-                <input type="text" id="bg-color-text" value="#0d1015" maxlength="7" style="flex:1;" placeholder="#0d1015" />
-              </div>
-            </div>
+          <div class="input-group">
+            <label class="checkbox-row">
+              <input type="checkbox" id="atom-size-use-default" checked />
+              Use default settings
+            </label>
+          </div>
+          <div class="input-group" id="atom-size-selected-section" style="display:none;">
+            <label>Selected (<span id="atom-size-selected-count">0</span>): <span id="atom-size-selected-value">0.30 Å</span></label>
+            <input type="range" id="atom-size-selected-slider" min="0.1" max="2.0" step="0.01" value="0.3" />
+            <button id="btn-atom-size-reset-selected" type="button">Reset to default</button>
+          </div>
+          <div class="input-group">
+            <label>Bond thickness: <span id="bond-size-value">1.0</span>x</label>
+            <input type="range" id="bond-size-slider" min="0.3" max="5" step="0.1" value="1" />
+          </div>
+          <div class="input-group">
+            <button id="atom-size-element-toggle" type="button" class="atom-size-element-toggle">By Element ▼</button>
+          </div>
+          <div id="atom-size-element-list" class="atom-size-element-list" style="display:none;"></div>
+          <div class="input-group">
+            <label>Atom scale: <span id="size-value">1.00</span>x</label>
+            <input type="range" id="size-slider" min="0.5" max="3" step="0.05" value="1" />
+          </div>
+          <div class="panel-section">
+            <div class="panel-section-title">Unit Cell Style</div>
             <div class="input-group">
               <label>Unit Cell Color</label>
               <div style="display:flex;gap:8px;align-items:center;">
@@ -310,151 +391,153 @@
               </div>
             </div>
             <div class="input-group">
-              <label>Lattice Thickness: <span id="lattice-thickness-value">1.0</span></label>
+              <label>Thickness: <span id="lattice-thickness-value">1.0</span></label>
               <input type="range" id="lattice-thickness-slider" min="0.5" max="6" step="0.1" value="1" />
             </div>
             <div class="input-group">
-              <label>Lattice Line Style</label>
+              <label>Line Style</label>
               <select id="lattice-line-style">
                 <option value="solid">Solid</option>
                 <option value="dashed">Dashed</option>
               </select>
             </div>
           </div>
+        </div>
+      </div>
 
-          <div class="panel">
-            <div class="panel-title">Lighting</div>
+      <div class="collapsible-panel" data-panel="lighting">
+        <div class="panel-header" onclick="togglePanel('lighting')">
+          <span class="panel-title">Lighting</span>
+          <span class="panel-toggle">▶</span>
+        </div>
+        <div class="panel-content collapsed" id="panel-lighting">
+          <div class="input-group">
+            <label class="checkbox-row">
+              <input type="checkbox" id="lighting-enabled" checked />
+              Enable custom lighting
+            </label>
+          </div>
+          <div class="input-group">
+            <label>Ambient Intensity: <span id="ambient-value">0.5</span></label>
+            <input type="range" id="ambient-slider" min="0" max="2" step="0.1" value="0.5" />
+          </div>
+          <div class="input-group">
+            <label>Ambient Color</label>
+            <input type="color" id="ambient-color-picker" value="#ffffff" style="width:40px;height:32px;border:none;cursor:pointer;" />
+          </div>
+          <div class="input-group">
+            <label>Surface Shininess: <span id="shininess-value">50</span></label>
+            <input type="range" id="shininess-slider" min="0" max="200" step="1" value="50" />
+          </div>
+          <div class="light-sub-panel">
+            <div class="light-sub-title">Key Light</div>
             <div class="input-group">
-              <label class="checkbox-row">
-                <input type="checkbox" id="lighting-enabled" checked />
-                Enable custom lighting
-              </label>
+              <label>Intensity: <span id="key-intensity-value">0.7</span></label>
+              <input type="range" id="key-intensity-slider" min="0" max="3" step="0.1" value="0.7" />
             </div>
             <div class="input-group">
-              <label>Ambient Intensity: <span id="ambient-value">0.5</span></label>
-              <input type="range" id="ambient-slider" min="0" max="2" step="0.1" value="0.5" />
+              <label>Color</label>
+              <input type="color" id="key-color-picker" value="#CCCCCC" style="width:40px;height:32px;border:none;cursor:pointer;" />
             </div>
             <div class="input-group">
-              <label>Ambient Color</label>
-              <input type="color" id="ambient-color-picker" value="#ffffff" style="width:40px;height:32px;border:none;cursor:pointer;" />
+              <label>X: <span id="key-x-value">0</span></label>
+              <input type="range" id="key-x-slider" min="-50" max="50" step="1" value="0" />
             </div>
             <div class="input-group">
-              <label>Surface Shininess: <span id="shininess-value">50</span></label>
-              <input type="range" id="shininess-slider" min="0" max="200" step="1" value="50" />
+              <label>Y: <span id="key-y-value">0</span></label>
+              <input type="range" id="key-y-slider" min="-50" max="50" step="1" value="0" />
             </div>
-            <div class="light-sub-panel">
-              <div class="light-sub-title">Key Light</div>
-              <div class="input-group">
-                <label>Intensity: <span id="key-intensity-value">0.7</span></label>
-                <input type="range" id="key-intensity-slider" min="0" max="3" step="0.1" value="0.7" />
-              </div>
-              <div class="input-group">
-                <label>Color</label>
-                <input type="color" id="key-color-picker" value="#CCCCCC" style="width:40px;height:32px;border:none;cursor:pointer;" />
-              </div>
-              <div class="input-group">
-                <label>X: <span id="key-x-value">0</span></label>
-                <input type="range" id="key-x-slider" min="-50" max="50" step="1" value="0" />
-              </div>
-              <div class="input-group">
-                <label>Y: <span id="key-y-value">0</span></label>
-                <input type="range" id="key-y-slider" min="-50" max="50" step="1" value="0" />
-              </div>
-              <div class="input-group">
-                <label>Z: <span id="key-z-value">10</span></label>
-                <input type="range" id="key-z-slider" min="-50" max="50" step="1" value="10" />
-              </div>
-              <button id="btn-pick-key-light" class="light-pick-button" type="button">Pick in Canvas</button>
+            <div class="input-group">
+              <label>Z: <span id="key-z-value">10</span></label>
+              <input type="range" id="key-z-slider" min="-50" max="50" step="1" value="10" />
             </div>
-            <div class="light-sub-panel">
-              <div class="light-sub-title">Fill Light</div>
-              <div class="input-group">
-                <label>Intensity: <span id="fill-intensity-value">0</span></label>
-                <input type="range" id="fill-intensity-slider" min="0" max="3" step="0.1" value="0" />
-              </div>
-              <div class="input-group">
-                <label>Color</label>
-                <input type="color" id="fill-color-picker" value="#ffffff" style="width:40px;height:32px;border:none;cursor:pointer;" />
-              </div>
-              <div class="input-group">
-                <label>X: <span id="fill-x-value">-10</span></label>
-                <input type="range" id="fill-x-slider" min="-50" max="50" step="1" value="-10" />
-              </div>
-              <div class="input-group">
-                <label>Y: <span id="fill-y-value">-5</span></label>
-                <input type="range" id="fill-y-slider" min="-50" max="50" step="1" value="-5" />
-              </div>
-              <div class="input-group">
-                <label>Z: <span id="fill-z-value">5</span></label>
-                <input type="range" id="fill-z-slider" min="-50" max="50" step="1" value="5" />
-              </div>
-              <button id="btn-pick-fill-light" class="light-pick-button" type="button">Pick in Canvas</button>
+            <button id="btn-pick-key-light" class="light-pick-button" type="button">Pick in Canvas</button>
+          </div>
+          <div class="light-sub-panel">
+            <div class="light-sub-title">Fill Light</div>
+            <div class="input-group">
+              <label>Intensity: <span id="fill-intensity-value">0</span></label>
+              <input type="range" id="fill-intensity-slider" min="0" max="3" step="0.1" value="0" />
             </div>
-            <div class="light-sub-panel">
-              <div class="light-sub-title">Rim Light</div>
-              <div class="input-group">
-                <label>Intensity: <span id="rim-intensity-value">0</span></label>
-                <input type="range" id="rim-intensity-slider" min="0" max="3" step="0.1" value="0" />
-              </div>
-              <div class="input-group">
-                <label>Color</label>
-                <input type="color" id="rim-color-picker" value="#ffffff" style="width:40px;height:32px;border:none;cursor:pointer;" />
-              </div>
-              <div class="input-group">
-                <label>X: <span id="rim-x-value">0</span></label>
-                <input type="range" id="rim-x-slider" min="-50" max="50" step="1" value="0" />
-              </div>
-              <div class="input-group">
-                <label>Y: <span id="rim-y-value">5</span></label>
-                <input type="range" id="rim-y-slider" min="-50" max="50" step="1" value="5" />
-              </div>
-              <div class="input-group">
-                <label>Z: <span id="rim-z-value">-10</span></label>
-                <input type="range" id="rim-z-slider" min="-50" max="50" step="1" value="-10" />
-              </div>
-              <button id="btn-pick-rim-light" class="light-pick-button" type="button">Pick in Canvas</button>
+            <div class="input-group">
+              <label>Color</label>
+              <input type="color" id="fill-color-picker" value="#ffffff" style="width:40px;height:32px;border:none;cursor:pointer;" />
             </div>
-            <div class="light-pick-hint">Tip: Click a Pick button, then drag in canvas to set light direction (Esc to exit).</div>
-            <button id="btn-reset-lighting">Reset Lighting</button>
+            <div class="input-group">
+              <label>X: <span id="fill-x-value">-10</span></label>
+              <input type="range" id="fill-x-slider" min="-50" max="50" step="1" value="-10" />
+            </div>
+            <div class="input-group">
+              <label>Y: <span id="fill-y-value">-5</span></label>
+              <input type="range" id="fill-y-slider" min="-50" max="50" step="1" value="-5" />
+            </div>
+            <div class="input-group">
+              <label>Z: <span id="fill-z-value">5</span></label>
+              <input type="range" id="fill-z-slider" min="-50" max="50" step="1" value="5" />
+            </div>
+            <button id="btn-pick-fill-light" class="light-pick-button" type="button">Pick in Canvas</button>
+          </div>
+          <div class="light-sub-panel">
+            <div class="light-sub-title">Rim Light</div>
+            <div class="input-group">
+              <label>Intensity: <span id="rim-intensity-value">0</span></label>
+              <input type="range" id="rim-intensity-slider" min="0" max="3" step="0.1" value="0" />
+            </div>
+            <div class="input-group">
+              <label>Color</label>
+              <input type="color" id="rim-color-picker" value="#ffffff" style="width:40px;height:32px;border:none;cursor:pointer;" />
+            </div>
+            <div class="input-group">
+              <label>X: <span id="rim-x-value">0</span></label>
+              <input type="range" id="rim-x-slider" min="-50" max="50" step="1" value="0" />
+            </div>
+            <div class="input-group">
+              <label>Y: <span id="rim-y-value">5</span></label>
+              <input type="range" id="rim-y-slider" min="-50" max="50" step="1" value="5" />
+            </div>
+            <div class="input-group">
+              <label>Z: <span id="rim-z-value">-10</span></label>
+              <input type="range" id="rim-z-slider" min="-50" max="50" step="1" value="-10" />
+            </div>
+            <button id="btn-pick-rim-light" class="light-pick-button" type="button">Pick in Canvas</button>
+          </div>
+          <div class="light-pick-hint">Tip: Click a Pick button, then drag in canvas to set light direction (Esc to exit).</div>
+          <button id="btn-reset-lighting">Reset Lighting</button>
+        </div>
+      </div>
+
+      <div class="collapsible-panel" data-panel="trajectory">
+        <div class="panel-header" onclick="togglePanel('trajectory')">
+          <span class="panel-title">Trajectory</span>
+          <span class="panel-toggle">▶</span>
+        </div>
+        <div class="panel-content collapsed" id="panel-trajectory">
+          <div class="input-group trajectory-row">
+            <button id="btn-first-frame" type="button">|&lt;</button>
+            <button id="btn-prev-frame" type="button">&lt;</button>
+            <input type="number" id="traj-frame-input" min="1" step="1" value="1" />
+            <button id="btn-next-frame" type="button">&gt;</button>
+            <button id="btn-last-frame" type="button">&gt;|</button>
+          </div>
+          <div class="input-group trajectory-row">
+            <button id="btn-play-trajectory" type="button">Play</button>
+          </div>
+          <div class="input-group trajectory-row">
+            <label for="traj-speed-slider">Speed</label>
+            <input type="range" id="traj-speed-slider" min="1" max="30" step="1" value="8" />
+            <span id="traj-speed-value">8 fps</span>
           </div>
         </div>
+      </div>
 
-        <div class="tab-pane" id="tab-tools">
-          <div class="panel">
-            <div class="panel-title">Atoms List</div>
-            <div class="atom-list" id="atom-list"></div>
-          </div>
-
-          <div class="panel">
-            <div class="panel-title">Measurements</div>
-            <div id="measurements">
-              <div>Bond length: <span id="bond-length">--</span> A</div>
-              <div>Bond angle: <span id="bond-angle">--</span> deg</div>
-              <div>Selected bond: <span id="bond-selected">--</span></div>
-            </div>
-            <div class="input-group">
-              <label>Set bond length (A)</label>
-              <input type="number" id="bond-length-input" step="0.01" />
-            </div>
-            <button id="btn-apply-bond">Apply Bond Length</button>
-            <div class="input-group">
-              <label>Set bond angle (deg)</label>
-              <input type="number" id="bond-angle-input" step="0.1" />
-            </div>
-            <button id="btn-apply-angle">Apply Bond Angle</button>
-          </div>
-
-          <div class="panel">
-            <div class="panel-title">Bond Tools</div>
-            <div class="input-group" style="display:flex;gap:6px;flex-direction:row;">
-              <button id="btn-create-bond" type="button">Create Bond (2 selected atoms)</button>
-              <button id="btn-delete-bond" type="button">Delete Selected Bond</button>
-            </div>
-            <button id="btn-recalculate-bonds" type="button">Recalculate All Bonds</button>
-          </div>
-
-          <div class="panel">
-            <div class="panel-title">Rotate Selection</div>
+      <div class="collapsible-panel" data-panel="tools">
+        <div class="panel-header" onclick="togglePanel('tools')">
+          <span class="panel-title">Tools</span>
+          <span class="panel-toggle">▶</span>
+        </div>
+        <div class="panel-content collapsed" id="panel-tools">
+          <div class="panel-section">
+            <div class="panel-section-title">Rotate Selection</div>
             <div class="input-group">
               <label>Axis</label>
               <div style="display:flex;gap:6px;">
@@ -472,9 +555,8 @@
               <input type="number" id="rotation-input" step="1" min="0" max="360" value="0" />
             </div>
           </div>
-
-          <div class="panel">
-            <div class="panel-title">Adjust Distance</div>
+          <div class="panel-section">
+            <div class="panel-section-title">Adjust Distance</div>
             <div id="adsorption-info">
               <div>Reference: <span id="adsorption-ref">--</span></div>
               <div>Distance: <span id="adsorption-distance">--</span> A</div>
@@ -488,35 +570,35 @@
               <input type="number" id="adsorption-input" step="0.01" />
             </div>
           </div>
-        </div>
-
-        <div class="tab-pane" id="tab-trajectory">
-          <div class="panel">
-            <div class="panel-title">Trajectory Playback</div>
-            <div class="input-group trajectory-row">
-              <button id="btn-first-frame" type="button">|&lt;</button>
-              <button id="btn-prev-frame" type="button">&lt;</button>
-              <input type="number" id="traj-frame-input" min="1" step="1" value="1" />
-              <button id="btn-next-frame" type="button">&gt;</button>
-              <button id="btn-last-frame" type="button">&gt;|</button>
+          <div class="panel-section">
+            <div class="panel-section-title">Configuration</div>
+            <div class="input-group">
+              <label>Current Config</label>
+              <div class="config-selector-row" style="display:flex;gap:6px;align-items:center;">
+                <select id="config-select" style="flex:1;">
+                  <option value="">Loading...</option>
+                </select>
+                <button id="btn-refresh-configs" type="button" title="Refresh list">↻</button>
+              </div>
             </div>
-            <div class="input-group trajectory-row">
-              <button id="btn-play-trajectory" type="button">Play</button>
+            <div class="input-group config-actions" style="display:flex;gap:6px;flex-wrap:wrap;">
+              <button id="btn-save-config" type="button">Save As...</button>
+              <button id="btn-export-config" type="button">Export</button>
+              <button id="btn-import-config" type="button">Import</button>
+              <button id="btn-delete-config" type="button" class="danger">Delete</button>
             </div>
-            <div class="input-group trajectory-row">
-              <label for="traj-speed-slider">Speed</label>
-              <input type="range" id="traj-speed-slider" min="1" max="30" step="1" value="8" />
-              <span id="traj-speed-value">8 fps</span>
-            </div>
+            <div id="config-info" style="font-size:11px;color:#888;margin-top:6px;"></div>
           </div>
         </div>
-          </div>
-        </div>
+      </div>
+    </div>
   </div>
 
   <div id="status-bar">
-    <span id="status-text">Ready.</span>
-    <span id="status-traj-frame">Frame 1/1</span>
+    <span id="status-mode">Select mode</span>
+    <span id="status-selection">Selected: 0</span>
+    <span id="status-hint">Move: Shift+Alt+drag | Add: type element</span>
+    <span id="status-frame">Frame 1/1</span>
   </div>
 
   <script src="{{webviewUri}}"></script>

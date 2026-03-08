@@ -1,9 +1,33 @@
-import { selectionStore, interactionStore } from './state';
+import { selectionStore, interactionStore, type ToolType } from './state';
 import { renderer } from './renderer';
-import { Vector3 } from 'three';
+import { Vector3, Plane } from 'three';
 import * as interactionLighting from './interactionLighting';
 import { init as initDisplay } from './interactionDisplay';
 import { init as initConfig } from './interactionConfig';
+import { setupContextMenu, type ContextMenuHandlers } from './components/contextMenu';
+import { updateToolButtons, updateStatusBar } from './ui/statusBar';
+
+const SINGLE_LETTER_ELEMENTS = new Set(['H', 'B', 'C', 'N', 'O', 'F', 'P', 'S', 'K', 'V', 'Y', 'I', 'W', 'U']);
+
+const TWO_LETTER_ELEMENTS = new Set([
+  'He', 'Li', 'Be', 'Ne', 'Na', 'Mg', 'Al', 'Si', 'Cl', 'Ar', 'Ca', 'Sc', 'Ti', 'Cr', 'Mn', 'Fe',
+  'Co', 'Ni', 'Cu', 'Zn', 'Ga', 'Ge', 'As', 'Se', 'Br', 'Kr', 'Rb', 'Sr', 'Zr', 'Nb', 'Mo', 'Tc',
+  'Ru', 'Rh', 'Pd', 'Ag', 'Cd', 'In', 'Sn', 'Sb', 'Te', 'Xe', 'Cs', 'Ba', 'La', 'Ce', 'Pr', 'Nd',
+  'Pm', 'Sm', 'Eu', 'Gd', 'Tb', 'Dy', 'Ho', 'Er', 'Tm', 'Yb', 'Lu', 'Hf', 'Ta', 'Re', 'Os', 'Ir',
+  'Pt', 'Au', 'Hg', 'Tl', 'Pb', 'Bi', 'Po', 'At', 'Rn', 'Fr', 'Ra', 'Ac', 'Th', 'Pa', 'Np', 'Pu',
+  'Am', 'Cm', 'Bk', 'Cf', 'Es', 'Fm', 'Md', 'No', 'Lr', 'Rf', 'Db', 'Sg', 'Bh', 'Hs', 'Mt', 'Ds',
+  'Rg', 'Cn', 'Nh', 'Fl', 'Mc', 'Lv', 'Ts', 'Og',
+]);
+
+const ALL_ELEMENTS = new Set([...SINGLE_LETTER_ELEMENTS, ...TWO_LETTER_ELEMENTS]);
+
+function isValidElement(symbol: string): boolean {
+  return ALL_ELEMENTS.has(symbol);
+}
+
+function isSingleLetterElement(letter: string): boolean {
+  return SINGLE_LETTER_ELEMENTS.has(letter.toUpperCase());
+}
 
 export interface InteractionHandlers {
   onSelectAtom: (atomId: string, add: boolean, preserve: boolean) => void;
@@ -16,35 +40,94 @@ export interface InteractionHandlers {
   onDragAtom: (atomId: string, intersection: Vector3) => void;
   onDragGroup?: (delta: Vector3) => void;
   onEndDrag?: () => void;
+  onDelete?: () => void;
+  onSelectAll?: () => void;
+  onInvertSelection?: () => void;
+  onAddAtom?: (element: string, x: number, y: number, z: number) => void;
+  onCopy?: (atomIds: string[]) => void;
+  onPaste?: () => void;
+  onUndo?: () => void;
+  onRedo?: () => void;
+  onSave?: () => void;
+  onExportImage?: () => void;
+  onSetAtomColor?: (atomIds: string[], color: string) => void;
+  onSetAtomRadius?: (atomIds: string[], radius: number) => void;
+  onChangeElement?: (atomIds: string[], element: string) => void;
+  onCreateBond?: (atomIds: string[]) => void;
+  onSetBondLength?: (bondKeys: string[], length: number) => void;
+  onDeleteAtoms?: (atomIds: string[]) => void;
+  onDeleteBonds?: (bondKeys: string[]) => void;
 }
 
-// Module-level AbortController for cleanup
 let controller: AbortController | null = null;
+let elementInputTimeout: ReturnType<typeof setTimeout> | null = null;
+
+function setTool(tool: ToolType, canvas: HTMLCanvasElement, handlers: InteractionHandlers): void {
+  interactionStore.currentTool = tool;
+  updateToolButtons();
+  updateStatusBar(true);
+  
+  if (tool === 'add') {
+    if (!interactionStore.addingAtomElement) {
+      interactionStore.addingAtomElement = 'C';
+      canvas.style.cursor = 'crosshair';
+      handlers.onSetStatus('Adding C atoms - Click to place, Esc to cancel');
+    }
+  } else if (interactionStore.addingAtomElement) {
+    interactionStore.addingAtomElement = null;
+    canvas.style.cursor = 'default';
+  }
+  
+  if (tool === 'move') {
+    canvas.style.cursor = 'grab';
+  } else if (tool === 'delete') {
+    canvas.style.cursor = 'not-allowed';
+  } else if (tool === 'box') {
+    canvas.style.cursor = 'crosshair';
+  } else {
+    canvas.style.cursor = 'default';
+  }
+}
+
+function setupLeftToolbar(canvas: HTMLCanvasElement, handlers: InteractionHandlers): void {
+  const toolbar = document.getElementById('left-toolbar');
+  if (!toolbar) return;
+  
+  toolbar.addEventListener('click', (e) => {
+    const target = e.target as HTMLElement;
+    if (target.classList.contains('tool-btn')) {
+      const tool = target.getAttribute('data-tool') as ToolType;
+      if (tool) {
+        setTool(tool, canvas, handlers);
+      }
+    }
+  });
+}
 
 export function init(canvas: HTMLCanvasElement, handlers: InteractionHandlers): void {
   const dragLerp = 0.18;
   const dragThreshold = 4;
   const selectionBox = document.getElementById('selection-box') as HTMLElement | null;
   let pendingDrag: { atomId: string; hitPoint: Vector3; startX: number; startY: number } | null = null;
-  let boxSelect: { startX: number; startY: number; bondMode: string } | null = null;
+  let boxSelect: { startX: number; startY: number } | null = null;
+  let isPointerDownOnEmpty = false;
+  const ELEMENT_INPUT_TIMEOUT_MS = 500;
 
-  // Pre-allocated scratch Vector3s for the hot pointermove path — avoids allocations at 60fps.
   const _intersection = new Vector3();
   const _normal       = new Vector3();
   const _delta        = new Vector3();
   const _normalDelta  = new Vector3();
   const _newPos       = new Vector3();
-  // For box-select projection (pointerup) — one scratch to avoid per-atom allocs.
   const _projected    = new Vector3();
   
-  // AbortController for cleaning up all event listeners on dispose
   controller = new AbortController();
   
   canvas.tabIndex = 0;
   (canvas.style as CSSStyleDeclaration).outline = 'none';
 
-  // Shared mutable state owned by the lighting module.
   const pickerState = interactionLighting.pickerState;
+  
+  setupLeftToolbar(canvas, handlers);
 
   canvas.addEventListener('pointerdown', (event: PointerEvent) => {
     canvas.focus();
@@ -55,6 +138,52 @@ export function init(canvas: HTMLCanvasElement, handlers: InteractionHandlers): 
       event.preventDefault();
       return;
     }
+
+    const currentTool = interactionStore.currentTool;
+
+    if (interactionStore.addingAtomElement && handlers.onAddAtom) {
+      const raycaster = renderer.getRaycaster();
+      const mouse = renderer.getMouse();
+      const camera = renderer.getCamera();
+      if (!raycaster || !mouse || !camera) { return; }
+
+      const meshes = Array.from(renderer.getAtomMeshes().values());
+      const rect = canvas.getBoundingClientRect();
+      mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+      mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+      raycaster.setFromCamera(mouse, camera);
+      const hits = meshes.length > 0 ? raycaster.intersectObjects(meshes) : [];
+
+      if (hits.length > 0) {
+        const hit = hits[0];
+        const atomId = hit.object.userData && (hit.object.userData as Record<string, unknown>).atomId as string | undefined;
+        if (atomId) {
+          interactionStore.addingAtomElement = null;
+          canvas.style.cursor = 'default';
+          handlers.onSetStatus('');
+          handlers.onSelectAtom(atomId, event.ctrlKey || event.metaKey, false);
+          return;
+        }
+      }
+
+      const dragPlane = new Plane();
+      const planeNormal = new Vector3();
+      camera.getWorldDirection(planeNormal);
+      dragPlane.setFromNormalAndCoplanarPoint(planeNormal, new Vector3(0, 0, 0));
+      const intersection = new Vector3();
+      raycaster.ray.intersectPlane(dragPlane, intersection);
+
+      if (intersection) {
+        const scale = renderer.getScale();
+        const invScale = scale ? 1 / scale : 1;
+        const x = intersection.x * invScale;
+        const y = intersection.y * invScale;
+        const z = intersection.z * invScale;
+        handlers.onAddAtom(interactionStore.addingAtomElement, x, y, z);
+      }
+      return;
+    }
+
     const raycaster = renderer.getRaycaster();
     const mouse = renderer.getMouse();
     const camera = renderer.getCamera();
@@ -67,41 +196,39 @@ export function init(canvas: HTMLCanvasElement, handlers: InteractionHandlers): 
     mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
     raycaster.setFromCamera(mouse, camera);
     const hits = meshes.length > 0 ? raycaster.intersectObjects(meshes) : [];
+    
     if (hits.length > 0) {
       const hit = hits[0];
       const atomId = hit.object.userData && (hit.object.userData as Record<string, unknown>).atomId as string | undefined;
-        if (atomId) {
-          if (event.shiftKey) {
-            const isSelected = selectionStore.selectedAtomIds && selectionStore.selectedAtomIds.includes(atomId);
-            if (isSelected) {
-              pendingDrag = {
-                atomId,
-                hitPoint: hit.point.clone(),
-                startX: event.clientX,
-                startY: event.clientY,
-              };
-              renderer.setControlsEnabled(false);
-            } else {
-              const localX = event.clientX - rect.left;
-              const localY = event.clientY - rect.top;
-              boxSelect = {
-              startX: localX,
-              startY: localY,
-              bondMode:
-                event.altKey
-                  ? 'subtract'
-                  : event.ctrlKey || event.metaKey || event.shiftKey
-                    ? 'add'
-                    : 'replace',
+      if (atomId) {
+        if (currentTool === 'delete') {
+          if (handlers.onDeleteAtoms) {
+            handlers.onDeleteAtoms([atomId]);
+          }
+          event.preventDefault();
+          return;
+        }
+        
+        const canDrag = currentTool === 'move' || (event.shiftKey && event.altKey);
+        if (canDrag) {
+          const isSelected = selectionStore.selectedAtomIds && selectionStore.selectedAtomIds.includes(atomId);
+          if (isSelected) {
+            pendingDrag = {
+              atomId,
+              hitPoint: hit.point.clone(),
+              startX: event.clientX,
+              startY: event.clientY,
             };
             renderer.setControlsEnabled(false);
-            if (selectionBox) {
-              selectionBox.style.display = 'block';
-              selectionBox.style.left = localX + 'px';
-              selectionBox.style.top = localY + 'px';
-              selectionBox.style.width = '0px';
-              selectionBox.style.height = '0px';
-            }
+          } else {
+            handlers.onSelectAtom(atomId, false, false);
+            pendingDrag = {
+              atomId,
+              hitPoint: hit.point.clone(),
+              startX: event.clientX,
+              startY: event.clientY,
+            };
+            renderer.setControlsEnabled(false);
           }
           return;
         }
@@ -116,25 +243,27 @@ export function init(canvas: HTMLCanvasElement, handlers: InteractionHandlers): 
         const hit = bondHits[0];
         const bondKey = hit.object.userData && (hit.object.userData as Record<string, unknown>).bondKey as string | undefined;
         if (bondKey && handlers.onSelectBond) {
-          handlers.onSelectBond(bondKey, event.ctrlKey || event.metaKey || event.shiftKey);
+          if (currentTool === 'delete') {
+            if (handlers.onDeleteBonds) {
+              handlers.onDeleteBonds([bondKey]);
+            }
+            event.preventDefault();
+            return;
+          }
+          handlers.onSelectBond(bondKey, event.ctrlKey || event.metaKey);
           return;
         }
       }
     }
 
-    if (event.shiftKey) {
+    if (currentTool === 'box' || currentTool === 'select') {
       const localX = event.clientX - rect.left;
       const localY = event.clientY - rect.top;
       boxSelect = {
         startX: localX,
         startY: localY,
-        bondMode:
-          event.altKey
-            ? 'subtract'
-            : event.ctrlKey || event.metaKey || event.shiftKey
-              ? 'add'
-              : 'replace',
       };
+      isPointerDownOnEmpty = true;
       renderer.setControlsEnabled(false);
       if (selectionBox) {
         selectionBox.style.display = 'block';
@@ -143,10 +272,6 @@ export function init(canvas: HTMLCanvasElement, handlers: InteractionHandlers): 
         selectionBox.style.width = '0px';
         selectionBox.style.height = '0px';
       }
-    } else if (handlers.onClearSelection) {
-      handlers.onClearSelection();
-    } else if (handlers.onSelectBond) {
-      handlers.onSelectBond(null, false);
     }
   }, { signal: controller.signal });
 
@@ -185,8 +310,6 @@ export function init(canvas: HTMLCanvasElement, handlers: InteractionHandlers): 
       const hit = raycaster.ray.intersectPlane(renderer.getDragPlane(), _intersection);
       if (hit) {
         const mesh = renderer.getAtomMeshes().get(interactionStore.dragAtomId);
-        // nextPosition: either the raw intersection or a lerped version; we write
-        // into _newPos to avoid aliasing _intersection when we need it below.
         let nextPosition: Vector3;
         if (mesh) {
           _newPos.copy(mesh.position).lerp(_intersection, dragLerp);
@@ -195,7 +318,6 @@ export function init(canvas: HTMLCanvasElement, handlers: InteractionHandlers): 
           nextPosition = _intersection;
         }
 
-        // Resolve normal from stored drag-plane normal (set at begin-drag).
         const storedNormal = interactionStore.dragPlaneNormal instanceof Vector3
           ? interactionStore.dragPlaneNormal
           : camera.getWorldDirection(_normal);
@@ -272,16 +394,15 @@ export function init(canvas: HTMLCanvasElement, handlers: InteractionHandlers): 
       const top = Math.min(boxSelect.startY, localY);
       const right = Math.max(boxSelect.startX, localX);
       const bottom = Math.max(boxSelect.startY, localY);
-      const modeForAtoms = event.altKey ? 'subtract' : event.ctrlKey || event.metaKey ? 'add' : 'replace';
-      const modeForBonds =
-        boxSelect.bondMode ||
-        (event.altKey ? 'subtract' : event.ctrlKey || event.metaKey || event.shiftKey ? 'add' : 'replace');
       const minW = Math.max(0, left);
       const maxW = Math.max(0, right);
       const minH = Math.max(0, top);
       const maxH = Math.max(0, bottom);
+      const modeForAtoms = event.altKey ? 'subtract' : event.ctrlKey || event.metaKey ? 'add' : 'replace';
+      const modeForBonds = event.altKey ? 'subtract' : event.ctrlKey || event.metaKey ? 'add' : 'replace';
+      const boxMode = interactionStore.boxSelectionMode;
       const camera = renderer.getCamera();
-      if (handlers.onBoxSelect && camera) {
+      if (handlers.onBoxSelect && camera && (boxMode === 'atoms' || boxMode === 'both')) {
         const ids: string[] = [];
         for (const [id, mesh] of renderer.getAtomMeshes()) {
           _projected.copy(mesh.position).project(camera);
@@ -294,7 +415,7 @@ export function init(canvas: HTMLCanvasElement, handlers: InteractionHandlers): 
         }
         handlers.onBoxSelect(ids, modeForAtoms);
       }
-      if (handlers.onBoxSelectBonds && camera) {
+      if (handlers.onBoxSelectBonds && camera && (boxMode === 'bonds' || boxMode === 'both')) {
         const selectedBondKeys = new Set<string>();
         const bondMeshesArr = renderer.getBondMeshes ? renderer.getBondMeshes() : [];
         for (const mesh of bondMeshesArr) {
@@ -317,26 +438,198 @@ export function init(canvas: HTMLCanvasElement, handlers: InteractionHandlers): 
     }
     pendingDrag = null;
     boxSelect = null;
+    isPointerDownOnEmpty = false;
   };
 
   canvas.addEventListener('pointerup', endDrag, { signal: controller.signal });
   canvas.addEventListener('pointerleave', endDrag, { signal: controller.signal });
   canvas.addEventListener('pointercancel', endDrag, { signal: controller.signal });
+
   canvas.addEventListener('keydown', (event: KeyboardEvent) => {
-    if (event.key === 'Escape' && pickerState.activeLightPicker) {
-      interactionLighting.deactivatePicker(canvas, handlers.onSetStatus);
+    if (event.key === 'Escape') {
+      if (interactionStore.addingAtomElement) {
+        interactionStore.addingAtomElement = null;
+        canvas.style.cursor = 'default';
+        handlers.onSetStatus('');
+        setTool('select', canvas, handlers);
+        event.preventDefault();
+        return;
+      }
+      if (pickerState.activeLightPicker) {
+        interactionLighting.deactivatePicker(canvas, handlers.onSetStatus);
+        event.preventDefault();
+        return;
+      }
+      if (boxSelect && selectionBox) {
+        selectionBox.style.display = 'none';
+        boxSelect = null;
+        renderer.setControlsEnabled(true);
+        event.preventDefault();
+        return;
+      }
+      if (pendingDrag) {
+        pendingDrag = null;
+        renderer.setControlsEnabled(true);
+        event.preventDefault();
+        return;
+      }
+      setTool('select', canvas, handlers);
       event.preventDefault();
+      return;
+    }
+
+    if (event.key === 'Delete' || event.key === 'Backspace') {
+      if (handlers.onDelete) {
+        handlers.onDelete();
+        event.preventDefault();
+      }
+      return;
+    }
+
+    if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'a') {
+      if (handlers.onSelectAll) {
+        handlers.onSelectAll();
+        event.preventDefault();
+      }
+      return;
+    }
+
+    if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'i') {
+      if (handlers.onInvertSelection) {
+        handlers.onInvertSelection();
+        event.preventDefault();
+      }
+      return;
+    }
+
+    if (event.key.length === 1 && /[a-zA-Z]/.test(event.key) && !event.ctrlKey && !event.metaKey && !event.altKey) {
+      const letter = event.key.toUpperCase();
+      
+      if (letter === 'V') {
+        setTool('select', canvas, handlers);
+        event.preventDefault();
+        return;
+      }
+      if (letter === 'M') {
+        setTool('move', canvas, handlers);
+        event.preventDefault();
+        return;
+      }
+      if (letter === 'B') {
+        setTool('box', canvas, handlers);
+        event.preventDefault();
+        return;
+      }
+      if (letter === 'A' && !interactionStore.addingAtomElement) {
+        setTool('add', canvas, handlers);
+        event.preventDefault();
+        return;
+      }
+      if (letter === 'D' && !isSingleLetterElement(letter)) {
+        setTool('delete', canvas, handlers);
+        event.preventDefault();
+        return;
+      }
+
+      if (interactionStore.addingAtomElement) {
+        if (elementInputTimeout) {
+          clearTimeout(elementInputTimeout);
+          elementInputTimeout = null;
+        }
+        const potentialTwoLetter = interactionStore.addingAtomElement + letter;
+        if (isValidElement(potentialTwoLetter)) {
+          interactionStore.addingAtomElement = potentialTwoLetter;
+          canvas.style.cursor = 'crosshair';
+          handlers.onSetStatus(`Adding ${potentialTwoLetter} atoms - Click to place, Esc to cancel`);
+          event.preventDefault();
+          return;
+        }
+        if (isSingleLetterElement(interactionStore.addingAtomElement)) {
+          canvas.style.cursor = 'crosshair';
+          handlers.onSetStatus(`Adding ${interactionStore.addingAtomElement} atoms - Click to place, Esc to cancel`);
+          event.preventDefault();
+          return;
+        }
+        interactionStore.addingAtomElement = null;
+        canvas.style.cursor = 'default';
+        handlers.onSetStatus('');
+        return;
+      }
+
+      const isSingleLetter = isSingleLetterElement(letter);
+      const startsTwoLetter = [...TWO_LETTER_ELEMENTS].some(e => e.startsWith(letter));
+
+      if (isSingleLetter && startsTwoLetter) {
+        interactionStore.addingAtomElement = letter;
+        canvas.style.cursor = 'crosshair';
+        handlers.onSetStatus(`Adding ${letter}? atoms - Type second letter or wait, Esc to cancel`);
+        elementInputTimeout = setTimeout(() => {
+          if (interactionStore.addingAtomElement && interactionStore.addingAtomElement.length === 1) {
+            handlers.onSetStatus(`Adding ${interactionStore.addingAtomElement} atoms - Click to place, Esc to cancel`);
+          }
+          elementInputTimeout = null;
+        }, ELEMENT_INPUT_TIMEOUT_MS);
+        event.preventDefault();
+        return;
+      }
+
+      if (isSingleLetter) {
+        interactionStore.addingAtomElement = letter;
+        canvas.style.cursor = 'crosshair';
+        handlers.onSetStatus(`Adding ${letter} atoms - Click to place, Esc to cancel`);
+        event.preventDefault();
+        return;
+      }
+
+      if (startsTwoLetter) {
+        interactionStore.addingAtomElement = letter;
+        canvas.style.cursor = 'crosshair';
+        handlers.onSetStatus(`Adding ${letter}? atoms - Type second letter, Esc to cancel`);
+        elementInputTimeout = setTimeout(() => {
+          if (interactionStore.addingAtomElement && interactionStore.addingAtomElement.length === 1) {
+            interactionStore.addingAtomElement = null;
+            canvas.style.cursor = 'default';
+            handlers.onSetStatus('');
+          }
+          elementInputTimeout = null;
+        }, ELEMENT_INPUT_TIMEOUT_MS);
+        event.preventDefault();
+        return;
+      }
     }
   }, { signal: controller.signal });
 
-  // Delegate panel initialisation to focused modules.
   interactionLighting.init(canvas, handlers.onSetStatus);
   initDisplay();
   initConfig();
+
+  const contextMenuHandlers: ContextMenuHandlers = {
+    onDeleteAtom: handlers.onDeleteAtoms,
+    onDeleteBond: handlers.onDeleteBonds,
+    onChangeElement: handlers.onChangeElement,
+    onCopy: handlers.onCopy,
+    onPaste: handlers.onPaste,
+    onSetAtomColor: handlers.onSetAtomColor,
+    onSetAtomRadius: handlers.onSetAtomRadius,
+    onCreateBond: handlers.onCreateBond,
+    onSetBondLength: handlers.onSetBondLength,
+    onAddAtom: handlers.onAddAtom,
+    onUndo: handlers.onUndo,
+    onRedo: handlers.onRedo,
+    onSelectAll: handlers.onSelectAll,
+    onClearSelection: handlers.onClearSelection,
+    onSave: handlers.onSave,
+    onExportImage: handlers.onExportImage,
+    onSetStatus: handlers.onSetStatus,
+  };
+  setupContextMenu(canvas, contextMenuHandlers);
 }
 
-/** Dispose of all event listeners and clean up resources */
 export function dispose(): void {
+  if (elementInputTimeout) {
+    clearTimeout(elementInputTimeout);
+    elementInputTimeout = null;
+  }
   if (controller) {
     controller.abort();
     controller = null;

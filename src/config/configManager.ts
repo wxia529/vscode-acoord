@@ -235,8 +235,8 @@ export class ConfigManager {
       const schemeIds = new Set<string>();
       for (const configId of configIds) {
         const config = await this.storage.loadConfig(configId);
-        if (config?.settings.atomColorSchemeId) {
-          schemeIds.add(config.settings.atomColorSchemeId);
+        if (config?.settings.currentColorScheme) {
+          schemeIds.add(config.settings.currentColorScheme);
         }
       }
       
@@ -295,8 +295,8 @@ export class ConfigManager {
       let processedConfig = config;
       
       // Update color scheme reference if it was remapped
-      if (config.settings.atomColorSchemeId && schemeIdMapping[config.settings.atomColorSchemeId]) {
-        config.settings.atomColorSchemeId = schemeIdMapping[config.settings.atomColorSchemeId];
+      if (config.settings.currentColorScheme && schemeIdMapping[config.settings.currentColorScheme]) {
+        config.settings.currentColorScheme = schemeIdMapping[config.settings.currentColorScheme];
       }
       
       if (this.migrationManager.needsMigration(config)) {

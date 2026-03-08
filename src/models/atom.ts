@@ -7,7 +7,9 @@ export class Atom {
   x: number;
   y: number;
   z: number;
-  color?: string;
+  color: string;
+  radius: number;
+  label?: string;
   selected: boolean = false;
   fixed: boolean = false;
   selectiveDynamics?: [boolean, boolean, boolean];
@@ -18,14 +20,24 @@ export class Atom {
     y: number,
     z: number,
     id?: string,
-    color?: string
+    options?: {
+      color?: string;
+      radius?: number;
+      label?: string;
+      fixed?: boolean;
+      selectiveDynamics?: [boolean, boolean, boolean];
+    }
   ) {
     this.element = element;
     this.x = x;
     this.y = y;
     this.z = z;
     this.id = id || `atom_${crypto.randomUUID()}`;
-    this.color = color;
+    this.color = options?.color || '#C0C0C0';
+    this.radius = options?.radius ?? 1.0;
+    this.label = options?.label;
+    this.fixed = options?.fixed ?? false;
+    this.selectiveDynamics = options?.selectiveDynamics;
   }
 
   /**
@@ -58,12 +70,14 @@ export class Atom {
    * Clone this atom
    */
   clone(): Atom {
-    const cloned = new Atom(this.element, this.x, this.y, this.z, this.id, this.color);
+    const cloned = new Atom(this.element, this.x, this.y, this.z, this.id, {
+      color: this.color,
+      radius: this.radius,
+      label: this.label,
+      fixed: this.fixed,
+      selectiveDynamics: this.selectiveDynamics ? [...this.selectiveDynamics] as [boolean, boolean, boolean] : undefined,
+    });
     cloned.selected = this.selected;
-    cloned.fixed = this.fixed;
-    if (this.selectiveDynamics) {
-      cloned.selectiveDynamics = [...this.selectiveDynamics];
-    }
     return cloned;
   }
 
@@ -78,6 +92,8 @@ export class Atom {
       y: this.y,
       z: this.z,
       color: this.color,
+      radius: this.radius,
+      label: this.label,
       fixed: this.fixed,
       selectiveDynamics: this.selectiveDynamics,
     };

@@ -1,7 +1,7 @@
 import { Structure } from '../../models/structure.js';
 import { Atom } from '../../models/atom.js';
 import { UnitCell } from '../../models/unitCell.js';
-import { parseElement } from '../../utils/elementData.js';
+import { parseElement, getDefaultAtomColor, getDefaultAtomRadius } from '../../utils/elementData.js';
 import { expandElements } from '../../utils/parserUtils.js';
 import { StructureParser } from './structureParser.js';
 
@@ -212,7 +212,10 @@ export class OUTCARParser extends StructureParser {
     for (let i = 0; i < positions.length; i++) {
       const element = expandedSymbols[i] || 'X';
       const [x, y, z] = positions[i];
-      structure.addAtom(new Atom(element, x, y, z));
+      structure.addAtom(new Atom(element, x, y, z, undefined, {
+        color: getDefaultAtomColor(element),
+        radius: getDefaultAtomRadius(element),
+      }));
     }
 
     return structure;

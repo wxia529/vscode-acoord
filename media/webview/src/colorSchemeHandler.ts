@@ -67,7 +67,7 @@ function handleSchemeLoaded(scheme: WireColorScheme | null): void {
 
   // Apply color scheme colors to displayStore for reference
   if (scheme.colors) {
-    displayStore.atomColorByElement = { ...scheme.colors };
+    displayStore.currentColorByElement = { ...scheme.colors };
   }
 
   updateUI();
@@ -125,14 +125,14 @@ export function updateUI(): void {
 
 export function updateColorSchemeSelector(): void {
   const select = document.getElementById('color-scheme-select') as HTMLSelectElement | null;
-  if (!select) return;
+  const toolbarSelect = document.getElementById('toolbar-color-scheme') as HTMLSelectElement | null;
 
   const selectedId = colorSchemeStore.currentSchemeId || '';
   const presets = colorSchemeStore.availableSchemes.presets || [];
   const user = colorSchemeStore.availableSchemes.user || [];
 
   const options: string[] = [];
-  
+
   if (presets.length > 0) {
     options.push('<optgroup label="Presets">');
     for (const preset of presets) {
@@ -155,5 +155,11 @@ export function updateColorSchemeSelector(): void {
     options.push('<option value="">No schemes available</option>');
   }
 
-  select.innerHTML = options.join('');
+  if (select) {
+    select.innerHTML = options.join('');
+  }
+
+  if (toolbarSelect) {
+    toolbarSelect.innerHTML = options.join('');
+  }
 }

@@ -12,6 +12,66 @@ export function getImageFileName(): string {
   return `structure-hd-${stamp}.png`;
 }
 
+export function togglePanel(panelId: string): void {
+  const panel = document.getElementById(`panel-${panelId}`);
+  const toggle = document.querySelector(`[data-panel="${panelId}"] .panel-toggle`);
+  if (panel && toggle) {
+    panel.classList.toggle('collapsed');
+    const isCollapsed = panel.classList.contains('collapsed');
+    toggle.textContent = isCollapsed ? '▶' : '▼';
+    savePanelState(panelId, !isCollapsed);
+  }
+}
+
+function savePanelState(panelId: string, isOpen: boolean): void {
+  try {
+    const key = `acoord-panel-${panelId}`;
+    localStorage.setItem(key, isOpen ? 'open' : 'closed');
+  } catch {
+    // localStorage may not be available in webview context
+  }
+}
+
+function loadPanelState(panelId: string): boolean | null {
+  try {
+    const key = `acoord-panel-${panelId}`;
+    const state = localStorage.getItem(key);
+    if (state === 'open') return true;
+    if (state === 'closed') return false;
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+export function setupCollapsiblePanels(): void {
+  const panels = Array.from(document.querySelectorAll('.collapsible-panel')) as HTMLElement[];
+  if (panels.length === 0) { return; }
+
+  panels.forEach((panel) => {
+    const panelId = panel.dataset['panel'];
+    if (!panelId) { return; }
+
+    const content = document.getElementById(`panel-${panelId}`);
+    const toggle = panel.querySelector('.panel-toggle');
+    if (!content || !toggle) { return; }
+
+    const savedState = loadPanelState(panelId);
+    if (savedState !== null) {
+      if (savedState) {
+        content.classList.remove('collapsed');
+        toggle.textContent = '▼';
+      } else {
+        content.classList.add('collapsed');
+        toggle.textContent = '▶';
+      }
+    } else {
+      const isCollapsed = content.classList.contains('collapsed');
+      toggle.textContent = isCollapsed ? '▶' : '▼';
+    }
+  });
+}
+
 export function setupTabs(): void {
   const tabButtons = Array.from(document.querySelectorAll('.tab-button')) as HTMLElement[];
   const tabPanes = Array.from(document.querySelectorAll('.tab-pane')) as HTMLElement[];

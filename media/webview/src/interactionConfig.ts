@@ -104,7 +104,7 @@ export function init(): void {
       // The host will prefer the active scheme's colors from its own store.
       const colors: Record<string, string> = Object.keys(colorSchemeStore.currentSchemeColors).length > 0
         ? { ...colorSchemeStore.currentSchemeColors }
-        : { ...displayStore.atomColorByElement };
+        : { ...displayStore.currentColorByElement };
       _vscode?.postMessage({ command: 'promptSaveColorScheme', colors: Object.keys(colors).length > 0 ? colors : undefined });
     });
   }

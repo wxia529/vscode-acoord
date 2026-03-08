@@ -30,12 +30,52 @@ body {
   background:
     linear-gradient(135deg, rgba(52, 211, 153, 0.18), rgba(245, 158, 11, 0.12)),
     var(--acoord-panel);
-  padding: 10px 14px;
+  padding: 6px 12px;
   display: flex;
-  gap: 10px;
+  align-items: center;
+  gap: 8px;
   border-bottom: 1px solid var(--acoord-border);
-  flex-wrap: wrap;
   box-shadow: 0 8px 20px rgba(0, 0, 0, 0.35);
+}
+
+.toolbar-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.toolbar-group label {
+  font-size: 11px;
+  color: var(--acoord-muted);
+}
+
+.toolbar-group select {
+  background: #11161c;
+  color: var(--acoord-text);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.toolbar-group select:focus {
+  outline: none;
+  border-color: rgba(52, 211, 153, 0.5);
+}
+
+.toolbar-separator {
+  width: 1px;
+  height: 20px;
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.toolbar-spacer {
+  flex: 1;
+}
+
+.toolbar-right {
+  margin-left: auto;
 }
 
 button {
@@ -80,6 +120,41 @@ button:hover {
   overflow: hidden;
   background: var(--acoord-bg-2);
   position: relative;
+}
+
+#left-toolbar {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 4px;
+  background: var(--acoord-panel);
+  border-right: 1px solid var(--acoord-border);
+}
+
+.tool-btn {
+  width: 32px;
+  height: 32px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: var(--acoord-bg-2);
+  color: var(--acoord-muted);
+  cursor: pointer;
+  font-weight: bold;
+  font-size: 12px;
+  border-radius: 6px;
+  transition: all 0.15s ease;
+}
+
+.tool-btn:hover {
+  background: var(--acoord-panel-2);
+  color: var(--acoord-text);
+  border-color: rgba(52, 211, 153, 0.4);
+}
+
+.tool-btn.active {
+  background: linear-gradient(135deg, rgba(52, 211, 153, 0.3), rgba(52, 211, 153, 0.1));
+  color: var(--acoord-text);
+  border-color: rgba(52, 211, 153, 0.7);
+  box-shadow: 0 2px 8px rgba(52, 211, 153, 0.25);
 }
 
 #canvas-wrap {
@@ -167,52 +242,98 @@ button:hover {
     linear-gradient(180deg, rgba(255, 255, 255, 0.02), transparent 50%),
     var(--acoord-panel);
   border-left: 1px solid var(--acoord-border);
-  padding: 12px;
-  overflow: hidden;
+  padding: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
   display: flex;
   flex-direction: column;
   box-shadow: inset 8px 0 16px rgba(0, 0, 0, 0.25);
 }
 
-.tab-nav {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(78px, 1fr));
-  gap: 6px;
-  margin-bottom: 10px;
+.collapsible-panel {
+  border-bottom: 1px solid var(--acoord-border);
 }
 
-.tab-button {
-  border-radius: 10px;
-  padding: 6px 4px;
+.panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 12px;
+  cursor: pointer;
+  background: linear-gradient(135deg, rgba(52, 211, 153, 0.08), rgba(245, 158, 11, 0.05));
+  transition: background 0.2s ease;
+  user-select: none;
+}
+
+.panel-header:hover {
+  background: linear-gradient(135deg, rgba(52, 211, 153, 0.15), rgba(245, 158, 11, 0.1));
+}
+
+.panel-header .panel-title {
+  font-weight: 700;
   font-size: 11px;
-  white-space: nowrap;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--acoord-muted);
+  margin: 0;
+  padding: 0;
+  border: none;
 }
 
-.tab-button.active {
-  border-color: rgba(245, 158, 11, 0.8);
-  box-shadow: 0 6px 18px rgba(245, 158, 11, 0.35);
-  background:
-    linear-gradient(135deg, rgba(245, 158, 11, 0.35), rgba(245, 158, 11, 0.1)),
-    #1b2026;
+.panel-toggle {
+  font-size: 10px;
+  color: var(--acoord-muted);
+  transition: transform 0.2s ease;
 }
 
-.tab-content {
-  flex: 1;
-  overflow-y: auto;
-  padding-right: 2px;
+.panel-content {
+  padding: 12px;
+  background: var(--acoord-bg-2);
+  border-top: 1px solid rgba(255, 255, 255, 0.02);
 }
 
-.tab-pane {
+.panel-content.collapsed {
   display: none;
 }
 
-.tab-pane.active {
-  display: block;
+.panel-section {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.panel-section-title {
+  font-weight: 600;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: rgba(246, 213, 92, 0.85);
+  margin-bottom: 8px;
+}
+
+.properties-message {
+  font-size: 11px;
+  color: var(--acoord-muted);
+  padding: 8px;
+  background-color: rgba(0, 0, 0, 0.15);
+  border-radius: 8px;
+  line-height: 1.5;
+  margin-bottom: 8px;
+}
+
+#structure-info {
+  font-size: 11px;
+  color: var(--acoord-muted);
+  padding: 8px;
+  background-color: rgba(0, 0, 0, 0.15);
+  border-radius: 8px;
+  line-height: 1.5;
 }
 
 #status-bar {
   display: flex;
   align-items: center;
+  gap: 16px;
   padding: 6px 12px;
   font-size: 11px;
   color: var(--acoord-muted);
@@ -223,23 +344,31 @@ button:hover {
   user-select: text;
 }
 
-#status-text {
-  min-width: 0;
+#status-mode {
+  color: rgba(52, 211, 153, 0.9);
+  font-weight: 600;
 }
 
-#status-traj-frame {
+#status-selection {
+  color: var(--acoord-text);
+}
+
+#status-hint {
   margin-left: auto;
+  color: rgba(157, 167, 179, 0.7);
+}
+
+#status-frame {
   font-size: 11px;
   color: var(--acoord-muted);
 }
 
 .panel {
-  margin-bottom: 16px;
+  margin-bottom: 12px;
   padding: 10px;
-  background: var(--acoord-panel-2);
-  border: 1px solid var(--acoord-border);
-  border-radius: 12px;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+  background: rgba(0, 0, 0, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
 }
 
 .panel-title {

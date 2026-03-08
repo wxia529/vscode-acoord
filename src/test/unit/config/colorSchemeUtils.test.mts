@@ -2,10 +2,12 @@ import { expect } from 'chai';
 import { Atom } from '../../../models/atom.js';
 import { getColorForElement, validateHexColor, parseColor } from '../../../config/colorSchemeUtils.js';
 import type { ColorScheme } from '../../../shared/protocol.js';
-import type { DisplaySettings } from '../../../config/types.js';
+import type { WireDisplaySettings } from '../../../shared/protocol.js';
+
+type DisplaySettings = Required<WireDisplaySettings>;
 
 function createAtom(element: string, color?: string): Atom {
-  return new Atom(element, 0, 0, 0, `atom_${element}_1`, color);
+  return new Atom(element, 0, 0, 0, `atom_${element}_1`, color ? { color } : undefined);
 }
 
 function createColorScheme(colors: Record<string, string>): ColorScheme {
@@ -22,30 +24,56 @@ function createColorScheme(colors: Record<string, string>): ColorScheme {
   };
 }
 
+function createDisplaySettings(overrides: Partial<WireDisplaySettings> = {}): DisplaySettings {
+  return {
+    showAxes: true,
+    backgroundColor: '#0d1015',
+    unitCellColor: '#FF6600',
+    unitCellThickness: 1,
+    unitCellLineStyle: 'solid',
+    currentRadiusByElement: {},
+    manualScale: 1,
+    autoScaleEnabled: false,
+    currentRadiusScale: 1,
+    bondThicknessScale: 1,
+    viewZoom: 1,
+    scaleAtomsWithLattice: false,
+    projectionMode: 'orthographic',
+    lightingEnabled: true,
+    ambientIntensity: 0.5,
+    ambientColor: '#ffffff',
+    shininess: 50,
+    keyLight: { intensity: 0.7, x: 0, y: 0, z: 10, color: '#CCCCCC' },
+    fillLight: { intensity: 0, x: -10, y: -5, z: 5, color: '#ffffff' },
+    rimLight: { intensity: 0, x: 0, y: 5, z: -10, color: '#ffffff' },
+    currentColorScheme: 'preset-jmol-default',
+    currentColorByElement: {},
+    ...overrides,
+  };
+}
+
 describe('colorSchemeUtils', () => {
   describe('getColorForElement', () => {
     let settings: DisplaySettings;
     let colorScheme: ColorScheme;
 
     beforeEach(() => {
-      settings = {
-        atomColorByElement: {},
-      } as DisplaySettings;
+      settings = createDisplaySettings();
       colorScheme = createColorScheme({});
     });
 
     it('should return atom.color when set (highest priority)', () => {
       const atom = createAtom('C', '#FF0000');
-      settings.atomColorByElement = { C: '#00FF00' };
+      settings = createDisplaySettings({ currentColorByElement: { C: '#00FF00' } });
       colorScheme = createColorScheme({ C: '#0000FF' });
       
       const color = getColorForElement(atom, 'C', settings, colorScheme);
       expect(color).to.equal('#FF0000');
     });
 
-    it('should return settings.atomColorByElement when atom.color is not set', () => {
+    it('should return settings.currentColorByElement when atom.color is not set', () => {
       const atom = createAtom('C');
-      settings.atomColorByElement = { C: '#00FF00' };
+      settings = createDisplaySettings({ currentColorByElement: { C: '#00FF00' } });
       colorScheme = createColorScheme({ C: '#0000FF' });
       
       const color = getColorForElement(atom, 'C', settings, colorScheme);
@@ -54,7 +82,7 @@ describe('colorSchemeUtils', () => {
 
     it('should return colorScheme.colors when atom.color and settings are not set', () => {
       const atom = createAtom('C');
-      settings.atomColorByElement = {};
+      settings = createDisplaySettings({ currentColorByElement: {} });
       colorScheme = createColorScheme({ C: '#0000FF' });
       
       const color = getColorForElement(atom, 'C', settings, colorScheme);
@@ -63,7 +91,7 @@ describe('colorSchemeUtils', () => {
 
     it('should return ELEMENT_DATA color as fallback', () => {
       const atom = createAtom('C');
-      settings.atomColorByElement = {};
+      settings = createDisplaySettings({ currentColorByElement: {} });
       colorScheme = createColorScheme({});
       
       const color = getColorForElement(atom, 'C', settings, colorScheme);
@@ -72,7 +100,7 @@ describe('colorSchemeUtils', () => {
 
     it('should return default fallback for unknown element', () => {
       const atom = createAtom('Xx');
-      settings.atomColorByElement = {};
+      settings = createDisplaySettings({ currentColorByElement: {} });
       colorScheme = createColorScheme({});
       
       const color = getColorForElement(atom, 'Xx', settings, colorScheme);
@@ -81,7 +109,7 @@ describe('colorSchemeUtils', () => {
 
     it('should handle null colorScheme', () => {
       const atom = createAtom('C');
-      settings.atomColorByElement = {};
+      settings = createDisplaySettings({ currentColorByElement: {} });
       
       const color = getColorForElement(atom, 'C', settings, null);
       expect(color).to.not.equal('#C0C0C0');
@@ -89,9 +117,9 @@ describe('colorSchemeUtils', () => {
 
     it('should handle empty settings', () => {
       const atom = createAtom('C');
-      const emptySettings = {} as DisplaySettings;
+      settings = createDisplaySettings();
       
-      const color = getColorForElement(atom, 'C', emptySettings, null);
+      const color = getColorForElement(atom, 'C', settings, null);
       expect(color).to.not.equal('#C0C0C0');
     });
   });

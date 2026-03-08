@@ -4,7 +4,7 @@ import { DisplayConfig, Migration } from '../types.js';
  * Manages configuration migrations between schema versions
  */
 export class MigrationManager {
-  private currentSchemaVersion = 4;
+  private currentSchemaVersion = 5;
   private migrations: Migration[] = [];
 
   constructor() {
@@ -53,7 +53,7 @@ export class MigrationManager {
       },
     });
 
-    // v3 → v4: Add color scheme support with atomColorSchemeId and atomColorByElement
+    // v3 → v4: Add color scheme support with currentColorScheme and currentColorByElement
     this.migrations.push({
       fromVersion: 3,
       toVersion: 4,
@@ -64,9 +64,55 @@ export class MigrationManager {
           schemaVersion: 4,
           settings: {
             ...settings,
-            atomColorSchemeId: 'preset-jmol-default',
-            atomColorByElement: {}
+            currentColorScheme: 'preset-jmol-default',
+            currentColorByElement: {}
           },
+        };
+      },
+    });
+
+    // v4 → v5: Rename display settings fields
+    // atomColorSchemeId → currentColorScheme
+    // atomSizeScale → currentRadiusScale
+    // atomColorByElement → currentColorByElement
+    // atomSizeByElement → currentRadiusByElement
+    // Remove: atomSizeByAtom, atomSizeUseDefaultSettings, atomSizeGlobal
+    this.migrations.push({
+      fromVersion: 4,
+      toVersion: 5,
+      migrate: async (config) => {
+        const settings = config.settings || ({} as DisplayConfig['settings']);
+        const oldSettings = settings as Record<string, unknown>;
+        
+        const newSettings: Record<string, unknown> = { ...settings };
+        
+        // Rename fields
+        if (oldSettings.atomColorSchemeId !== undefined) {
+          newSettings.currentColorScheme = oldSettings.atomColorSchemeId;
+          delete newSettings.atomColorSchemeId;
+        }
+        if (oldSettings.atomSizeScale !== undefined) {
+          newSettings.currentRadiusScale = oldSettings.atomSizeScale;
+          delete newSettings.atomSizeScale;
+        }
+        if (oldSettings.atomColorByElement !== undefined) {
+          newSettings.currentColorByElement = oldSettings.atomColorByElement;
+          delete newSettings.atomColorByElement;
+        }
+        if (oldSettings.atomSizeByElement !== undefined) {
+          newSettings.currentRadiusByElement = oldSettings.atomSizeByElement;
+          delete newSettings.atomSizeByElement;
+        }
+        
+        // Remove deprecated fields
+        delete newSettings.atomSizeByAtom;
+        delete newSettings.atomSizeUseDefaultSettings;
+        delete newSettings.atomSizeGlobal;
+        
+        return {
+          ...config,
+          schemaVersion: 5,
+          settings: newSettings as DisplayConfig['settings'],
         };
       },
     });

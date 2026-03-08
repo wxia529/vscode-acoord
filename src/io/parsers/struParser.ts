@@ -1,8 +1,7 @@
 import { Structure } from '../../models/structure.js';
 import { Atom } from '../../models/atom.js';
 import { UnitCell } from '../../models/unitCell.js';
-import { DEFAULT_NUMERICAL_ORBITALS, ELEMENT_DATA, ElementInfo } from '../../utils/elementData.js';
-import { parseElement } from '../../utils/elementData.js';
+import { DEFAULT_NUMERICAL_ORBITALS, ELEMENT_DATA, ElementInfo, parseElement, getDefaultAtomColor, getDefaultAtomRadius } from '../../utils/elementData.js';
 import { BOHR_TO_ANGSTROM, ANGSTROM_TO_BOHR } from '../../utils/constants.js';
 import { fractionalToCartesian } from '../../utils/parserUtils.js';
 import { StructureParser } from './structureParser.js';
@@ -176,7 +175,10 @@ export class STRUParser extends StructureParser {
               z *= scale;
             }
 
-            const atom = new Atom(element, x, y, z);
+            const atom = new Atom(element, x, y, z, undefined, {
+              color: getDefaultAtomColor(element),
+              radius: getDefaultAtomRadius(element),
+            });
             atom.fixed = fixed;
             structure.addAtom(atom);
           }

@@ -7,8 +7,8 @@ const DEFAULT_FALLBACK_COLOR = '#C0C0C0';
 
 /**
  * Get color for an element with fallback chain:
- * 1. atom.color (manual per-atom override)
- * 2. settings.atomColorByElement[element] (user override)
+ * 1. atom.color (manual per-atom override, but skip default gray)
+ * 2. settings.currentColorByElement[element] (user override)
  * 3. colorScheme.colors[element] (ColorScheme definition)
  * 4. ELEMENT_DATA[element].color (Jmol default)
  * 5. '#C0C0C0' (final fallback: gray)
@@ -19,12 +19,13 @@ export function getColorForElement(
   settings: DisplaySettings,
   colorScheme: ColorScheme | null
 ): string {
-  if (atom.color) {
+  // Skip default gray color - it's just the Atom constructor default
+  if (atom.color && atom.color !== DEFAULT_FALLBACK_COLOR) {
     return atom.color;
   }
 
-  if (settings.atomColorByElement?.[symbol]) {
-    return settings.atomColorByElement[symbol];
+  if (settings.currentColorByElement?.[symbol]) {
+    return settings.currentColorByElement[symbol];
   }
 
   if (colorScheme?.colors[symbol]) {

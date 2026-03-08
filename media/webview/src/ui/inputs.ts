@@ -3,6 +3,52 @@ import { getAtomById } from '../utils/measurements';
 import { getAdsorptionReference } from '../utils/transformations';
 import type { Atom } from '../types';
 
+export function updatePropertiesPanel(): void {
+  const noSelection = document.getElementById('properties-no-selection');
+  const singleAtom = document.getElementById('properties-single-atom');
+  const multiAtom = document.getElementById('properties-multi-atom');
+  const singleBond = document.getElementById('properties-single-bond');
+
+  if (!noSelection || !singleAtom || !multiAtom || !singleBond) { return; }
+
+  const selectedAtomIds = selectionStore.selectedAtomIds || [];
+  const selectedBondKeys = selectionStore.selectedBondKeys || [];
+
+  noSelection.style.display = 'none';
+  singleAtom.style.display = 'none';
+  multiAtom.style.display = 'none';
+  singleBond.style.display = 'none';
+
+  if (selectedAtomIds.length === 1) {
+    singleAtom.style.display = 'block';
+  } else if (selectedAtomIds.length > 1) {
+    multiAtom.style.display = 'block';
+    const countEl = document.getElementById('multi-atom-count');
+    const breakdownEl = document.getElementById('multi-atom-breakdown');
+    if (countEl) {
+      countEl.textContent = String(selectedAtomIds.length);
+    }
+    if (breakdownEl) {
+      const elementCounts = new Map<string, number>();
+      for (const atomId of selectedAtomIds) {
+        const atom = getAtomById(atomId);
+        if (atom) {
+          const count = elementCounts.get(atom.element) || 0;
+          elementCounts.set(atom.element, count + 1);
+        }
+      }
+      const parts = Array.from(elementCounts.entries())
+        .sort((a, b) => a[0].localeCompare(b[0]))
+        .map(([element, count]) => `${element}: ${count}`);
+      breakdownEl.textContent = parts.join(', ');
+    }
+  } else if (selectedBondKeys.length === 1) {
+    singleBond.style.display = 'block';
+  } else {
+    noSelection.style.display = 'block';
+  }
+}
+
 export function normalizeHexColor(value: string): string | null {
   if (typeof value !== 'string') { return null; }
   const trimmed = value.trim();

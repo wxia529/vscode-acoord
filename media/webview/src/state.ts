@@ -41,23 +41,20 @@ export interface DisplayState {
   unitCellColor: string;
   unitCellThickness: number;
   unitCellLineStyle: 'solid' | 'dashed';
-  atomSizeUseDefaultSettings: boolean;
-  atomSizeGlobal: number;
-  atomSizeByElement: Record<string, number>;
-  atomSizeByAtom: Record<string, number>;
+  currentRadiusByElement: Record<string, number>;
   atomSizeElementExpanded: boolean;
   shininess: number;
   manualScale: number;
   autoScaleEnabled: boolean;
-  atomSizeScale: number;
+  currentRadiusScale: number;
   bondThicknessScale: number;
   viewZoom: number;
   scaleAtomsWithLattice: boolean;
   projectionMode: 'orthographic' | 'perspective';
   supercell: [number, number, number];
   unitCellEditing: boolean;
-  atomColorSchemeId: string;
-  atomColorByElement: Record<string, string>;
+  currentColorScheme: string;
+  currentColorByElement: Record<string, string>;
 }
 
 export const displayStore: DisplayState = {
@@ -66,23 +63,20 @@ export const displayStore: DisplayState = {
   unitCellColor: '#FF6600',
   unitCellThickness: 1,
   unitCellLineStyle: 'solid',
-  atomSizeUseDefaultSettings: true,
-  atomSizeGlobal: 0.3,
-  atomSizeByElement: {},
-  atomSizeByAtom: {},
+  currentRadiusByElement: {},
   atomSizeElementExpanded: false,
   shininess: 50,
   manualScale: 1,
   autoScaleEnabled: false,
-  atomSizeScale: 1,
+  currentRadiusScale: 1,
   bondThicknessScale: 1,
   viewZoom: 1,
   scaleAtomsWithLattice: false,
   projectionMode: 'orthographic',
   supercell: [1, 1, 1],
   unitCellEditing: false,
-  atomColorSchemeId: '',
-  atomColorByElement: {},
+  currentColorScheme: '',
+  currentColorByElement: {},
 };
 
 /** Default display settings used when a loaded config omits a field. */
@@ -92,13 +86,10 @@ const DISPLAY_DEFAULTS: Required<DisplaySettings> = {
   unitCellColor: '#FF6600',
   unitCellThickness: 1,
   unitCellLineStyle: 'solid',
-  atomSizeUseDefaultSettings: true,
-  atomSizeGlobal: 0.3,
-  atomSizeByElement: {},
-  atomSizeByAtom: {},
+  currentRadiusByElement: {},
   manualScale: 1,
   autoScaleEnabled: false,
-  atomSizeScale: 1,
+  currentRadiusScale: 1,
   bondThicknessScale: 1,
   viewZoom: 1,
   scaleAtomsWithLattice: false,
@@ -110,8 +101,8 @@ const DISPLAY_DEFAULTS: Required<DisplaySettings> = {
   keyLight: { intensity: 0.7, x: 0, y: 0, z: 10, color: '#CCCCCC' },
   fillLight: { intensity: 0, x: -10, y: -5, z: 5, color: '#ffffff' },
   rimLight: { intensity: 0, x: 0, y: 5, z: -10, color: '#ffffff' },
-  atomColorSchemeId: '',
-  atomColorByElement: {},
+  currentColorScheme: '',
+  currentColorByElement: {},
 };
 
 function flattenLight(light: LightConfig | { intensity: number; color: string; position: { x: number; y: number; z: number } }): LightConfig {
@@ -136,13 +127,10 @@ export function extractDisplaySettings(): DisplaySettings {
     unitCellColor: displayStore.unitCellColor,
     unitCellThickness: displayStore.unitCellThickness,
     unitCellLineStyle: displayStore.unitCellLineStyle,
-    atomSizeUseDefaultSettings: displayStore.atomSizeUseDefaultSettings,
-    atomSizeGlobal: displayStore.atomSizeGlobal,
-    atomSizeByElement: displayStore.atomSizeByElement,
-    atomSizeByAtom: displayStore.atomSizeByAtom,
+    currentRadiusByElement: displayStore.currentRadiusByElement,
     manualScale: displayStore.manualScale,
     autoScaleEnabled: displayStore.autoScaleEnabled,
-    atomSizeScale: displayStore.atomSizeScale,
+    currentRadiusScale: displayStore.currentRadiusScale,
     bondThicknessScale: displayStore.bondThicknessScale,
     viewZoom: displayStore.viewZoom,
     scaleAtomsWithLattice: displayStore.scaleAtomsWithLattice,
@@ -154,8 +142,8 @@ export function extractDisplaySettings(): DisplaySettings {
     keyLight: flattenToSettings(lightingStore.keyLight),
     fillLight: flattenToSettings(lightingStore.fillLight),
     rimLight: flattenToSettings(lightingStore.rimLight),
-    atomColorSchemeId: displayStore.atomColorSchemeId,
-    atomColorByElement: displayStore.atomColorByElement,
+    currentColorScheme: displayStore.currentColorScheme,
+    currentColorByElement: displayStore.currentColorByElement,
   };
 }
 
@@ -169,20 +157,17 @@ export function applyDisplaySettings(settings: DisplaySettings): void {
   displayStore.unitCellColor = settings.unitCellColor ?? d.unitCellColor;
   displayStore.unitCellThickness = settings.unitCellThickness ?? d.unitCellThickness;
   displayStore.unitCellLineStyle = settings.unitCellLineStyle ?? d.unitCellLineStyle;
-  displayStore.atomSizeUseDefaultSettings = settings.atomSizeUseDefaultSettings ?? d.atomSizeUseDefaultSettings;
-  displayStore.atomSizeGlobal = settings.atomSizeGlobal ?? d.atomSizeGlobal;
-  displayStore.atomSizeByElement = settings.atomSizeByElement ?? d.atomSizeByElement;
-  displayStore.atomSizeByAtom = settings.atomSizeByAtom ?? d.atomSizeByAtom;
+  displayStore.currentRadiusByElement = settings.currentRadiusByElement ?? d.currentRadiusByElement;
   displayStore.manualScale = settings.manualScale ?? d.manualScale;
   displayStore.autoScaleEnabled = settings.autoScaleEnabled ?? d.autoScaleEnabled;
-  displayStore.atomSizeScale = settings.atomSizeScale ?? d.atomSizeScale;
+  displayStore.currentRadiusScale = settings.currentRadiusScale ?? d.currentRadiusScale;
   displayStore.bondThicknessScale = settings.bondThicknessScale ?? d.bondThicknessScale;
   displayStore.viewZoom = settings.viewZoom ?? d.viewZoom;
   displayStore.scaleAtomsWithLattice = settings.scaleAtomsWithLattice ?? d.scaleAtomsWithLattice;
   displayStore.projectionMode = settings.projectionMode ?? d.projectionMode;
   displayStore.shininess = settings.shininess ?? d.shininess;
-  displayStore.atomColorSchemeId = settings.atomColorSchemeId ?? d.atomColorSchemeId;
-  displayStore.atomColorByElement = settings.atomColorByElement ?? d.atomColorByElement;
+  displayStore.currentColorScheme = settings.currentColorScheme ?? d.currentColorScheme;
+  displayStore.currentColorByElement = settings.currentColorByElement ?? d.currentColorByElement;
   
   lightingStore.lightingEnabled = settings.lightingEnabled ?? d.lightingEnabled;
   lightingStore.ambientIntensity = settings.ambientIntensity ?? d.ambientIntensity;
@@ -216,6 +201,10 @@ export const lightingStore: LightingState = {
 // ─────────────────────────────────────────────────────────────────────────────
 // Interaction Store - 交互状态
 // ─────────────────────────────────────────────────────────────────────────────
+export type BoxSelectionMode = 'atoms' | 'bonds' | 'both';
+
+export type ToolType = 'select' | 'move' | 'box' | 'add' | 'delete';
+
 export interface InteractionState {
   isDragging: boolean;
   dragAtomId: string | null;
@@ -226,6 +215,9 @@ export interface InteractionState {
   groupMoveActive: boolean;
   renderAtomOffsets: Record<string, [number, number, number]>;
   shouldFitCamera: boolean;
+  addingAtomElement: string | null;
+  boxSelectionMode: BoxSelectionMode;
+  currentTool: ToolType;
 }
 
 export const interactionStore: InteractionState = {
@@ -238,6 +230,9 @@ export const interactionStore: InteractionState = {
   groupMoveActive: false,
   renderAtomOffsets: {},
   shouldFitCamera: true,
+  addingAtomElement: null,
+  boxSelectionMode: 'atoms',
+  currentTool: 'select',
 };
 
 // ─────────────────────────────────────────────────────────────────────────────

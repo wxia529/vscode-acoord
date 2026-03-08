@@ -124,13 +124,12 @@ export interface WireDisplaySettings {
   unitCellColor?: string;
   unitCellThickness?: number;
   unitCellLineStyle?: 'solid' | 'dashed';
-  atomSizeUseDefaultSettings?: boolean;
-  atomSizeGlobal?: number;
-  atomSizeByElement?: Record<string, number>;
-  atomSizeByAtom?: Record<string, number>;
+  currentColorScheme?: string;
+  currentRadiusScale?: number;
+  currentColorByElement?: Record<string, string>;
+  currentRadiusByElement?: Record<string, number>;
   manualScale?: number;
   autoScaleEnabled?: boolean;
-  atomSizeScale?: number;
   bondThicknessScale?: number;
   viewZoom?: number;
   scaleAtomsWithLattice?: boolean;
@@ -142,8 +141,6 @@ export interface WireDisplaySettings {
   keyLight?: WireLightConfig;
   fillLight?: WireLightConfig;
   rimLight?: WireLightConfig;
-  atomColorSchemeId?: string;
-  atomColorByElement?: Record<string, string>;
 }
 
 export interface WireConfigEntry {
@@ -437,6 +434,17 @@ export interface SetAtomColorMessage {
   color: string;
 }
 
+export interface SetAtomRadiusMessage {
+  command: 'setAtomRadius';
+  atomIds: string[];
+  radius: number;
+}
+
+export interface ApplyDisplaySettingsMessage {
+  command: 'applyDisplaySettings';
+  atomIds: string[];
+}
+
 export interface UpdateAtomMessage {
   command: 'updateAtom';
   atomId: string;
@@ -608,6 +616,8 @@ export type WebviewToExtensionMessage =
   | PasteSelectionMessage
   | ChangeAtomsMessage
   | SetAtomColorMessage
+  | SetAtomRadiusMessage
+  | ApplyDisplaySettingsMessage
   | UpdateAtomMessage
   | SetBondLengthMessage
   | CreateBondMessage

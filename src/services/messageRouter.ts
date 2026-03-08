@@ -216,6 +216,16 @@ export class MessageRouter {
       return true;
     });
 
+    this.registerTyped('setAtomRadius', (message) => {
+      this.atomEditService.setAtomRadius(message.atomIds, message.radius);
+      return true;
+    });
+
+    this.registerTyped('applyDisplaySettings', (message) => {
+      this.atomEditService.applyDisplaySettings(message.atomIds);
+      return true;
+    });
+
     this.registerTyped('updateAtom', (message) => {
       if (message.atomId) {
         this.atomEditService.updateAtom(message.atomId, {
@@ -357,8 +367,8 @@ export class MessageRouter {
       // handleLoadDisplayConfig posts 'colorSchemeLoaded' to the webview but does
       // not update the RenderMessageBuilder — mirror what loadColorScheme does.
       const settings = this.displayConfigService.getSessionDisplaySettings();
-      if (settings?.atomColorSchemeId) {
-        const scheme = await this.colorSchemeManager.getScheme(settings.atomColorSchemeId);
+      if (settings?.currentColorScheme) {
+        const scheme = await this.colorSchemeManager.getScheme(settings.currentColorScheme);
         if (scheme) {
           this.renderer.setOptions({ colorScheme: scheme });
         }
@@ -385,21 +395,21 @@ export class MessageRouter {
     });
 
     this.registerTyped('updateDisplaySettings', async (message) => {
-      const oldSchemeId = this.displayConfigService.getSessionDisplaySettings()?.atomColorSchemeId;
-      const newSchemeId = message.settings.atomColorSchemeId;
+      const oldSchemeId = this.displayConfigService.getSessionDisplaySettings()?.currentColorScheme;
+      const newSchemeId = message.settings.currentColorScheme;
       
       this.displayConfigService.updateDisplaySettings(message.settings);
       
-      // If atomColorSchemeId changed, load and apply the new color scheme
+      // If currentColorScheme changed, load and apply the new color scheme
       if (newSchemeId && newSchemeId !== oldSchemeId) {
         try {
           const scheme = await this.colorSchemeManager.getScheme(newSchemeId);
           if (scheme) {
             this.renderer.setOptions({ colorScheme: scheme });
-            // Clear atomColorByElement to prevent stale overrides from shadowing the new scheme
+            // Clear currentColorByElement to prevent stale overrides from shadowing the new scheme
             const current = this.displayConfigService.getSessionDisplaySettings();
             if (current) {
-              current.atomColorByElement = {};
+              current.currentColorByElement = {};
             }
             this.onRenderRequired();
           }
@@ -450,13 +460,13 @@ export class MessageRouter {
         if (scheme) {
           this.renderer.setOptions({ colorScheme: scheme });
           // Update session displaySettings to reflect the new color scheme.
-          // Clear atomColorByElement so stale per-element overrides from a
+          // Clear currentColorByElement so stale per-element overrides from a
           // previous scheme don't shadow the new scheme's colors in the
           // getColorForElement() fallback chain.
           const current = this.displayConfigService.getSessionDisplaySettings();
           if (current) {
-            current.atomColorSchemeId = scheme.id;
-            current.atomColorByElement = {};
+            current.currentColorScheme = scheme.id;
+            current.currentColorByElement = {};
           }
           this.onRenderRequired();
         }
@@ -479,7 +489,7 @@ export class MessageRouter {
       let colors: Record<string, string> = message.colors ?? {};
 
       const currentSettings = this.displayConfigService.getSessionDisplaySettings();
-      const schemeId = currentSettings?.atomColorSchemeId;
+      const schemeId = currentSettings?.currentColorScheme;
       if (schemeId) {
         try {
           const currentScheme = await this.colorSchemeManager.getScheme(schemeId);

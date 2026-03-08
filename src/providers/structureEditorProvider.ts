@@ -152,6 +152,9 @@ export class StructureEditorProvider implements vscode.CustomEditorProvider<Stru
       session
     );
 
+    // Set up atomEditService session ref for applyDisplaySettings
+    atomEditService.setSessionRef(session);
+
     // Create messageRouter with all required dependencies
     const messageRouter = new MessageRouter(
       renderer,

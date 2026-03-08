@@ -2,7 +2,8 @@ import { RenderMessageBuilder } from '../renderers/renderMessageBuilder.js';
 import { Atom } from '../models/atom.js';
 import { UndoManager } from '../providers/undoManager.js';
 import { TrajectoryManager } from '../providers/trajectoryManager.js';
-import { parseElement } from '../utils/elementData.js';
+import { parseElement, getDefaultAtomColor, getDefaultAtomRadius } from '../utils/elementData.js';
+import { DisplaySettings } from '../config/types.js';
 
 export interface PositionUpdate {
   id: string;
@@ -18,11 +19,17 @@ export interface CopyOffset {
 }
 
 export class AtomEditService {
+  private sessionRef?: { displaySettings?: DisplaySettings };
+
   constructor(
     private renderer: RenderMessageBuilder,
     private trajectoryManager: TrajectoryManager,
     private undoManager: UndoManager
   ) {}
+
+  setSessionRef(ref: { displaySettings?: DisplaySettings }): void {
+    this.sessionRef = ref;
+  }
 
   addAtom(element: string, x: number, y: number, z: number): boolean {
     const parsedElement = parseElement(element);
@@ -35,7 +42,10 @@ export class AtomEditService {
     }
     const editStructure = this.trajectoryManager.activeStructure;
     
-    const atom = new Atom(parsedElement, x, y, z);
+    const atom = new Atom(parsedElement, x, y, z, undefined, {
+      color: getDefaultAtomColor(parsedElement),
+      radius: getDefaultAtomRadius(parsedElement),
+    });
     this.undoManager.push(editStructure);
     editStructure.addAtom(atom);
     this.renderer.setStructure(editStructure);
@@ -184,7 +194,8 @@ export class AtomEditService {
       const atom = editStructure.getAtom(id);
       if (atom) {
         atom.element = parsedElement;
-        atom.color = undefined;
+        atom.color = getDefaultAtomColor(parsedElement);
+        atom.radius = getDefaultAtomRadius(parsedElement);
       }
     }
     this.renderer.setStructure(editStructure);
@@ -207,6 +218,69 @@ export class AtomEditService {
       const atom = editStructure.getAtom(id);
       if (atom) {
         atom.color = color;
+      }
+    }
+    this.renderer.setStructure(editStructure);
+    this.trajectoryManager.commitEdit();
+    return true;
+  }
+
+  setAtomRadius(atomIds: string[], radius: number): boolean {
+    if (atomIds.length === 0 || !Number.isFinite(radius) || radius <= 0) {
+      return false;
+    }
+
+    if (!this.trajectoryManager.isEditing) {
+      this.trajectoryManager.beginEdit();
+    }
+    const editStructure = this.trajectoryManager.activeStructure;
+    
+    this.undoManager.push(editStructure);
+    for (const id of atomIds) {
+      const atom = editStructure.getAtom(id);
+      if (atom) {
+        atom.radius = radius;
+      }
+    }
+    this.renderer.setStructure(editStructure);
+    this.trajectoryManager.commitEdit();
+    return true;
+  }
+
+  applyDisplaySettings(atomIds: string[]): boolean {
+    if (atomIds.length === 0) {
+      return false;
+    }
+
+    const settings = this.sessionRef?.displaySettings;
+    if (!settings) {
+      return false;
+    }
+
+    if (!this.trajectoryManager.isEditing) {
+      this.trajectoryManager.beginEdit();
+    }
+    const editStructure = this.trajectoryManager.activeStructure;
+    
+    this.undoManager.push(editStructure);
+
+    for (const id of atomIds) {
+      const atom = editStructure.getAtom(id);
+      if (atom) {
+        if (settings.currentColorByElement?.[atom.element]) {
+          atom.color = settings.currentColorByElement[atom.element];
+        } else {
+          atom.color = getDefaultAtomColor(atom.element);
+        }
+
+        if (settings.currentRadiusByElement?.[atom.element]) {
+          atom.radius = settings.currentRadiusByElement[atom.element];
+        } else {
+          const baseRadius = getDefaultAtomRadius(atom.element);
+          atom.radius = settings.currentRadiusScale !== undefined 
+            ? baseRadius * settings.currentRadiusScale 
+            : baseRadius;
+        }
       }
     }
     this.renderer.setStructure(editStructure);

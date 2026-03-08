@@ -2,7 +2,6 @@ import * as THREE from 'three';
 import { TrackballControls } from 'three/examples/jsm/controls/TrackballControls.js';
 import { structureStore, displayStore, lightingStore } from './state';
 import type { Atom, Bond, Structure, UiHooks, UnitCellEdge } from './types';
-import { clampAtomSize, getBaseAtomId } from './utils/atomSize';
 import { debounce } from './utils/performance';
 
 // Camera auto-scaling constants
@@ -411,23 +410,8 @@ function getAutoScales(atoms: Atom[]): { scale: number; sizeScale: number } {
   return { scale, sizeScale };
 }
 
-function getConfiguredAtomRadius(atom: Atom, baseAtomsById: Map<string, Atom>): number {
-  const baseId = getBaseAtomId(atom.id);
-  const baseAtom = baseAtomsById.get(baseId);
-  const fallbackRadius = Number.isFinite(atom.radius)
-    ? atom.radius
-    : Number.isFinite(baseAtom?.radius) ? baseAtom!.radius : 0.1;
-
-  if (displayStore.atomSizeUseDefaultSettings !== false) return fallbackRadius;
-
-  const atomOverride = (displayStore.atomSizeByAtom || {})[baseId];
-  if (Number.isFinite(atomOverride)) return clampAtomSize(atomOverride, fallbackRadius);
-
-  const element = atom.element || baseAtom?.element;
-  const elementOverride = element ? (displayStore.atomSizeByElement || {})[element] : undefined;
-  if (Number.isFinite(elementOverride)) return clampAtomSize(elementOverride, fallbackRadius);
-
-  return clampAtomSize(displayStore.atomSizeGlobal, fallbackRadius);
+function getConfiguredAtomRadius(atom: Atom): number {
+  return Number.isFinite(atom.radius) ? atom.radius : 0.1;
 }
 
 function disposeMaterial(material: THREE.Material | THREE.Material[] | null | undefined): void {
@@ -577,7 +561,7 @@ function buildUnitCellGroup(edges: UnitCellEdge[], scale: number): THREE.Group |
 function renderStructure(data: Structure, uiHooks?: Partial<UiHooks>, options?: { fitCamera?: boolean }): void {
   structureStore.currentStructure = data;
   let scale = displayStore.manualScale;
-  let sizeScale = displayStore.atomSizeScale;
+  let sizeScale = displayStore.currentRadiusScale;
   if (displayStore.autoScaleEnabled) {
     const auto = getAutoScales(data.atoms || []);
     scale = auto.scale;
@@ -628,7 +612,6 @@ function renderStructure(data: Structure, uiHooks?: Partial<UiHooks>, options?: 
   const selectedSet = new Set(data.selectedAtomIds || []);
   const renderAtoms = data.renderAtoms || data.atoms;
   const renderBonds = data.renderBonds || data.bonds;
-  const baseAtomsById = new Map((data.atoms || []).map((atom) => [atom.id, atom]));
   const surfaceShininess = getSurfaceShininess();
 
   if (renderAtoms) {
@@ -650,7 +633,7 @@ function renderStructure(data: Structure, uiHooks?: Partial<UiHooks>, options?: 
       const byRadius = new Map<number, typeof selectableAtoms>();
       for (const atom of selectableAtoms) {
         const isSelected = !!atom.selected || selectedSet.has(atom.id);
-        const configuredRadius = getConfiguredAtomRadius(atom, baseAtomsById);
+        const configuredRadius = getConfiguredAtomRadius(atom);
         const sphereRadius = Math.max(configuredRadius * sizeScale, 0.12) * (isSelected ? 1.12 : 1);
         // Round to 3 decimal places as map key.
         const key = Math.round(sphereRadius * 1000) / 1000;
@@ -713,7 +696,7 @@ function renderStructure(data: Structure, uiHooks?: Partial<UiHooks>, options?: 
     if (nonSelectableAtoms.length > 0) {
       const sharedGhostGeo = new THREE.SphereGeometry(1, 16, 12);
       for (const atom of nonSelectableAtoms) {
-        const configuredRadius = getConfiguredAtomRadius(atom, baseAtomsById);
+        const configuredRadius = getConfiguredAtomRadius(atom);
         const sphereRadius = Math.max(configuredRadius * sizeScale, 0.12);
         const material = new THREE.MeshPhongMaterial({
           color: new THREE.Color(atom.color),

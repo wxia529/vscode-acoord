@@ -31,60 +31,35 @@ export function getAvailableElements(): string[] {
 }
 
 export function cleanupAtomSizeOverrides(): void {
-  const atoms = getCurrentStructureAtoms();
-  if (!displayStore.atomSizeByAtom || typeof displayStore.atomSizeByAtom !== 'object') {
-    displayStore.atomSizeByAtom = {};
+  if (!displayStore.currentRadiusByElement || typeof displayStore.currentRadiusByElement !== 'object') {
+    displayStore.currentRadiusByElement = {};
   }
-  if (!displayStore.atomSizeByElement || typeof displayStore.atomSizeByElement !== 'object') {
-    displayStore.atomSizeByElement = {};
+  const elements = new Set(getCurrentStructureAtoms().map((atom) => atom.element));
+  for (const element of Object.keys(displayStore.currentRadiusByElement)) {
+    if (!elements.has(element)) { delete displayStore.currentRadiusByElement[element]; }
   }
-  const atomIds = new Set(atoms.map((atom) => atom.id));
-  for (const atomId of Object.keys(displayStore.atomSizeByAtom)) {
-    if (!atomIds.has(atomId)) { delete displayStore.atomSizeByAtom[atomId]; }
-  }
-  const elements = new Set(atoms.map((atom) => atom.element));
-  for (const element of Object.keys(displayStore.atomSizeByElement)) {
-    if (!elements.has(element)) { delete displayStore.atomSizeByElement[element]; }
-  }
-}
-
-export function hasAtomSizeOverride(atomId: string): boolean {
-  const baseId = getBaseAtomId(atomId);
-  return Number.isFinite(displayStore.atomSizeByAtom && displayStore.atomSizeByAtom[baseId]);
 }
 
 export function hasElementSizeOverride(element: string): boolean {
-  return Number.isFinite(displayStore.atomSizeByElement && displayStore.atomSizeByElement[element]);
+  return Number.isFinite(displayStore.currentRadiusByElement && displayStore.currentRadiusByElement[element]);
+}
+
+export function hasAtomSizeOverride(_atomId: string): boolean {
+  return false;
 }
 
 export function getFallbackRadiusForAtom(atom: Atom | null): number {
   if (atom && Number.isFinite(atom.radius)) { return atom.radius; }
-  return clampAtomSize(displayStore.atomSizeGlobal, 0.3);
+  return 0.3;
 }
 
 export function getAtomSizeForAtomId(atomId: string): number {
   const baseId = getBaseAtomId(atomId);
   const atom = getCurrentStructureAtoms().find((candidate) => candidate.id === baseId) || null;
-  const fallback = getFallbackRadiusForAtom(atom);
-
-  if (displayStore.atomSizeUseDefaultSettings !== false) { return fallback; }
-
-  const atomOverride = displayStore.atomSizeByAtom && displayStore.atomSizeByAtom[baseId];
-  if (Number.isFinite(atomOverride)) { return clampAtomSize(atomOverride, fallback); }
-
-  const elementOverride = atom && displayStore.atomSizeByElement
-    ? displayStore.atomSizeByElement[atom.element]
-    : undefined;
-  if (Number.isFinite(elementOverride)) { return clampAtomSize(elementOverride!, fallback); }
-
-  return clampAtomSize(displayStore.atomSizeGlobal, fallback);
+  return getFallbackRadiusForAtom(atom);
 }
 
 export function getAtomSizeForElement(element: string): number {
   const atom = getCurrentStructureAtoms().find((candidate) => candidate.element === element) || null;
-  const fallback = getFallbackRadiusForAtom(atom);
-  if (displayStore.atomSizeUseDefaultSettings !== false) { return fallback; }
-  const elementOverride = displayStore.atomSizeByElement && displayStore.atomSizeByElement[element];
-  if (Number.isFinite(elementOverride)) { return clampAtomSize(elementOverride, fallback); }
-  return clampAtomSize(displayStore.atomSizeGlobal, fallback);
+  return getFallbackRadiusForAtom(atom);
 }

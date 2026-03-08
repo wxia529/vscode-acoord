@@ -309,7 +309,12 @@ export class Structure {
           ];
 
           for (const atom of this.atoms) {
-            const newAtom = new Atom(atom.element, atom.x, atom.y, atom.z, undefined, atom.color);
+            const newAtom = new Atom(atom.element, atom.x, atom.y, atom.z, undefined, {
+              color: atom.color,
+              radius: atom.radius,
+              fixed: atom.fixed,
+              selectiveDynamics: atom.selectiveDynamics,
+            });
             newAtom.x += displacement[0];
             newAtom.y += displacement[1];
             newAtom.z += displacement[2];
@@ -520,11 +525,12 @@ export class Structure {
     // Preserve the original id so references (e.g. undo entries) stay valid.
     s.id = data.id;
     for (const a of data.atoms) {
-      const atom = new Atom(a.element, a.x, a.y, a.z, a.id, a.color);
-      atom.fixed = a.fixed ?? false;
-      if (a.selectiveDynamics) {
-        atom.selectiveDynamics = a.selectiveDynamics;
-      }
+      const atom = new Atom(a.element, a.x, a.y, a.z, a.id, {
+        color: a.color,
+        radius: a.radius,
+        fixed: a.fixed ?? false,
+        selectiveDynamics: a.selectiveDynamics,
+      });
       s.addAtom(atom);
     }
     s.manualBonds = data.manualBonds ?? [];

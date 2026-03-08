@@ -99,6 +99,7 @@ export function updateAtomList(
     updateAdsorptionUI: () => void;
     updateAtomSizePanel: () => void;
     updateStatusBar: () => void;
+    updatePropertiesPanel: () => void;
   }
 ): void {
   const derivedSelectedIds = atoms.filter((atom) => atom.selected).map((atom) => atom.id);
@@ -154,6 +155,7 @@ export function updateAtomList(
   callbacks.updateAdsorptionUI();
   callbacks.updateAtomSizePanel();
   callbacks.updateStatusBar();
+  callbacks.updatePropertiesPanel();
 }
 
 export function handleSelect(
@@ -168,6 +170,7 @@ export function handleSelect(
     updateAdsorptionUI: () => void;
     updateAtomSizePanel: () => void;
     updateStatusBar: () => void;
+    updatePropertiesPanel: () => void;
   }
 ): void {
   if (!structureStore.currentStructure || !structureStore.currentStructure.atoms) {
@@ -206,6 +209,7 @@ export function applySelectionFromIds(
     updateAdsorptionUI: () => void;
     updateAtomSizePanel: () => void;
     updateStatusBar: () => void;
+    updatePropertiesPanel: () => void;
   }
 ): void {
   if (!structureStore.currentStructure || !structureStore.currentStructure.atoms) { return; }

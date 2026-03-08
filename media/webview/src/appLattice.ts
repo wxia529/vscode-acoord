@@ -79,56 +79,24 @@ export function updateLatticeUI(
 
 // ── Atom size panel ────────────────────────────────────────────────────────────
 
-export function updateAtomSizePanel(): void {
-  if (!_cb) { return; }
-  const {
-    clampAtomSize, getBaseAtomId, getAvailableElements,
-    hasAtomSizeOverride, hasElementSizeOverride,
-    getAtomSizeForAtomId, getAtomSizeForElement,
-    cleanupAtomSizeOverrides, rerenderCurrentStructure,
-    ATOM_SIZE_MIN, ATOM_SIZE_MAX,
-  } = _cb;
+function rerenderCurrentStructure(): void {
+  _cb?.rerenderCurrentStructure();
+}
 
-  const globalSlider = getElementById<HTMLInputElement>('atom-size-global-slider');
-  const globalValue = getElementById<HTMLElement>('atom-size-global-value');
-  const useDefaultCheckbox = getElementById<HTMLInputElement>('atom-size-use-default');
-  const selectedSection = getElementById<HTMLElement>('atom-size-selected-section');
-  const selectedCount = getElementById<HTMLElement>('atom-size-selected-count');
-  const selectedSlider = getElementById<HTMLInputElement>('atom-size-selected-slider');
-  const selectedValue = getElementById<HTMLElement>('atom-size-selected-value');
-  const resetSelectedButton = getElementById<HTMLButtonElement>('btn-atom-size-reset-selected');
+export function updateAtomSizePanel(): void {
   const elementToggle = getElementById<HTMLButtonElement>('atom-size-element-toggle');
   const elementList = getElementById<HTMLElement>('atom-size-element-list');
 
-  if (!globalSlider || !globalValue || !useDefaultCheckbox || !selectedSection || !selectedCount ||
-    !selectedSlider || !selectedValue || !resetSelectedButton || !elementToggle || !elementList) {
+  if (!elementToggle || !elementList) {
     return;
   }
 
-  cleanupAtomSizeOverrides();
+  const { cleanupAtomSizeOverrides, getAvailableElements, getAtomSizeForElement, hasElementSizeOverride,
+    clampAtomSize, ATOM_SIZE_MIN, ATOM_SIZE_MAX } = _cb || {};
 
-  const manualEnabled = displayStore.atomSizeUseDefaultSettings === false;
-  const selectedIds = Array.isArray(selectionStore.selectedAtomIds) ? selectionStore.selectedAtomIds : [];
-  const selectedAtomCount = selectedIds.length;
-  const currentSelectedId = selectedAtomCount > 0 ? selectedIds[selectedAtomCount - 1] : '';
-  const selectedAtomSize = selectedAtomCount > 0
-    ? getAtomSizeForAtomId(currentSelectedId)
-    : clampAtomSize(displayStore.atomSizeGlobal, 0.3);
-  const selectedHasAtomOverride = selectedIds.some((id) => hasAtomSizeOverride(id));
-  const availableElements = getAvailableElements();
+  cleanupAtomSizeOverrides?.();
 
-  displayStore.atomSizeGlobal = clampAtomSize(displayStore.atomSizeGlobal, 0.3);
-  globalSlider.value = displayStore.atomSizeGlobal.toFixed(2);
-  globalValue.textContent = `${displayStore.atomSizeGlobal.toFixed(2)} Å`;
-  globalSlider.disabled = !manualEnabled;
-  useDefaultCheckbox.checked = !manualEnabled;
-
-  selectedSection.style.display = selectedAtomCount > 0 ? '' : 'none';
-  selectedCount.textContent = String(selectedAtomCount);
-  selectedSlider.value = selectedAtomSize.toFixed(2);
-  selectedValue.textContent = `${selectedAtomSize.toFixed(2)} Å`;
-  selectedSlider.disabled = !manualEnabled;
-  resetSelectedButton.disabled = !manualEnabled || !selectedHasAtomOverride;
+  const availableElements = getAvailableElements?.() || [];
 
   if (availableElements.length === 0) { displayStore.atomSizeElementExpanded = false; }
   elementToggle.disabled = availableElements.length === 0;
@@ -138,8 +106,8 @@ export function updateAtomSizePanel(): void {
 
   if (displayStore.atomSizeElementExpanded && availableElements.length > 0) {
     for (const element of availableElements) {
-      const size = getAtomSizeForElement(element);
-      const hasOverride = hasElementSizeOverride(element);
+      const size = getAtomSizeForElement?.(element) ?? 0.3;
+      const hasOverride = hasElementSizeOverride?.(element) ?? false;
 
       const row = document.createElement('div');
       row.className = `atom-size-element-row${hasOverride ? ' size-override' : ''}`;
@@ -154,9 +122,9 @@ export function updateAtomSizePanel(): void {
       resetButton.type = 'button';
       resetButton.className = 'atom-size-element-reset';
       resetButton.textContent = '↺';
-      resetButton.disabled = !manualEnabled || !hasOverride;
+      resetButton.disabled = !hasOverride;
       resetButton.addEventListener('click', () => {
-        delete displayStore.atomSizeByElement[element];
+        delete displayStore.currentRadiusByElement[element];
         updateAtomSizePanel();
         rerenderCurrentStructure();
       });
@@ -166,15 +134,14 @@ export function updateAtomSizePanel(): void {
 
       const slider = document.createElement('input');
       slider.type = 'range';
-      slider.min = String(ATOM_SIZE_MIN);
-      slider.max = String(ATOM_SIZE_MAX);
+      slider.min = String(ATOM_SIZE_MIN ?? 0.1);
+      slider.max = String(ATOM_SIZE_MAX ?? 2.0);
       slider.step = '0.01';
       slider.value = size.toFixed(2);
-      slider.disabled = !manualEnabled;
       slider.oninput = (event: Event) => {
         const target = event.target as HTMLInputElement;
-        const nextSize = clampAtomSize(target.value, size);
-        displayStore.atomSizeByElement[element] = nextSize;
+        const nextSize = clampAtomSize?.(target.value, size) ?? size;
+        displayStore.currentRadiusByElement[element] = nextSize;
         updateAtomSizePanel();
         debouncedRerenderFromPanel();
       };
@@ -284,66 +251,25 @@ export function setup(callbacks: AppLatticeContext): void {
 
   // ── Atom size panel ────────────────────────────────────────────────────────
 
-  const globalSlider = getElementById<HTMLInputElement>('atom-size-global-slider');
-  const useDefaultCheckbox = getElementById<HTMLInputElement>('atom-size-use-default');
-  const selectedSlider = getElementById<HTMLInputElement>('atom-size-selected-slider');
-  const resetSelectedButton = getElementById<HTMLButtonElement>('btn-atom-size-reset-selected');
   const elementToggle = getElementById<HTMLButtonElement>('atom-size-element-toggle');
 
-  if (globalSlider && useDefaultCheckbox && selectedSlider && resetSelectedButton && elementToggle) {
-    globalSlider.addEventListener('input', (event: Event) => {
-      displayStore.atomSizeGlobal = clampAtomSize((event.target as HTMLInputElement).value, displayStore.atomSizeGlobal || 0.3);
-      updateAtomSizePanel();
-      debouncedRerenderCurrentStructure();
-    });
-
-    useDefaultCheckbox.addEventListener('change', (event: Event) => {
-      displayStore.atomSizeUseDefaultSettings = !!(event.target as HTMLInputElement).checked;
-      updateAtomSizePanel();
-      rerenderCurrentStructure();
-    });
-
-    selectedSlider.addEventListener('input', (event: Event) => {
-      if (displayStore.atomSizeUseDefaultSettings !== false) {
-        updateAtomSizePanel();
-        return;
-      }
-      const nextSize = clampAtomSize((event.target as HTMLInputElement).value, displayStore.atomSizeGlobal || 0.3);
-      const selectedIds = Array.isArray(selectionStore.selectedAtomIds) ? selectionStore.selectedAtomIds : [];
-      for (const atomId of selectedIds) {
-        const baseId = getBaseAtomId(atomId);
-        if (baseId) { displayStore.atomSizeByAtom[baseId] = nextSize; }
-      }
-      updateAtomSizePanel();
-      debouncedRerenderCurrentStructure();
-    });
-
-    resetSelectedButton.addEventListener('click', () => {
-      const selectedIds = Array.isArray(selectionStore.selectedAtomIds) ? selectionStore.selectedAtomIds : [];
-      for (const atomId of selectedIds) {
-        const baseId = getBaseAtomId(atomId);
-        if (baseId) { delete displayStore.atomSizeByAtom[baseId]; }
-      }
-      updateAtomSizePanel();
-      rerenderCurrentStructure();
-    });
-
+  if (elementToggle) {
     elementToggle.addEventListener('click', () => {
       displayStore.atomSizeElementExpanded = !displayStore.atomSizeElementExpanded;
       updateAtomSizePanel();
     });
-
-    if (sizeSlider) {
-      sizeSlider.addEventListener('input', (event: Event) => {
-        displayStore.atomSizeScale = parseFloat((event.target as HTMLInputElement).value);
-        const sizeValue = getElementById<HTMLElement>('size-value');
-        if (sizeValue) sizeValue.textContent = displayStore.atomSizeScale.toFixed(2);
-        if (structureStore.currentStructure) {
-          debouncedRenderStructure();
-        }
-      });
-    }
-
-    updateAtomSizePanel();
   }
+
+  if (sizeSlider) {
+    sizeSlider.addEventListener('input', (event: Event) => {
+      displayStore.currentRadiusScale = parseFloat((event.target as HTMLInputElement).value);
+      const sizeValue = getElementById<HTMLElement>('size-value');
+      if (sizeValue) sizeValue.textContent = displayStore.currentRadiusScale.toFixed(2);
+      if (structureStore.currentStructure) {
+        debouncedRenderStructure();
+      }
+    });
+  }
+
+  updateAtomSizePanel();
 }

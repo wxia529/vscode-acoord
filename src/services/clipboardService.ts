@@ -21,10 +21,12 @@ export class ClipboardService {
       const atom = structure.getAtom(id);
       if (atom) {
         const elementInfo = ELEMENT_DATA[atom.element];
+        // Skip default gray color - prefer element-specific color if available
+        const atomColor = atom.color !== '#C0C0C0' ? atom.color : undefined;
         atomsToCopy.push({
           id: atom.id,
           element: atom.element,
-          color: atom.color || elementInfo?.color || '#C0C0C0',
+          color: atomColor || elementInfo?.color || '#C0C0C0',
           position: [atom.x, atom.y, atom.z],
           radius: elementInfo?.covalentRadius || 0.7,
         });

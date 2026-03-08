@@ -16,13 +16,10 @@ export const DEFAULT_PRESET: DisplayConfig = {
     unitCellColor: '#FF6600',
     unitCellThickness: 1,
     unitCellLineStyle: 'solid',
-    atomSizeUseDefaultSettings: true,
-    atomSizeGlobal: 0.3,
-    atomSizeByElement: {},
-    atomSizeByAtom: {},
+    currentRadiusByElement: {},
     manualScale: 1,
     autoScaleEnabled: false,
-    atomSizeScale: 1,
+    currentRadiusScale: 1,
     bondThicknessScale: 1,
     viewZoom: 1,
     scaleAtomsWithLattice: false,
@@ -52,7 +49,7 @@ export const DEFAULT_PRESET: DisplayConfig = {
       y: 5,
       z: -10
     },
-    atomColorSchemeId: 'preset-jmol-default',
-    atomColorByElement: {}
+    currentColorScheme: 'preset-jmol-default',
+    currentColorByElement: {}
   }
 };
