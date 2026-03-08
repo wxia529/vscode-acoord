@@ -57,7 +57,10 @@ export function setup(callbacks: AppToolsContext): void {
 
   const btnCreateBond = document.getElementById('btn-create-bond') as HTMLButtonElement | null;
   const btnDeleteBond = document.getElementById('btn-delete-bond') as HTMLButtonElement | null;
-  const btnRecalculateBonds = document.getElementById('btn-recalculate-bonds') as HTMLButtonElement | null;
+  const btnCalculateBonds = document.getElementById('btn-calculate-bonds') as HTMLButtonElement | null;
+  const btnCalculateBondsPanel = document.getElementById('btn-calculate-bonds-panel') as HTMLButtonElement | null;
+  const btnClearBonds = document.getElementById('btn-clear-bonds') as HTMLButtonElement | null;
+  const bondSchemeSelect = document.getElementById('bond-scheme-select') as HTMLSelectElement | null;
 
   if (btnCreateBond) {
     btnCreateBond.addEventListener('click', () => {
@@ -79,9 +82,27 @@ export function setup(callbacks: AppToolsContext): void {
     });
   }
 
-  if (btnRecalculateBonds) {
-    btnRecalculateBonds.addEventListener('click', () => {
-      vscode.postMessage({ command: 'recalculateBonds' });
+  if (btnCalculateBonds) {
+    btnCalculateBonds.addEventListener('click', () => {
+      vscode.postMessage({ command: 'calculateBonds' });
+    });
+  }
+
+  if (btnCalculateBondsPanel) {
+    btnCalculateBondsPanel.addEventListener('click', () => {
+      vscode.postMessage({ command: 'calculateBonds' });
+    });
+  }
+
+  if (btnClearBonds) {
+    btnClearBonds.addEventListener('click', () => {
+      vscode.postMessage({ command: 'clearBonds' });
+    });
+  }
+
+  if (bondSchemeSelect) {
+    bondSchemeSelect.addEventListener('change', () => {
+      vscode.postMessage({ command: 'setBondScheme', scheme: bondSchemeSelect.value });
     });
   }
 

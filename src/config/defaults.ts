@@ -1,4 +1,5 @@
 import type { DisplaySettings } from './types.js';
+import { DEFAULT_BOND_SCHEME } from './bondSchemes.js';
 
 export function getDefaultDisplaySettings(): DisplaySettings {
   return {
@@ -14,6 +15,7 @@ export function getDefaultDisplaySettings(): DisplaySettings {
     autoScaleEnabled: false,
     currentRadiusScale: 1,
     bondThicknessScale: 1,
+    bondScheme: DEFAULT_BOND_SCHEME,
     viewZoom: 1,
     currentColorScheme: 'preset-bright',
     currentColorByElement: {},

@@ -407,6 +407,14 @@ function setupInteraction(): void {
         vscode.postMessage({ command: 'deleteBond', bondKey: bondKeys[0] });
       }
     },
+
+    onCalculateBonds: () => {
+      vscode.postMessage({ command: 'calculateBonds' });
+    },
+
+    onClearBonds: () => {
+      vscode.postMessage({ command: 'clearBonds' });
+    },
   });
 }
 

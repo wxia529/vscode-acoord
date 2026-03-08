@@ -46,6 +46,7 @@
     </div>
     <div class="toolbar-spacer"></div>
     <div class="toolbar-group toolbar-right">
+      <button id="btn-calculate-bonds" title="Calculate Bonds">Calculate Bonds</button>
       <button id="btn-reset" title="Reset View">Reset</button>
       <button id="btn-undo" title="Undo (Ctrl+Z)">↶</button>
       <button id="btn-redo" title="Redo (Ctrl+Y)">↷</button>
@@ -189,13 +190,32 @@
             <input type="number" id="bond-angle-input" step="0.1" />
           </div>
           <button id="btn-apply-angle">Apply Bond Angle</button>
+        </div>
+      </div>
+
+      <div class="collapsible-panel" data-panel="bonds">
+        <div class="panel-header">
+          <span class="panel-title">Bonds</span>
+          <span class="panel-toggle">▶</span>
+        </div>
+        <div class="panel-content collapsed" id="panel-bonds">
+          <div class="input-group">
+            <label>Bond Scheme</label>
+            <select id="bond-scheme-select">
+              <option value="all">All Bonds</option>
+              <option value="no-sf-shell">No s/f-Shell Bonds</option>
+            </select>
+          </div>
+          <div style="display:flex;gap:6px;margin-top:8px;">
+            <button id="btn-calculate-bonds-panel" type="button">Calculate Bonds</button>
+            <button id="btn-clear-bonds" type="button">Clear All</button>
+          </div>
           <div class="panel-section" style="margin-top:12px;">
-            <div class="panel-section-title">Bond Tools</div>
-            <div class="input-group" style="display:flex;gap:6px;flex-direction:row;">
-              <button id="btn-create-bond" type="button">Create Bond</button>
-              <button id="btn-delete-bond" type="button">Delete Bond</button>
+            <div class="panel-section-title">Manual Bonds</div>
+            <div style="display:flex;gap:6px;">
+              <button id="btn-create-bond" type="button">Create</button>
+              <button id="btn-delete-bond" type="button">Delete</button>
             </div>
-            <button id="btn-recalculate-bonds" type="button">Recalculate All Bonds</button>
           </div>
         </div>
       </div>

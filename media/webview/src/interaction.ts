@@ -57,6 +57,8 @@ export interface InteractionHandlers {
   onSetBondLength?: (bondKeys: string[], length: number) => void;
   onDeleteAtoms?: (atomIds: string[]) => void;
   onDeleteBonds?: (bondKeys: string[]) => void;
+  onCalculateBonds?: () => void;
+  onClearBonds?: () => void;
 }
 
 let controller: AbortController | null = null;
@@ -613,6 +615,8 @@ export function init(canvas: HTMLCanvasElement, handlers: InteractionHandlers): 
     onSetAtomRadius: handlers.onSetAtomRadius,
     onCreateBond: handlers.onCreateBond,
     onSetBondLength: handlers.onSetBondLength,
+    onCalculateBonds: handlers.onCalculateBonds,
+    onClearBonds: handlers.onClearBonds,
     onAddAtom: handlers.onAddAtom,
     onUndo: handlers.onUndo,
     onRedo: handlers.onRedo,

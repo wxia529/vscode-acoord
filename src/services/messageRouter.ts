@@ -263,8 +263,21 @@ export class MessageRouter {
       return true;
     });
 
-    this.registerTyped('recalculateBonds', () => {
-      this.bondService.recalculateBonds();
+    this.registerTyped('calculateBonds', (message) => {
+      this.bondService.calculateBonds(message.scheme);
+      return true;
+    });
+
+    this.registerTyped('clearBonds', () => {
+      this.bondService.clearBonds();
+      return true;
+    });
+
+    this.registerTyped('setBondScheme', (message) => {
+      const settings = this.displayConfigService.getSessionDisplaySettings();
+      if (settings) {
+        settings.bondScheme = message.scheme;
+      }
       return true;
     });
   }

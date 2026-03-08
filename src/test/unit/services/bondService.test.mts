@@ -32,15 +32,15 @@ function makeServices(structure: Structure): {
 
 describe('BondService', () => {
   describe('createBond', () => {
-    it('should create a manual bond between two atoms', () => {
+    it('should create a bond between two atoms', () => {
       const s = makeH2O();
       const { svc, tm } = makeServices(s);
       const [o, h1] = s.atoms;
       svc.createBond(o.id, h1.id);
-      const manual = tm.activeStructure.manualBonds;
-      expect(manual).to.have.length.greaterThan(0);
+      const bonds = tm.activeStructure.bonds;
+      expect(bonds).to.have.length.greaterThan(0);
       const bondKey = Structure.bondKey(o.id, h1.id);
-      expect(manual.some((b) => Structure.bondKey(b[0], b[1]) === bondKey)).to.be.true;
+      expect(bonds.some((b) => Structure.bondKey(b[0], b[1]) === bondKey)).to.be.true;
     });
 
     it('should push an undo snapshot when creating a bond', () => {
@@ -56,18 +56,18 @@ describe('BondService', () => {
       const s = makeH2O();
       const { svc, tm } = makeServices(s);
       const [o] = s.atoms;
-      const before = tm.activeStructure.manualBonds.length;
+      const before = tm.activeStructure.bonds.length;
       svc.createBond(o.id, o.id);
-      expect(tm.activeStructure.manualBonds).to.have.lengthOf(before);
+      expect(tm.activeStructure.bonds).to.have.lengthOf(before);
     });
 
     it('should not create a bond with an invalid atom id', () => {
       const s = makeH2O();
       const { svc, tm } = makeServices(s);
       const [o] = s.atoms;
-      const before = tm.activeStructure.manualBonds.length;
+      const before = tm.activeStructure.bonds.length;
       svc.createBond(o.id, 'nonexistent-id');
-      expect(tm.activeStructure.manualBonds).to.have.lengthOf(before);
+      expect(tm.activeStructure.bonds).to.have.lengthOf(before);
     });
   });
 
@@ -79,8 +79,8 @@ describe('BondService', () => {
       svc.createBond(o.id, h1.id);
       const bondKey = Structure.bondKey(o.id, h1.id);
       svc.deleteBond(bondKey);
-      const manual = tm.activeStructure.manualBonds;
-      expect(manual.some((b) => Structure.bondKey(b[0], b[1]) === bondKey)).to.be.false;
+      const bonds = tm.activeStructure.bonds;
+      expect(bonds.some((b) => Structure.bondKey(b[0], b[1]) === bondKey)).to.be.false;
     });
 
     it('should delete bonds by bondKeys array', () => {
@@ -92,23 +92,32 @@ describe('BondService', () => {
       const bk1 = Structure.bondKey(o.id, h1.id);
       const bk2 = Structure.bondKey(o.id, h2.id);
       svc.deleteBond(undefined, undefined, [bk1, bk2]);
-      expect(tm.activeStructure.manualBonds).to.have.lengthOf(0);
+      expect(tm.activeStructure.bonds).to.have.lengthOf(0);
     });
 
     it('should not error when given a non-existent bond key', () => {
     });
   });
 
-  describe('recalculateBonds', () => {
-    it('should clear manual bonds and suppressed auto bonds', () => {
+  describe('calculateBonds', () => {
+    it('should calculate bonds based on covalent radii', () => {
+      const s = makeH2O();
+      const { svc, tm } = makeServices(s);
+      expect(tm.activeStructure.bonds.length).to.equal(0);
+      svc.calculateBonds('all');
+      expect(tm.activeStructure.bonds.length).to.be.greaterThan(0);
+    });
+  });
+
+  describe('clearBonds', () => {
+    it('should clear all bonds', () => {
       const s = makeH2O();
       const { svc, tm } = makeServices(s);
       const [o, h1] = s.atoms;
       svc.createBond(o.id, h1.id);
-      expect(tm.activeStructure.manualBonds.length).to.be.greaterThan(0);
-      svc.recalculateBonds();
-      expect(tm.activeStructure.manualBonds).to.have.lengthOf(0);
-      expect(tm.activeStructure.suppressedAutoBonds).to.have.lengthOf(0);
+      expect(tm.activeStructure.bonds.length).to.be.greaterThan(0);
+      svc.clearBonds();
+      expect(tm.activeStructure.bonds).to.have.lengthOf(0);
     });
   });
 

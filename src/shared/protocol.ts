@@ -111,6 +111,8 @@ export interface WireLightConfig {
   z: number;
 }
 
+export type BondSchemeId = 'all' | 'no-sf-shell';
+
 /**
  * Display settings as they appear on the wire.
  *
@@ -131,6 +133,7 @@ export interface WireDisplaySettings {
   manualScale?: number;
   autoScaleEnabled?: boolean;
   bondThicknessScale?: number;
+  bondScheme?: BondSchemeId;
   viewZoom?: number;
   scaleAtomsWithLattice?: boolean;
   projectionMode?: 'orthographic' | 'perspective';
@@ -423,8 +426,18 @@ export interface DeleteBondMessage {
   bondKeys?: string[];
 }
 
-export interface RecalculateBondsMessage {
-  command: 'recalculateBonds';
+export interface CalculateBondsMessage {
+  command: 'calculateBonds';
+  scheme?: BondSchemeId;
+}
+
+export interface ClearBondsMessage {
+  command: 'clearBonds';
+}
+
+export interface SetBondSchemeMessage {
+  command: 'setBondScheme';
+  scheme: BondSchemeId;
 }
 
 export interface SaveStructureMessage {
@@ -525,7 +538,9 @@ export type WebviewToExtensionMessage =
   | SetBondLengthMessage
   | CreateBondMessage
   | DeleteBondMessage
-  | RecalculateBondsMessage
+  | CalculateBondsMessage
+  | ClearBondsMessage
+  | SetBondSchemeMessage
   | SaveStructureMessage
   | SaveStructureAsMessage
   | SaveRenderedImageMessage

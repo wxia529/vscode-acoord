@@ -111,7 +111,7 @@ export class ACoordParser extends StructureParser {
 
     if (data.bonds && Array.isArray(data.bonds)) {
       for (const bond of data.bonds) {
-        structure.addManualBond(bond.atomId1, bond.atomId2);
+        structure.addBond(bond.atomId1, bond.atomId2);
       }
     }
 
@@ -157,9 +157,9 @@ export class ACoordParser extends StructureParser {
       };
     }
 
-    const manualBonds = structure.manualBonds;
-    if (manualBonds.length > 0) {
-      output.bonds = manualBonds.map((bond: [string, string]) => ({
+    const bonds = structure.bonds;
+    if (bonds.length > 0) {
+      output.bonds = bonds.map((bond: [string, string]) => ({
         atomId1: bond[0],
         atomId2: bond[1],
       }));

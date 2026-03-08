@@ -101,6 +101,7 @@ describe('Structure', () => {
       structure.addAtom(o);
       structure.addAtom(h2);
 
+      structure.calculateBonds('all');
       const bonds = structure.getBonds();
       expect(bonds).to.have.lengthOf(2);
 
@@ -130,6 +131,7 @@ describe('Structure', () => {
       structure.addAtom(h3);
       structure.addAtom(h4);
 
+      structure.calculateBonds('all');
       const bonds = structure.getBonds();
       expect(bonds).to.have.lengthOf(4);
 
@@ -147,6 +149,7 @@ describe('Structure', () => {
       structure.addAtom(atom1);
       structure.addAtom(atom2);
 
+      structure.calculateBonds('all');
       const bonds = structure.getBonds();
       expect(bonds).to.have.lengthOf(0);
     });
@@ -190,7 +193,7 @@ describe('Structure', () => {
   });
 
   describe('Periodic Bonds', () => {
-    it('should detect bonds across periodic boundaries', () => {
+    it('should return bonds with image info for periodic structures', () => {
       const structure = new Structure('periodic', true);
       structure.unitCell = new UnitCell(2, 2, 2, 90, 90, 90);
 
@@ -200,6 +203,7 @@ describe('Structure', () => {
       structure.addAtom(atom1);
       structure.addAtom(atom2);
 
+      structure.calculateBonds('all');
       const bonds = structure.getPeriodicBonds();
       expect(bonds.length).to.be.greaterThan(0);
     });

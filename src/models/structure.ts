@@ -1,17 +1,15 @@
 import { Atom } from './atom.js';
 import { UnitCell } from './unitCell.js';
 import { ELEMENT_DATA, parseElement } from '../utils/elementData.js';
+import type { BondSchemeId } from '../shared/protocol.js';
+import { BOND_SCHEMES, DEFAULT_BOND_SCHEME } from '../config/bondSchemes.js';
 
-/**
- * Represents a molecular or crystal structure
- */
 export class Structure {
   id: string;
   name: string;
   atoms: Atom[] = [];
   private atomIndex: Map<string, Atom> = new Map();
-  manualBonds: Array<[string, string]> = [];
-  suppressedAutoBonds: Array<[string, string]> = [];
+  bonds: Array<[string, string]> = [];
   unitCell?: UnitCell;
   isCrystal: boolean = false;
   supercell: [number, number, number] = [1, 1, 1];
@@ -40,8 +38,7 @@ export class Structure {
   removeAtom(atomId: string): void {
     this.atoms = this.atoms.filter((a) => a.id !== atomId);
     this.atomIndex.delete(atomId);
-    this.manualBonds = this.manualBonds.filter(([a, b]) => a !== atomId && b !== atomId);
-    this.suppressedAutoBonds = this.suppressedAutoBonds.filter(([a, b]) => a !== atomId && b !== atomId);
+    this.bonds = this.bonds.filter(([a, b]) => a !== atomId && b !== atomId);
   }
 
   static normalizeBondPair(atomId1: string, atomId2: string): [string, string] {
@@ -64,30 +61,29 @@ export class Structure {
     return Structure.normalizeBondPair(parts[0], parts[1]);
   }
 
-  addManualBond(atomId1: string, atomId2: string): void {
+  addBond(atomId1: string, atomId2: string): void {
     if (!this.getAtom(atomId1) || !this.getAtom(atomId2) || atomId1 === atomId2) {
       return;
     }
     const [a, b] = Structure.normalizeBondPair(atomId1, atomId2);
-    this.suppressedAutoBonds = this.suppressedAutoBonds.filter(([x, y]) => !(x === a && y === b));
-    const exists = this.manualBonds.some(([x, y]) => x === a && y === b);
+    const exists = this.bonds.some(([x, y]) => x === a && y === b);
     if (!exists) {
-      this.manualBonds.push([a, b]);
+      this.bonds.push([a, b]);
     }
   }
 
   removeBond(atomId1: string, atomId2: string): void {
     const [a, b] = Structure.normalizeBondPair(atomId1, atomId2);
-    this.manualBonds = this.manualBonds.filter(([x, y]) => !(x === a && y === b));
-    const suppressed = this.suppressedAutoBonds.some(([x, y]) => x === a && y === b);
-    if (!suppressed) {
-      this.suppressedAutoBonds.push([a, b]);
-    }
+    this.bonds = this.bonds.filter(([x, y]) => !(x === a && y === b));
   }
 
-  hasManualBond(atomId1: string, atomId2: string): boolean {
+  hasBond(atomId1: string, atomId2: string): boolean {
     const [a, b] = Structure.normalizeBondPair(atomId1, atomId2);
-    return this.manualBonds.some(([x, y]) => x === a && y === b);
+    return this.bonds.some(([x, y]) => x === a && y === b);
+  }
+
+  clearBonds(): void {
+    this.bonds = [];
   }
 
   /**
@@ -149,43 +145,78 @@ export class Structure {
     }
   }
 
-  getBonds(): Array<{ atomId1: string; atomId2: string; distance: number; manual: boolean }> {
-    const bonds: Array<{ atomId1: string; atomId2: string; distance: number; manual: boolean }> = [];
-    const tolerance = Structure.BOND_TOLERANCE;
-    const suppressed = new Set(this.suppressedAutoBonds.map(([a, b]) => Structure.bondKey(a, b)));
+  getBonds(): Array<{ atomId1: string; atomId2: string; distance: number }> {
+    return this.bonds
+      .map(([id1, id2]) => {
+        const atom1 = this.getAtom(id1);
+        const atom2 = this.getAtom(id2);
+        if (!atom1 || !atom2) return null;
+        return {
+          atomId1: id1,
+          atomId2: id2,
+          distance: atom1.distanceTo(atom2),
+        };
+      })
+      .filter((b): b is NonNullable<typeof b> => b !== null);
+  }
+
+  calculateBonds(schemeId?: BondSchemeId): void {
+    const scheme = BOND_SCHEMES[schemeId ?? DEFAULT_BOND_SCHEME];
+    this.bonds = [];
+    
     const seen = new Set<string>();
 
-    // Pre-compute element symbols and covalent radii to avoid repeated lookups
-    const atomData = new Map<string, { symbol: string; radius: number }>();
-    let maxBondLength = 0;
+    const atomData = new Map<string, { symbol: string; radius: number; atomicNumber: number }>();
     for (const atom of this.atoms) {
       const symbol = parseElement(atom.element) || atom.element;
-      const radius = ELEMENT_DATA[symbol]?.covalentRadius || 1.5;
-      atomData.set(atom.id, { symbol, radius });
-      maxBondLength = Math.max(maxBondLength, radius * 2 * tolerance);
+      const data = ELEMENT_DATA[symbol];
+      const radius = data?.covalentRadius || 1.5;
+      const atomicNumber = data?.atomicNumber || 0;
+      atomData.set(atom.id, { symbol, radius, atomicNumber });
+    }
+
+    if (this.isCrystal && this.unitCell) {
+      this.calculatePeriodicBonds(scheme, atomData, seen);
+    } else {
+      this.calculateNonPeriodicBonds(scheme, atomData, seen);
+    }
+  }
+
+  private calculateNonPeriodicBonds(
+    scheme: import('../config/bondSchemes.js').BondScheme,
+    atomData: Map<string, { symbol: string; radius: number; atomicNumber: number }>,
+    seen: Set<string>
+  ): void {
+    const tolerance = Structure.BOND_TOLERANCE;
+    let maxBondLength = 0;
+    for (const atom of this.atoms) {
+      const data = atomData.get(atom.id)!;
+      maxBondLength = Math.max(maxBondLength, data.radius * 2 * tolerance);
     }
     maxBondLength = Math.max(maxBondLength, Structure.MAX_COVALENT_RADIUS * 2);
 
-    // Build spatial hash with cell size equal to max bond length
     const cellSize = maxBondLength;
     const grid = this.buildSpatialHash(cellSize);
 
-    // Check bonds using spatial hash - only check neighbors in nearby cells
     for (const atom1 of this.atoms) {
       const data1 = atomData.get(atom1.id)!;
+      if (scheme.excludedAtomicNumbers.has(data1.atomicNumber)) {
+        continue;
+      }
       const radius1 = data1.radius;
 
       for (const atom2 of this.getNeighboringAtoms(atom1, grid, cellSize, maxBondLength)) {
-        // Only process each pair once (avoid duplicates and self-pairs)
         if (atom1.id >= atom2.id) {
           continue;
         }
 
         const data2 = atomData.get(atom2.id)!;
+        if (scheme.excludedAtomicNumbers.has(data2.atomicNumber)) {
+          continue;
+        }
         const radius2 = data2.radius;
         const bondLength = (radius1 + radius2) * tolerance;
 
-        // Quick distance check using squared distance to avoid sqrt
         const dx = atom1.x - atom2.x;
         const dy = atom1.y - atom2.y;
         const dz = atom1.z - atom2.z;
@@ -193,40 +224,79 @@ export class Structure {
 
         if (distanceSq < bondLength * bondLength) {
           const key = Structure.bondKey(atom1.id, atom2.id);
-          if (suppressed.has(key) || seen.has(key)) {
+          if (seen.has(key)) {
             continue;
           }
-          bonds.push({
-            atomId1: atom1.id,
-            atomId2: atom2.id,
-            distance: Math.sqrt(distanceSq),
-            manual: false,
-          });
+          this.bonds.push([atom1.id, atom2.id]);
           seen.add(key);
         }
       }
     }
+  }
 
-    for (const [a, b] of this.manualBonds) {
-      const atom1 = this.getAtom(a);
-      const atom2 = this.getAtom(b);
-      if (!atom1 || !atom2) {
-        continue;
+  private calculatePeriodicBonds(
+    scheme: import('../config/bondSchemes.js').BondScheme,
+    atomData: Map<string, { symbol: string; radius: number; atomicNumber: number }>,
+    seen: Set<string>
+  ): void {
+    if (!this.unitCell) return;
+
+    const tolerance = Structure.BOND_TOLERANCE;
+    const vectors = this.unitCell.getLatticeVectors();
+
+    const offsets: Array<[number, number, number]> = [];
+    for (let ox = -1; ox <= 1; ox++) {
+      for (let oy = -1; oy <= 1; oy++) {
+        for (let oz = -1; oz <= 1; oz++) {
+          offsets.push([ox, oy, oz]);
+        }
       }
-      const key = Structure.bondKey(atom1.id, atom2.id);
-      if (seen.has(key)) {
-        continue;
-      }
-      bonds.push({
-        atomId1: atom1.id,
-        atomId2: atom2.id,
-        distance: atom1.distanceTo(atom2),
-        manual: true,
-      });
-      seen.add(key);
     }
 
-    return bonds;
+    for (const atom1 of this.atoms) {
+      const data1 = atomData.get(atom1.id)!;
+      if (scheme.excludedAtomicNumbers.has(data1.atomicNumber)) {
+        continue;
+      }
+      const radius1 = data1.radius;
+
+      for (const atom2 of this.atoms) {
+        if (atom1.id >= atom2.id) {
+          continue;
+        }
+
+        const data2 = atomData.get(atom2.id)!;
+        if (scheme.excludedAtomicNumbers.has(data2.atomicNumber)) {
+          continue;
+        }
+        const radius2 = data2.radius;
+        const bondLength = (radius1 + radius2) * tolerance;
+
+        let minDistSq = Infinity;
+        for (const [ox, oy, oz] of offsets) {
+          const offsetX = ox * vectors[0][0] + oy * vectors[1][0] + oz * vectors[2][0];
+          const offsetY = ox * vectors[0][1] + oy * vectors[1][1] + oz * vectors[2][1];
+          const offsetZ = ox * vectors[0][2] + oy * vectors[1][2] + oz * vectors[2][2];
+
+          const dx = (atom2.x + offsetX) - atom1.x;
+          const dy = (atom2.y + offsetY) - atom1.y;
+          const dz = (atom2.z + offsetZ) - atom1.z;
+          const distanceSq = dx * dx + dy * dy + dz * dz;
+
+          if (distanceSq < minDistSq) {
+            minDistSq = distanceSq;
+          }
+        }
+
+        if (minDistSq < bondLength * bondLength) {
+          const key = Structure.bondKey(atom1.id, atom2.id);
+          if (!seen.has(key)) {
+            this.bonds.push([atom1.id, atom2.id]);
+            seen.add(key);
+          }
+        }
+      }
+    }
   }
 
   /**
@@ -335,8 +405,7 @@ export class Structure {
     for (const atom of this.atoms) {
       cloned.addAtom(atom.clone());
     }
-    cloned.manualBonds = this.manualBonds.map(([a, b]) => [a, b]);
-    cloned.suppressedAutoBonds = this.suppressedAutoBonds.map(([a, b]) => [a, b]);
+    cloned.bonds = this.bonds.map(([a, b]) => [a, b]);
     if (this.unitCell) {
       cloned.unitCell = this.unitCell.clone();
     }
@@ -366,134 +435,52 @@ export class Structure {
    * Get periodic bonds using spatial hashing for O(n) performance
    * This is the periodic equivalent of getBonds() for crystal structures
    */
-  getPeriodicBonds(): Array<{ atomId1: string; atomId2: string; distance: number; manual: boolean; image?: [number, number, number] }> {
+  getPeriodicBonds(): Array<{ atomId1: string; atomId2: string; distance: number; image?: [number, number, number] }> {
     if (!this.isCrystal || !this.unitCell) {
       return [];
     }
 
-    const bonds: Array<{ atomId1: string; atomId2: string; distance: number; manual: boolean; image?: [number, number, number] }> = [];
-    const tolerance = Structure.BOND_TOLERANCE;
-    const suppressed = new Set(this.suppressedAutoBonds.map(([a, b]) => Structure.bondKey(a, b)));
-    const manualSet = new Set(this.manualBonds.map(([a, b]) => Structure.bondKey(a, b)));
-    const seen = new Set<string>();
+    const bonds: Array<{ atomId1: string; atomId2: string; distance: number; image?: [number, number, number] }> = [];
     const vectors = this.unitCell.getLatticeVectors();
 
-    // Pre-compute element symbols and covalent radii
-    const atomData = new Map<string, { symbol: string; radius: number }>();
-    let maxBondLength = 0;
-    for (const atom of this.atoms) {
-      const symbol = parseElement(atom.element) || atom.element;
-      const radius = ELEMENT_DATA[symbol]?.covalentRadius || 1.5;
-      atomData.set(atom.id, { symbol, radius });
-      maxBondLength = Math.max(maxBondLength, radius * 2 * tolerance);
-    }
-    maxBondLength = Math.max(maxBondLength, Structure.MAX_COVALENT_RADIUS * 2);
+    for (const [id1, id2] of this.bonds) {
+      const atom1 = this.getAtom(id1);
+      const atom2 = this.getAtom(id2);
+      if (!atom1 || !atom2) continue;
 
-    // Build spatial hash for base atoms (unit cell at origin)
-    const cellSize = maxBondLength;
-    const grid = this.buildSpatialHash(cellSize);
+      let minDist = Infinity;
+      let bestImage: [number, number, number] = [0, 0, 0];
 
-    // Generate periodic images to check (-1, 0, +1 in each direction)
-    const offsets: Array<[number, number, number]> = [];
-    for (let ox = -1; ox <= 1; ox++) {
-      for (let oy = -1; oy <= 1; oy++) {
-        for (let oz = -1; oz <= 1; oz++) {
-          offsets.push([ox, oy, oz]);
-        }
-      }
-    }
+      for (let ox = -1; ox <= 1; ox++) {
+        for (let oy = -1; oy <= 1; oy++) {
+          for (let oz = -1; oz <= 1; oz++) {
+            const offsetX = ox * vectors[0][0] + oy * vectors[1][0] + oz * vectors[2][0];
+            const offsetY = ox * vectors[0][1] + oy * vectors[1][1] + oz * vectors[2][1];
+            const offsetZ = ox * vectors[0][2] + oy * vectors[1][2] + oz * vectors[2][2];
 
-    // Check against all periodic images
-    for (const atom1 of this.atoms) {
-      const data1 = atomData.get(atom1.id)!;
-      const radius1 = data1.radius;
+            const imageX = atom2.x + offsetX;
+            const imageY = atom2.y + offsetY;
+            const imageZ = atom2.z + offsetZ;
 
-      // Check against all periodic images
-      for (const [ox, oy, oz] of offsets) {
-        if (ox === 0 && oy === 0 && oz === 0) {
-          // Same cell - check all atom pairs once (handled by id comparison)
-          for (const atom2 of this.getNeighboringAtoms(atom1, grid, cellSize, maxBondLength)) {
-            if (atom1.id >= atom2.id) {continue;}
+            const dx = imageX - atom1.x;
+            const dy = imageY - atom1.y;
+            const dz = imageZ - atom1.z;
+            const distSq = dx * dx + dy * dy + dz * dz;
 
-            const data2 = atomData.get(atom2.id)!;
-            const radius2 = data2.radius;
-            const bondLength = (radius1 + radius2) * tolerance;
-
-            const dx = atom1.x - atom2.x;
-            const dy = atom1.y - atom2.y;
-            const dz = atom1.z - atom2.z;
-            const distanceSq = dx * dx + dy * dy + dz * dz;
-
-            if (distanceSq < bondLength * bondLength) {
-              const key = Structure.bondKey(atom1.id, atom2.id);
-              if (suppressed.has(key) || seen.has(key)) {continue;}
-              bonds.push({
-                atomId1: atom1.id,
-                atomId2: atom2.id,
-                distance: Math.sqrt(distanceSq),
-                manual: manualSet.has(key),
-                image: [0, 0, 0],
-              });
-              seen.add(key);
-            }
-          }
-        } else {
-          // Different cell - use spatial hash of image atoms for O(n*k) performance.
-          // All atoms can form cross-boundary bonds regardless of their position.
-          const offsetX = ox * vectors[0][0] + oy * vectors[1][0] + oz * vectors[2][0];
-          const offsetY = ox * vectors[0][1] + oy * vectors[1][1] + oz * vectors[2][1];
-          const offsetZ = ox * vectors[0][2] + oy * vectors[1][2] + oz * vectors[2][2];
-
-          // Build spatial hash for this image (atoms shifted by periodic offset)
-          // Wrap fractional coordinates to [0, 1) to ensure each atom has one representative
-          const imageGrid = new Map<string, Atom[]>();
-          for (const atom of this.atoms) {
-            const ix = Math.floor((atom.x + offsetX) / cellSize);
-            const iy = Math.floor((atom.y + offsetY) / cellSize);
-            const iz = Math.floor((atom.z + offsetZ) / cellSize);
-            const ck = `${ix},${iy},${iz}`;
-            const bucket = imageGrid.get(ck);
-            if (bucket) { bucket.push(atom); } else { imageGrid.set(ck, [atom]); }
-          }
-
-          // Query neighbors of atom1 from image hash
-          const cx1 = Math.floor(atom1.x / cellSize);
-          const cy1 = Math.floor(atom1.y / cellSize);
-          const cz1 = Math.floor(atom1.z / cellSize);
-          const range = Math.ceil(maxBondLength / cellSize);
-          for (let ddx = -range; ddx <= range; ddx++) {
-            for (let ddy = -range; ddy <= range; ddy++) {
-              for (let ddz = -range; ddz <= range; ddz++) {
-                const bucket = imageGrid.get(`${cx1 + ddx},${cy1 + ddy},${cz1 + ddz}`);
-                if (!bucket) {continue;}
-                for (const atom2 of bucket) {
-                  const data2 = atomData.get(atom2.id)!;
-                  const radius2 = data2.radius;
-                  const bondLength = (radius1 + radius2) * tolerance;
-
-                  const dx = (atom2.x + offsetX) - atom1.x;
-                  const dy = (atom2.y + offsetY) - atom1.y;
-                  const dz = (atom2.z + offsetZ) - atom1.z;
-                  const distanceSq = dx * dx + dy * dy + dz * dz;
-
-                  if (distanceSq < bondLength * bondLength) {
-                    const key = Structure.bondKey(atom1.id, atom2.id);
-                    if (suppressed.has(key) || seen.has(key)) {continue;}
-                    bonds.push({
-                      atomId1: atom1.id,
-                      atomId2: atom2.id,
-                      distance: Math.sqrt(distanceSq),
-                      manual: false,
-                      image: [ox, oy, oz],
-                    });
-                    seen.add(key);
-                  }
-                }
-              }
+            if (distSq < minDist * minDist) {
+              minDist = Math.sqrt(distSq);
+              bestImage = [ox, oy, oz];
             }
           }
         }
       }
+
+      bonds.push({
+        atomId1: id1,
+        atomId2: id2,
+        distance: minDist,
+        image: bestImage,
+      });
     }
 
     return bonds;
@@ -507,8 +494,7 @@ export class Structure {
       id: this.id,
       name: this.name,
       atoms: this.atoms.map((a) => a.toJSON()),
-      manualBonds: this.manualBonds,
-      suppressedAutoBonds: this.suppressedAutoBonds,
+      bonds: this.bonds,
       unitCell: this.unitCell?.toJSON(),
       isCrystal: this.isCrystal,
       supercell: this.supercell,
@@ -516,13 +502,8 @@ export class Structure {
     };
   }
 
-  /**
-   * Reconstruct a Structure from the plain-object representation produced by
-   * `toJSON()`.  Used to restore hot-exit backups.
-   */
   static fromJSON(data: ReturnType<Structure['toJSON']>): Structure {
     const s = new Structure(data.name, data.isCrystal);
-    // Preserve the original id so references (e.g. undo entries) stay valid.
     s.id = data.id;
     for (const a of data.atoms) {
       const atom = new Atom(a.element, a.x, a.y, a.z, a.id, {
@@ -533,8 +514,9 @@ export class Structure {
       });
       s.addAtom(atom);
     }
-    s.manualBonds = data.manualBonds ?? [];
-    s.suppressedAutoBonds = data.suppressedAutoBonds ?? [];
+    s.bonds = (data as Record<string, unknown>).bonds as Array<[string, string]> | undefined 
+      ?? (data as Record<string, unknown>).manualBonds as Array<[string, string]> | undefined 
+      ?? [];
     if (data.unitCell) {
       const uc = data.unitCell;
       s.unitCell = new UnitCell(uc.a, uc.b, uc.c, uc.alpha, uc.beta, uc.gamma);

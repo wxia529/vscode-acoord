@@ -213,6 +213,8 @@ export interface ContextMenuHandlers {
   onSetAtomRadius?: (atomIds: string[], radius: number) => void;
   onCreateBond?: (atomIds: string[]) => void;
   onSetBondLength?: (bondKeys: string[], length: number) => void;
+  onCalculateBonds?: () => void;
+  onClearBonds?: () => void;
   onAddAtom?: (element: string, x: number, y: number, z: number) => void;
   onUndo?: () => void;
   onRedo?: () => void;
@@ -670,6 +672,15 @@ export function createEmptySpaceContextMenu(
     {
       label: 'Add atom',
       submenu: addAtomSubmenu,
+    },
+    { divider: true },
+    {
+      label: 'Calculate Bonds',
+      action: () => handlers.onCalculateBonds?.(),
+    },
+    {
+      label: 'Clear All Bonds',
+      action: () => handlers.onClearBonds?.(),
     },
     { divider: true },
     {

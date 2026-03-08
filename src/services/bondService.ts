@@ -3,6 +3,8 @@ import { Structure } from '../models/structure.js';
 import { UndoManager } from '../providers/undoManager.js';
 import { TrajectoryManager } from '../providers/trajectoryManager.js';
 import { SelectionService } from './selectionService.js';
+import type { BondSchemeId } from '../shared/protocol.js';
+import { DEFAULT_BOND_SCHEME } from '../config/bondSchemes.js';
 
 export class BondService {
   constructor(
@@ -23,7 +25,7 @@ export class BondService {
     }
 
     this.undoManager.push(editStructure);
-    editStructure.addManualBond(atomId1, atomId2);
+    editStructure.addBond(atomId1, atomId2);
     this.renderer.setStructure(editStructure);
     this.selectionService.selectBond(Structure.bondKey(atomId1, atomId2));
     this.trajectoryManager.commitEdit();
@@ -73,15 +75,27 @@ export class BondService {
     this.trajectoryManager.commitEdit();
   }
 
-  recalculateBonds(): void {
+  calculateBonds(schemeId?: BondSchemeId): void {
     if (!this.trajectoryManager.isEditing) {
       this.trajectoryManager.beginEdit();
     }
     const editStructure = this.trajectoryManager.activeStructure;
     
     this.undoManager.push(editStructure);
-    editStructure.manualBonds = [];
-    editStructure.suppressedAutoBonds = [];
+    editStructure.calculateBonds(schemeId ?? DEFAULT_BOND_SCHEME);
+    this.renderer.setStructure(editStructure);
+    this.selectionService.deselectBond();
+    this.trajectoryManager.commitEdit();
+  }
+
+  clearBonds(): void {
+    if (!this.trajectoryManager.isEditing) {
+      this.trajectoryManager.beginEdit();
+    }
+    const editStructure = this.trajectoryManager.activeStructure;
+    
+    this.undoManager.push(editStructure);
+    editStructure.clearBonds();
     this.renderer.setStructure(editStructure);
     this.selectionService.deselectBond();
     this.trajectoryManager.commitEdit();
