@@ -800,3 +800,97 @@ input[type="color"]::-moz-color-swatch {
 .rotation-angle-row input[type="number"] {
   text-align: right;
 }
+
+#axis-indicator {
+  position: absolute;
+  left: 16px;
+  bottom: 16px;
+  width: 90px;
+  height: 90px;
+  pointer-events: none;
+  z-index: 10;
+  background: linear-gradient(145deg, rgba(20, 24, 30, 0.85), rgba(10, 12, 18, 0.92));
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  box-shadow: 
+    0 4px 16px rgba(0, 0, 0, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(8px);
+}
+
+.axis-axes-container {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.axis-line {
+  position: absolute;
+  left: 40px;
+  top: 44px;
+  height: 3px;
+  width: 28px;
+  border-radius: 2px;
+  transform-origin: 0% 50%;
+  transition: width 0.08s ease-out, opacity 0.15s ease;
+}
+
+.axis-line::before {
+  content: '';
+  position: absolute;
+  right: 0;
+  top: -3px;
+  width: 0;
+  height: 0;
+  border-left: 6px solid var(--axis-color, #fff);
+  border-top: 4.5px solid transparent;
+  border-bottom: 4.5px solid transparent;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.4));
+}
+
+.axis-x {
+  background: linear-gradient(90deg, 
+    rgba(180, 50, 50, 0.3) 0%, 
+    rgba(255, 68, 68, 0.95) 100%);
+  box-shadow: 0 1px 3px rgba(255, 68, 68, 0.3);
+}
+
+.axis-y {
+  background: linear-gradient(90deg, 
+    rgba(50, 180, 50, 0.3) 0%, 
+    rgba(68, 255, 68, 0.95) 100%);
+  box-shadow: 0 1px 3px rgba(68, 255, 68, 0.3);
+}
+
+.axis-z {
+  background: linear-gradient(90deg, 
+    rgba(50, 100, 200, 0.3) 0%, 
+    rgba(68, 136, 255, 0.95) 100%);
+  box-shadow: 0 1px 3px rgba(68, 136, 255, 0.3);
+}
+
+.axis-label {
+  position: absolute;
+  font-family: 'Segoe UI', 'SF Pro Display', -apple-system, sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-shadow: 
+    0 1px 2px rgba(0, 0, 0, 0.8),
+    0 0 8px rgba(255, 255, 255, 0.15);
+  transition: opacity 0.15s ease;
+}
+
+#axis-indicator::after {
+  content: '';
+  position: absolute;
+  left: 36px;
+  top: 40px;
+  width: 8px;
+  height: 8px;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.9), rgba(200, 200, 200, 0.6));
+  border-radius: 50%;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+}

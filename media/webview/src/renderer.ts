@@ -3,6 +3,7 @@ import { TrackballControls } from 'three/examples/jsm/controls/TrackballControls
 import { structureStore, displayStore, lightingStore } from './state';
 import type { Atom, Bond, Structure, UiHooks, UnitCellEdge } from './types';
 import { debounce } from './utils/performance';
+import * as axisIndicator from './axisIndicator';
 
 // Camera auto-scaling constants
 const CAMERA_TARGET_DIMENSION = 30;
@@ -106,7 +107,6 @@ interface RendererState {
   keyLight: THREE.DirectionalLight | null;
   fillLight: THREE.DirectionalLight | null;
   rimLight: THREE.DirectionalLight | null;
-  axesHelper: THREE.AxesHelper | null;
   /** Dirty flag: set true whenever the scene needs a re-render. */
   needsRender: boolean;
   /** Status update interval handle for cleanup. */
@@ -142,7 +142,6 @@ const rendererState: RendererState = {
   keyLight: null,
   fillLight: null,
   rimLight: null,
-  axesHelper: null,
   needsRender: true,
   statusInterval: null,
   animationFrameId: null,
@@ -303,9 +302,7 @@ function init(canvas: HTMLCanvasElement, handlers: { setError: (m: string) => vo
 
   updateLightsForCamera();
 
-  rendererState.axesHelper = new THREE.AxesHelper(5);
-  rendererState.axesHelper.visible = displayStore.showAxes !== false;
-  scene.add(rendererState.axesHelper);
+  axisIndicator.init();
 
   applyControls(camera);
 
@@ -331,6 +328,9 @@ function animate(): void {
   rendererState.animationFrameId = requestAnimationFrame(animate);
   if (!rendererState.renderer || !rendererState.controls) return;
   rendererState.controls.update();
+  if (rendererState.camera) {
+    axisIndicator.update(rendererState.camera.quaternion);
+  }
   if (!rendererState.needsRender) return;
   rendererState.needsRender = false;
   updateLightsForCamera();
@@ -1049,9 +1049,7 @@ function updateLighting(): void {
  * (see interactionDisplay.ts rerenderStructure).
  */
 function updateDisplaySettings(): void {
-  if (rendererState.axesHelper) {
-    rendererState.axesHelper.visible = displayStore.showAxes !== false;
-  }
+  axisIndicator.setVisible(displayStore.showAxes !== false);
   if (rendererState.scene && displayStore.backgroundColor) {
     rendererState.scene.background = new THREE.Color(displayStore.backgroundColor);
   }
@@ -1329,11 +1327,7 @@ function dispose(): void {
     rendererState.unitCellGroup = null;
   }
 
-  if (rendererState.axesHelper) {
-    rendererState.scene?.remove(rendererState.axesHelper);
-    rendererState.axesHelper.dispose();
-    rendererState.axesHelper = null;
-  }
+  axisIndicator.dispose();
 
   const ctrl = rendererState.controls as TrackballControls | null;
   if (ctrl && ctrl.dispose) {
