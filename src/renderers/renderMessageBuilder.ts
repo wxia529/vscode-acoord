@@ -1,5 +1,4 @@
 import { Structure } from '../models/structure.js';
-import { ELEMENT_DATA, parseElement } from '../utils/elementData.js';
 import type {
   WireAtom,
   WireBond,
@@ -8,7 +7,6 @@ import type {
   RenderMessage,
 } from '../shared/protocol.js';
 import { ColorScheme } from '../shared/protocol.js';
-import { getColorForElement } from '../config/colorSchemeUtils.js';
 import { DisplaySettings } from '../config/types.js';
 
 /**
@@ -31,7 +29,14 @@ export interface RenderMessageBuilderOptions {
 }
 
 /**
- * Builds render message data for webview visualization
+ * Transforms Structure data into WireRenderData for the webview.
+ * 
+ * IMPORTANT: This class is a pure data transformer. It does NOT compute
+ * atom colors or radii - those are already set on each Atom instance by
+ * parsers or user actions. This class simply copies atom.color and atom.radius
+ * directly to WireAtom for transmission to the webview.
+ * 
+ * Architecture principle: Extension owns all computation, webview only renders.
  */
 export class RenderMessageBuilder {
   private state: RendererState;
@@ -50,11 +55,15 @@ export class RenderMessageBuilder {
     this.options = options || {};
   }
 
-  /**
-   * Update options
-   */
   setOptions(options: RenderMessageBuilderOptions): void {
     this.options = { ...this.options, ...options };
+  }
+
+  /**
+   * Get current color scheme (used by AtomEditService for computing atom colors).
+   */
+  getColorScheme(): ColorScheme | null {
+    return this.options.colorScheme || null;
   }
 
   /**
@@ -168,34 +177,29 @@ export class RenderMessageBuilder {
   }
 
   /**
-   * Generate atom geometry data for webview
+   * Generate atom geometry data for webview.
+   * 
+   * Directly copies atom.color and atom.radius - no computation is performed.
+   * All color/radius values are pre-computed by parsers or set by user actions.
    */
   private getAtomGeometry(): WireAtom[] {
-    const settings = this.options.displaySettings;
-    const colorScheme = this.options.colorScheme || null;
-    
     return this.state.structure.atoms.map((atom) => {
-      const symbol = parseElement(atom.element) || atom.element;
-      const info = ELEMENT_DATA[symbol];
-      const baseRadius = info?.covalentRadius || 0.3;
-      const radius = Math.max(baseRadius * 0.35, 0.1);
-      const color = settings 
-        ? getColorForElement(atom, symbol, settings, colorScheme)
-        : (atom.color || info?.color || '#C0C0C0');
-
       return {
         id: atom.id,
-        element: symbol,
+        element: atom.element,
         position: [atom.x, atom.y, atom.z] as [number, number, number],
-        radius: radius,
-        color: color,
+        radius: atom.radius,
+        color: atom.color,
         selected: atom.selected,
       };
     });
   }
 
   /**
-   * Generate bond geometry data for webview
+   * Generate bond geometry data for webview.
+   * 
+   * Bond colors are taken from the connected atoms (atom1.color, atom2.color).
+   * No computation is performed - all values come from pre-set atom properties.
    */
   private getBondGeometry(): WireBond[] {
     if (this.state.structure.unitCell) {
@@ -204,8 +208,6 @@ export class RenderMessageBuilder {
 
     const structureBonds = this.state.structure.getBonds();
     const wireBonds: WireBond[] = [];
-    const settings = this.options.displaySettings;
-    const colorScheme = this.options.colorScheme || null;
 
     for (const bondInfo of structureBonds) {
       const atom1 = this.state.structure.getAtom(bondInfo.atomId1);
@@ -215,16 +217,6 @@ export class RenderMessageBuilder {
         continue;
       }
 
-      const symbol1 = parseElement(atom1.element) || atom1.element;
-      const symbol2 = parseElement(atom2.element) || atom2.element;
-      
-      const color1 = settings 
-        ? getColorForElement(atom1, symbol1, settings, colorScheme)
-        : (atom1.color || ELEMENT_DATA[symbol1]?.color || '#C0C0C0');
-      const color2 = settings
-        ? getColorForElement(atom2, symbol2, settings, colorScheme)
-        : (atom2.color || ELEMENT_DATA[symbol2]?.color || '#C0C0C0');
-
       wireBonds.push({
         key: Structure.bondKey(atom1.id, atom2.id),
         atomId1: atom1.id,
@@ -233,8 +225,8 @@ export class RenderMessageBuilder {
         end: [atom2.x, atom2.y, atom2.z] as [number, number, number],
         radius: 0.04,
         color: '#C0C0C0',
-        color1: color1,
-        color2: color2,
+        color1: atom1.color,
+        color2: atom2.color,
         selected: this.state.selectedBondKeys.includes(Structure.bondKey(atom1.id, atom2.id)),
       });
     }
@@ -249,10 +241,6 @@ export class RenderMessageBuilder {
       return [];
     }
 
-    const settings = this.options.displaySettings;
-    const colorScheme = this.options.colorScheme || null;
-
-    // Use optimized spatial hash implementation from Structure
     const periodicBonds = structure.getPeriodicBonds();
     const bonds: WireBond[] = [];
 
@@ -261,10 +249,6 @@ export class RenderMessageBuilder {
       const atom2 = structure.getAtom(bond.atomId2);
       if (!atom1 || !atom2) {continue;}
 
-      const symbolA = parseElement(atom1.element) || atom1.element;
-      const symbolB = parseElement(atom2.element) || atom2.element;
-
-      // Calculate end position based on periodic image
       let endPos: [number, number, number];
       if (bond.image && (bond.image[0] !== 0 || bond.image[1] !== 0 || bond.image[2] !== 0)) {
         const vectors = unitCell.getLatticeVectors();
@@ -278,20 +262,9 @@ export class RenderMessageBuilder {
 
       const bondKey = Structure.bondKey(bond.atomId1, bond.atomId2);
       const isSelected = this.state.selectedBondKeys.includes(bondKey);
-      const colorA = settings
-        ? getColorForElement(atom1, symbolA, settings, colorScheme)
-        : (atom1.color || ELEMENT_DATA[symbolA]?.color || '#C0C0C0');
-      const colorB = settings
-        ? getColorForElement(atom2, symbolB, settings, colorScheme)
-        : (atom2.color || ELEMENT_DATA[symbolB]?.color || '#C0C0C0');
 
       const isCrossBoundary = bond.image && (bond.image[0] !== 0 || bond.image[1] !== 0 || bond.image[2] !== 0);
       if (isCrossBoundary) {
-        // For cross-boundary bonds, emit two half-stubs so each stub is visually
-        // attached to its own atom and terminates at the cell boundary, matching
-        // the display behavior of professional crystallography viewers (e.g. VESTA).
-        //
-        // Stub 1: atom1 → midpoint (halfway toward atom2's image)
         const midX = atom1.x + 0.5 * (endPos[0] - atom1.x);
         const midY = atom1.y + 0.5 * (endPos[1] - atom1.y);
         const midZ = atom1.z + 0.5 * (endPos[2] - atom1.z);
@@ -302,16 +275,13 @@ export class RenderMessageBuilder {
           start: [atom1.x, atom1.y, atom1.z],
           end: [midX, midY, midZ],
           radius: 0.04,
-          color: colorA,
-          color1: colorA,
-          color2: colorA,
+          color: atom1.color,
+          color1: atom1.color,
+          color2: atom1.color,
           selected: isSelected,
           periodicStub: true,
         });
 
-        // Stub 2: atom2 → its own midpoint (halfway toward atom1's image in atom2's cell)
-        // atom1's image in atom2's frame is at atom2 - (endPos - atom1), so
-        // midpoint = atom2 - 0.5*(endPos - atom1)
         const mid2X = atom2.x - 0.5 * (endPos[0] - atom1.x);
         const mid2Y = atom2.y - 0.5 * (endPos[1] - atom1.y);
         const mid2Z = atom2.z - 0.5 * (endPos[2] - atom1.z);
@@ -322,9 +292,9 @@ export class RenderMessageBuilder {
           start: [atom2.x, atom2.y, atom2.z],
           end: [mid2X, mid2Y, mid2Z],
           radius: 0.04,
-          color: colorB,
-          color1: colorB,
-          color2: colorB,
+          color: atom2.color,
+          color1: atom2.color,
+          color2: atom2.color,
           selected: isSelected,
           periodicStub: true,
         });
@@ -337,8 +307,8 @@ export class RenderMessageBuilder {
           end: endPos,
           radius: 0.04,
           color: '#C0C0C0',
-          color1: colorA,
-          color2: colorB,
+          color1: atom1.color,
+          color2: atom2.color,
           selected: isSelected,
         });
       }

@@ -2,12 +2,22 @@ import { expect } from 'chai';
 import { Structure } from '../../../models/structure.js';
 import { Atom } from '../../../models/atom.js';
 import { ClipboardService } from '../../../services/clipboardService.js';
+import { getDefaultAtomColor, getDefaultAtomRadius } from '../../../utils/elementData.js';
 
 function makeStructure(): Structure {
   const s = new Structure('test');
-  s.addAtom(new Atom('C', 0, 0, 0));
-  s.addAtom(new Atom('O', 1.5, 0, 0));
-  s.addAtom(new Atom('H', 0, 1.5, 0));
+  s.addAtom(new Atom('C', 0, 0, 0, undefined, {
+    color: getDefaultAtomColor('C'),
+    radius: getDefaultAtomRadius('C'),
+  }));
+  s.addAtom(new Atom('O', 1.5, 0, 0, undefined, {
+    color: getDefaultAtomColor('O'),
+    radius: getDefaultAtomRadius('O'),
+  }));
+  s.addAtom(new Atom('H', 0, 1.5, 0, undefined, {
+    color: getDefaultAtomColor('H'),
+    radius: getDefaultAtomRadius('H'),
+  }));
   return s;
 }
 

@@ -51,6 +51,10 @@ class EditorSession {
   }
 
   displaySettings?: DisplaySettings;
+  
+  getColorScheme() {
+    return this.renderer.getColorScheme();
+  }
 }
 
 export class StructureEditorProvider implements vscode.CustomEditorProvider<StructureDocument> {

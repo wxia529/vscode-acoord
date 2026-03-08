@@ -4,6 +4,21 @@ import { UnitCell } from '../../models/unitCell.js';
 import { parseElement, getDefaultAtomColor, getDefaultAtomRadius } from '../../utils/elementData.js';
 import { StructureParser } from './structureParser.js';
 
+/**
+ * ACoord native file format parser.
+ * 
+ * .acoord is a JSON-based format that preserves all atom properties including
+ * user-specified colors and radii.
+ * 
+ * Radius semantics:
+ * - If file specifies radius, use it directly (user has full control)
+ * - If file omits radius, use default visual radius (covalent * 0.35)
+ * - This differs from XYZ/POSCAR formats which always use visual defaults
+ * 
+ * Users can specify physical radii (e.g., 0.76 for carbon covalent radius)
+ * and they will be rendered exactly as specified.
+ */
+
 interface ACoordAtom {
   id: string;
   element: string;
@@ -67,9 +82,14 @@ export class ACoordParser extends StructureParser {
         throw new Error(`ACoordParser: invalid position for atom ${atomData.id}`);
       }
 
+      const fileRadius = atomData.radius;
+      const radius = (typeof fileRadius === 'number' && Number.isFinite(fileRadius) && fileRadius > 0)
+        ? fileRadius
+        : getDefaultAtomRadius(element);
+
       const atom = new Atom(element, atomData.x, atomData.y, atomData.z, atomData.id, {
         color: atomData.color || getDefaultAtomColor(element),
-        radius: atomData.radius ?? getDefaultAtomRadius(element),
+        radius,
         label: atomData.label,
         fixed: atomData.fixed ?? false,
         selectiveDynamics: atomData.selectiveDynamics,

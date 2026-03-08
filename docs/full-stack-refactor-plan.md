@@ -762,12 +762,18 @@ interface ACoordAtom {
   x: number;
   y: number;
   z: number;
-  color: string;      // CSS hex color: "#RRGGBB"
-  radius: number;     // Angstroms
+  color: string;      // CSS hex color: "#RRGGBB" - rendered as-is
+  radius: number;     // Render radius in Angstroms - used directly for display
   label?: string;
   fixed?: boolean;
   selectiveDynamics?: [boolean, boolean, boolean];
 }
+
+// Radius semantics:
+// - .acoord radius values are used directly for rendering (no scaling applied)
+// - Users can specify any value (e.g., covalent radius 0.76 for carbon)
+// - If omitted, defaults to covalent radius * 0.35 for visual aesthetics
+// - This gives users full control over atom appearance
 
 interface ACoordUnitCell {
   a: number;

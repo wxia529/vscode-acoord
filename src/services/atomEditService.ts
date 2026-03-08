@@ -4,6 +4,7 @@ import { UndoManager } from '../providers/undoManager.js';
 import { TrajectoryManager } from '../providers/trajectoryManager.js';
 import { parseElement, getDefaultAtomColor, getDefaultAtomRadius } from '../utils/elementData.js';
 import { DisplaySettings } from '../config/types.js';
+import { ColorScheme } from '../shared/protocol.js';
 
 export interface PositionUpdate {
   id: string;
@@ -18,8 +19,22 @@ export interface CopyOffset {
   z: number;
 }
 
+/**
+ * Service for atom editing operations (add, delete, move, copy, change element).
+ * 
+ * Color/radius priority when creating or modifying atoms:
+ * 1. DisplaySettings.currentColorByElement / currentRadiusByElement (user overrides)
+ * 2. ColorScheme.colors (current color scheme)
+ * 3. ELEMENT_DATA defaults (JMol colors, covalent radii with visual scale)
+ * 
+ * Key principle: All color/radius computation happens here (Extension side).
+ * The webview only renders the pre-computed values stored in atom.color/atom.radius.
+ */
 export class AtomEditService {
-  private sessionRef?: { displaySettings?: DisplaySettings };
+  private sessionRef?: { 
+    displaySettings?: DisplaySettings;
+    getColorScheme?: () => ColorScheme | null;
+  };
 
   constructor(
     private renderer: RenderMessageBuilder,
@@ -27,10 +42,17 @@ export class AtomEditService {
     private undoManager: UndoManager
   ) {}
 
-  setSessionRef(ref: { displaySettings?: DisplaySettings }): void {
+  setSessionRef(ref: { 
+    displaySettings?: DisplaySettings;
+    getColorScheme?: () => ColorScheme | null;
+  }): void {
     this.sessionRef = ref;
   }
 
+  /**
+   * Add a new atom with color/radius from current DisplaySettings.
+   * Uses the "current brush" concept - applies active color scheme and radius scale.
+   */
   addAtom(element: string, x: number, y: number, z: number): boolean {
     const parsedElement = parseElement(element);
     if (!parsedElement) {
@@ -42,9 +64,11 @@ export class AtomEditService {
     }
     const editStructure = this.trajectoryManager.activeStructure;
     
+    const { color, radius } = this.computeAtomProperties(parsedElement);
+    
     const atom = new Atom(parsedElement, x, y, z, undefined, {
-      color: getDefaultAtomColor(parsedElement),
-      radius: getDefaultAtomRadius(parsedElement),
+      color,
+      radius,
     });
     this.undoManager.push(editStructure);
     editStructure.addAtom(atom);
@@ -166,7 +190,15 @@ export class AtomEditService {
         atom.element,
         atom.x + (offset.x || 0),
         atom.y + (offset.y || 0),
-        atom.z + (offset.z || 0)
+        atom.z + (offset.z || 0),
+        undefined,
+        {
+          color: atom.color,
+          radius: atom.radius,
+          label: atom.label,
+          fixed: atom.fixed,
+          selectiveDynamics: atom.selectiveDynamics,
+        }
       );
       editStructure.addAtom(copy);
     }
@@ -174,6 +206,9 @@ export class AtomEditService {
     this.trajectoryManager.commitEdit();
   }
 
+  /**
+   * Change the element type of atoms and update their color/radius accordingly.
+   */
   changeAtoms(atomIds: string[], element: string): boolean {
     if (atomIds.length === 0) {
       return false;
@@ -190,12 +225,15 @@ export class AtomEditService {
     const editStructure = this.trajectoryManager.activeStructure;
     
     this.undoManager.push(editStructure);
+    
+    const { color, radius } = this.computeAtomProperties(parsedElement);
+    
     for (const id of atomIds) {
       const atom = editStructure.getAtom(id);
       if (atom) {
         atom.element = parsedElement;
-        atom.color = getDefaultAtomColor(parsedElement);
-        atom.radius = getDefaultAtomRadius(parsedElement);
+        atom.color = color;
+        atom.radius = radius;
       }
     }
     this.renderer.setStructure(editStructure);
@@ -247,6 +285,10 @@ export class AtomEditService {
     return true;
   }
 
+  /**
+   * Apply current DisplaySettings to selected atoms ("Apply to Selection" action).
+   * Updates atom.color and atom.radius based on current brush settings.
+   */
   applyDisplaySettings(atomIds: string[]): boolean {
     if (atomIds.length === 0) {
       return false;
@@ -267,25 +309,44 @@ export class AtomEditService {
     for (const id of atomIds) {
       const atom = editStructure.getAtom(id);
       if (atom) {
-        if (settings.currentColorByElement?.[atom.element]) {
-          atom.color = settings.currentColorByElement[atom.element];
-        } else {
-          atom.color = getDefaultAtomColor(atom.element);
-        }
-
-        if (settings.currentRadiusByElement?.[atom.element]) {
-          atom.radius = settings.currentRadiusByElement[atom.element];
-        } else {
-          const baseRadius = getDefaultAtomRadius(atom.element);
-          atom.radius = settings.currentRadiusScale !== undefined 
-            ? baseRadius * settings.currentRadiusScale 
-            : baseRadius;
-        }
+        const { color, radius } = this.computeAtomProperties(atom.element);
+        atom.color = color;
+        atom.radius = radius;
       }
     }
     this.renderer.setStructure(editStructure);
     this.trajectoryManager.commitEdit();
     return true;
+  }
+
+  /**
+   * Compute color and radius for an element using current DisplaySettings.
+   * Priority: user overrides > color scheme > element defaults.
+   */
+  private computeAtomProperties(element: string): { color: string; radius: number } {
+    const settings = this.sessionRef?.displaySettings;
+    const colorScheme = this.sessionRef?.getColorScheme?.();
+    
+    let color: string;
+    if (settings?.currentColorByElement?.[element]) {
+      color = settings.currentColorByElement[element];
+    } else if (colorScheme?.colors[element]) {
+      color = colorScheme.colors[element];
+    } else {
+      color = getDefaultAtomColor(element);
+    }
+    
+    let radius: number;
+    if (settings?.currentRadiusByElement?.[element]) {
+      radius = settings.currentRadiusByElement[element];
+    } else {
+      const baseRadius = getDefaultAtomRadius(element);
+      radius = settings?.currentRadiusScale !== undefined 
+        ? baseRadius * settings.currentRadiusScale 
+        : baseRadius;
+    }
+    
+    return { color, radius };
   }
 
   updateAtom(

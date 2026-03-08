@@ -1,16 +1,20 @@
 import { WireAtom, WireClipboardData } from '../shared/protocol.js';
 import { Atom } from '../models/atom.js';
 import { Structure } from '../models/structure.js';
-import { ELEMENT_DATA } from '../utils/elementData.js';
 
 /**
  * Global clipboard service shared across all editor sessions.
  * Enables cross-window copy/paste operations.
+ * 
+ * Preserves atom color and radius during copy/paste operations.
  */
 export class ClipboardService {
   private clipboard: WireClipboardData | null = null;
   private readonly MAX_ATOMS = 10000;
 
+  /**
+   * Copy atoms to clipboard, preserving their color and radius.
+   */
   copy(atomIds: string[], structure: Structure, sessionKey: string, documentUri: string): void {
     if (atomIds.length === 0) {
       return;
@@ -20,15 +24,12 @@ export class ClipboardService {
     for (const id of atomIds) {
       const atom = structure.getAtom(id);
       if (atom) {
-        const elementInfo = ELEMENT_DATA[atom.element];
-        // Skip default gray color - prefer element-specific color if available
-        const atomColor = atom.color !== '#C0C0C0' ? atom.color : undefined;
         atomsToCopy.push({
           id: atom.id,
           element: atom.element,
-          color: atomColor || elementInfo?.color || '#C0C0C0',
+          color: atom.color,
           position: [atom.x, atom.y, atom.z],
-          radius: elementInfo?.covalentRadius || 0.7,
+          radius: atom.radius,
         });
       }
     }
@@ -50,6 +51,9 @@ export class ClipboardService {
     };
   }
 
+  /**
+   * Paste atoms from clipboard, preserving their color and radius.
+   */
   paste(structure: Structure, offset?: { x: number; y: number; z: number }): string[] {
     if (!this.clipboard || this.clipboard.atoms.length === 0) {
       throw new Error('Clipboard is empty');
@@ -63,9 +67,13 @@ export class ClipboardService {
         wireAtom.element,
         wireAtom.position[0] + pasteOffset.x,
         wireAtom.position[1] + pasteOffset.y,
-        wireAtom.position[2] + pasteOffset.z
+        wireAtom.position[2] + pasteOffset.z,
+        undefined,
+        {
+          color: wireAtom.color,
+          radius: wireAtom.radius,
+        }
       );
-      atom.color = wireAtom.color;
       structure.addAtom(atom);
       newAtomIds.push(atom.id);
     }

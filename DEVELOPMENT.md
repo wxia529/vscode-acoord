@@ -896,12 +896,18 @@ interface ACoordAtom {
   x: number;
   y: number;
   z: number;
-  color: string;      // CSS hex color: "#RRGGBB" — required
-  radius: number;     // Angstroms — required
+  color: string;      // CSS hex color: "#RRGGBB" — rendered as-is
+  radius: number;     // Render radius in Angstroms — used directly for display
   label?: string;
   fixed?: boolean;
   selectiveDynamics?: [boolean, boolean, boolean];
 }
+
+// Radius semantics in .acoord:
+// - User-specified radius values are used directly for rendering (no scaling)
+// - Users can specify any value (e.g., covalent radius 0.76Å for carbon)
+// - If radius is omitted or invalid, defaults to covalent radius * 0.35
+// - This gives users full control: physical units for precision, or any value for art
 
 interface ACoordUnitCell {
   a: number;
@@ -941,8 +947,12 @@ When a user opens a .acoord file, modifies it, and saves:
 
 When opening XYZ, POSCAR, CIF, etc.:
 1. Parser sets default color (from current color scheme, typically JMol)
-2. Parser sets default radius (from covalent radii)
+2. Parser sets default radius (covalent radius × 0.35 for visual aesthetics)
 3. User can modify these and save as .acoord to preserve changes
+
+**Note:** The 0.35 scaling factor is only applied as a default for formats that don't
+support radius. When users save to .acoord and specify their own radius values, those
+values are used exactly as written.
 
 ---
 

@@ -232,14 +232,48 @@ export function parseElement(input: string): string | undefined {
 
 const DEFAULT_RADIUS = 1.0;
 
+/**
+ * Visual radius scale factor applied to covalent radii for default atom sizes.
+ * 
+ * Covalent radii represent physical bond lengths, but for visualization we need
+ * smaller values to show atoms as distinct spheres with visible gaps between them.
+ * A scale of 0.35 provides good visual separation while maintaining relative sizes.
+ * 
+ * This factor is ONLY applied when generating default radii for atoms that don't
+ * have user-specified values (e.g., when parsing XYZ/POSCAR files, or when .acoord
+ * file omits the radius field). User-specified radii (from .acoord or setAtomRadius)
+ * are used directly without additional scaling.
+ * 
+ * Related: DisplaySettings.currentRadiusScale allows additional user-controlled scaling
+ * when applying display settings to atoms.
+ */
+const VISUAL_RADIUS_SCALE = 0.35;
+
+/**
+ * Get the default color for an element.
+ * Returns the color from ELEMENT_DATA (JMol scheme) or a fallback gray.
+ */
 export function getDefaultAtomColor(element: string): string {
   return ELEMENT_DATA[element]?.color || DEFAULT_COLOR;
 }
 
+/**
+ * Get the default visual radius for an element.
+ * 
+ * Returns the covalent radius scaled by VISUAL_RADIUS_SCALE for visualization.
+ * This provides a good default for atoms without user-specified radii.
+ * 
+ * Note: This is used when parsing formats that don't support radius (XYZ, POSCAR, etc.)
+ * or when .acoord files omit the radius field. For .acoord files with explicit radii,
+ * those values are used directly (see acoordParser.ts).
+ * 
+ * @param element - Element symbol (e.g., "C", "H", "O")
+ * @returns Default visual radius in Angstroms, scaled for display
+ */
 export function getDefaultAtomRadius(element: string): number {
   const info = ELEMENT_DATA[element];
   if (info?.covalentRadius) {
-    return Math.max(info.covalentRadius * 1.0, 0.3);
+    return Math.max(info.covalentRadius * VISUAL_RADIUS_SCALE, 0.1);
   }
-  return DEFAULT_RADIUS;
+  return DEFAULT_RADIUS * VISUAL_RADIUS_SCALE;
 }
