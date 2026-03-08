@@ -1,7 +1,6 @@
 import { Atom } from '../models/atom.js';
 import { ColorScheme } from '../shared/protocol.js';
 import { DisplaySettings } from './types.js';
-import { ELEMENT_DATA } from '../utils/elementData.js';
 
 const DEFAULT_FALLBACK_COLOR = '#C0C0C0';
 
@@ -10,8 +9,7 @@ const DEFAULT_FALLBACK_COLOR = '#C0C0C0';
  * 1. atom.color (manual per-atom override, but skip default gray)
  * 2. settings.currentColorByElement[element] (user override)
  * 3. colorScheme.colors[element] (ColorScheme definition)
- * 4. ELEMENT_DATA[element].color (Jmol default)
- * 5. '#C0C0C0' (final fallback: gray)
+ * 4. '#C0C0C0' (final fallback: gray)
  */
 export function getColorForElement(
   atom: Atom,
@@ -19,7 +17,6 @@ export function getColorForElement(
   settings: DisplaySettings,
   colorScheme: ColorScheme | null
 ): string {
-  // Skip default gray color - it's just the Atom constructor default
   if (atom.color && atom.color !== DEFAULT_FALLBACK_COLOR) {
     return atom.color;
   }
@@ -30,11 +27,6 @@ export function getColorForElement(
 
   if (colorScheme?.colors[symbol]) {
     return colorScheme.colors[symbol];
-  }
-
-  const info = ELEMENT_DATA[symbol];
-  if (info?.color) {
-    return info.color;
   }
 
   return DEFAULT_FALLBACK_COLOR;

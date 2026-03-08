@@ -157,6 +157,138 @@ button:hover {
   box-shadow: 0 2px 8px rgba(52, 211, 153, 0.25);
 }
 
+.toolbar-spacer-vertical {
+  flex: 1;
+}
+
+#brush-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-top: 8px;
+  border-top: 1px solid var(--acoord-border);
+  margin-top: 4px;
+}
+
+.brush-scheme-wrapper {
+  position: relative;
+}
+
+.brush-scheme-name {
+  text-align: center;
+  font-size: 10px;
+  color: rgba(52, 211, 153, 0.9);
+  font-weight: 600;
+  padding: 4px 0;
+  cursor: pointer;
+  border-radius: 4px;
+  background: var(--acoord-panel-2);
+  border: 1px solid var(--acoord-border);
+  transition: border-color 0.15s ease;
+}
+
+.brush-scheme-name:hover {
+  border-color: rgba(52, 211, 153, 0.6);
+}
+
+.brush-scheme-name::after {
+  content: ' ▾';
+  font-size: 8px;
+  opacity: 0.6;
+}
+
+.brush-scheme-dropdown {
+  position: absolute;
+  left: 100%;
+  top: 0;
+  margin-left: 4px;
+  min-width: 120px;
+  background: var(--acoord-panel);
+  border: 1px solid var(--acoord-border);
+  border-radius: 4px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  z-index: 1000;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.brush-scheme-dropdown-item {
+  padding: 6px 10px;
+  font-size: 11px;
+  cursor: pointer;
+  color: var(--acoord-text);
+  border-bottom: 1px solid var(--acoord-border);
+}
+
+.brush-scheme-dropdown-item:last-child {
+  border-bottom: none;
+}
+
+.brush-scheme-dropdown-item:hover {
+  background: var(--acoord-panel-2);
+}
+
+.brush-scheme-dropdown-item.active {
+  color: rgba(52, 211, 153, 0.9);
+  font-weight: 600;
+}
+
+.brush-scheme-dropdown-group {
+  padding: 4px 10px 2px;
+  font-size: 9px;
+  color: var(--acoord-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.brush-scheme-info {
+  text-align: center;
+  font-size: 10px;
+  color: var(--acoord-muted);
+  padding: 2px 0;
+}
+
+.brush-btn {
+  width: 32px;
+  padding: 4px 0;
+  font-size: 9px;
+  border-radius: 4px;
+  text-align: center;
+  line-height: 1.2;
+}
+
+.brush-btn:hover {
+  transform: none;
+  border-color: rgba(52, 211, 153, 0.6);
+}
+
+.brush-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+#color-palette-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-top: 8px;
+  border-top: 1px solid var(--acoord-border);
+  margin-top: 4px;
+}
+
+#toolbar-color-picker {
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--acoord-border);
+  border-radius: 4px;
+  cursor: pointer;
+  padding: 0;
+}
+
+#toolbar-color-picker:hover {
+  border-color: rgba(52, 211, 153, 0.6);
+}
+
 #canvas-wrap {
   flex: 1;
   position: relative;

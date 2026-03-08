@@ -113,6 +113,37 @@ export function setup(callbacks: AppEditContext): void {
     });
   }
 
+  // ── Toolbar Color Palette (left toolbar) ─────────────────────────────────────
+
+  const toolbarColorPicker = document.getElementById('toolbar-color-picker') as HTMLInputElement | null;
+
+  const syncAllColorInputs = (rawValue: string): string | null => {
+    const normalized = normalizeHexColor(rawValue);
+    if (!normalized) { return null; }
+    if (atomColorPicker) atomColorPicker.value = normalized;
+    if (atomColorText) atomColorText.value = normalized;
+    if (toolbarColorPicker) toolbarColorPicker.value = normalized;
+    return normalized;
+  };
+
+  if (toolbarColorPicker) {
+    toolbarColorPicker.addEventListener('input', (event: Event) => {
+      const color = syncAllColorInputs((event.target as HTMLInputElement).value);
+      if (!color || !selectionStore.selectedAtomIds || selectionStore.selectedAtomIds.length === 0) { return; }
+      vscode.postMessage({ command: 'setAtomColor', atomIds: selectionStore.selectedAtomIds, color });
+    });
+  }
+
+  // Sync toolbar color picker when atom color picker changes
+  if (atomColorPicker) {
+    atomColorPicker.addEventListener('input', (event: Event) => {
+      const normalized = normalizeHexColor((event.target as HTMLInputElement).value);
+      if (normalized && toolbarColorPicker) {
+        toolbarColorPicker.value = normalized;
+      }
+    });
+  }
+
   // ── Keyboard shortcuts (global — delete, undo, save, copy, paste) ──────────────────────
 
   document.addEventListener('keydown', (event: KeyboardEvent) => {

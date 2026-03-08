@@ -1,7 +1,8 @@
 import { Structure } from '../../models/structure.js';
 import { Atom } from '../../models/atom.js';
 import { UnitCell } from '../../models/unitCell.js';
-import { ELEMENT_DATA, parseElement, getDefaultAtomColor, getDefaultAtomRadius } from '../../utils/elementData.js';
+import { ELEMENT_DATA, parseElement, getDefaultAtomRadius } from '../../utils/elementData.js';
+import { BRIGHT_SCHEME } from '../../config/presets/color-schemes/index.js';
 import { BOHR_TO_ANGSTROM } from '../../utils/constants.js';
 import { fractionalToCartesian } from '../../utils/parserUtils.js';
 import { StructureParser } from './structureParser.js';
@@ -361,7 +362,7 @@ export class QEParser extends StructureParser {
 
     for (const item of atoms) {
       const atom = new Atom(item.element, item.position[0], item.position[1], item.position[2], undefined, {
-        color: getDefaultAtomColor(item.element),
+        color: BRIGHT_SCHEME.colors[item.element] || '#C0C0C0',
         radius: getDefaultAtomRadius(item.element),
       });
       atom.fixed = item.fixed;
@@ -450,7 +451,7 @@ export class QEParser extends StructureParser {
     }
     for (const item of atoms) {
       const atom = new Atom(item.element, item.position[0], item.position[1], item.position[2], undefined, {
-        color: getDefaultAtomColor(item.element),
+        color: BRIGHT_SCHEME.colors[item.element] || '#C0C0C0',
         radius: getDefaultAtomRadius(item.element),
       });
       atom.fixed = item.fixed;

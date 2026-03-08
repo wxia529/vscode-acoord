@@ -89,13 +89,13 @@ describe('colorSchemeUtils', () => {
       expect(color).to.equal('#0000FF');
     });
 
-    it('should return ELEMENT_DATA color as fallback', () => {
+    it('should return fallback color when no color is set', () => {
       const atom = createAtom('C');
       settings = createDisplaySettings({ currentColorByElement: {} });
       colorScheme = createColorScheme({});
       
       const color = getColorForElement(atom, 'C', settings, colorScheme);
-      expect(color).to.not.equal('#C0C0C0');
+      expect(color).to.equal('#C0C0C0');
     });
 
     it('should return default fallback for unknown element', () => {
@@ -112,7 +112,7 @@ describe('colorSchemeUtils', () => {
       settings = createDisplaySettings({ currentColorByElement: {} });
       
       const color = getColorForElement(atom, 'C', settings, null);
-      expect(color).to.not.equal('#C0C0C0');
+      expect(color).to.equal('#C0C0C0');
     });
 
     it('should handle empty settings', () => {
@@ -120,7 +120,7 @@ describe('colorSchemeUtils', () => {
       settings = createDisplaySettings();
       
       const color = getColorForElement(atom, 'C', settings, null);
-      expect(color).to.not.equal('#C0C0C0');
+      expect(color).to.equal('#C0C0C0');
     });
   });
 

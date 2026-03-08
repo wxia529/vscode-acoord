@@ -1,4 +1,5 @@
 import { colorSchemeStore, displayStore } from './state';
+import * as brushPanel from './brushPanel';
 import type { VsCodeApi } from './types';
 import type { ExtensionToWebviewMessage, WireColorScheme } from '../../../src/shared/protocol';
 
@@ -72,6 +73,7 @@ function handleSchemeLoaded(scheme: WireColorScheme | null): void {
 
   updateUI();
   _updateColorSchemeSelectorFn?.();
+  brushPanel.update();
 
   // Note: No need to call _rerenderStructureFn here because the extension
   // will send a new render message with updated atom colors after calling
@@ -125,7 +127,6 @@ export function updateUI(): void {
 
 export function updateColorSchemeSelector(): void {
   const select = document.getElementById('color-scheme-select') as HTMLSelectElement | null;
-  const toolbarSelect = document.getElementById('toolbar-color-scheme') as HTMLSelectElement | null;
 
   const selectedId = colorSchemeStore.currentSchemeId || '';
   const presets = colorSchemeStore.availableSchemes.presets || [];
@@ -157,9 +158,5 @@ export function updateColorSchemeSelector(): void {
 
   if (select) {
     select.innerHTML = options.join('');
-  }
-
-  if (toolbarSelect) {
-    toolbarSelect.innerHTML = options.join('');
   }
 }

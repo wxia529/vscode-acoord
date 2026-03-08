@@ -1,7 +1,8 @@
 import { Structure } from '../../models/structure.js';
 import { Atom } from '../../models/atom.js';
 import { UnitCell } from '../../models/unitCell.js';
-import { parseElement, getDefaultAtomColor, getDefaultAtomRadius } from '../../utils/elementData.js';
+import { parseElement, getDefaultAtomRadius } from '../../utils/elementData.js';
+import { BRIGHT_SCHEME } from '../../config/presets/color-schemes/index.js';
 import { StructureParser } from './structureParser.js';
 
 /**
@@ -88,7 +89,7 @@ export class ACoordParser extends StructureParser {
         : getDefaultAtomRadius(element);
 
       const atom = new Atom(element, atomData.x, atomData.y, atomData.z, atomData.id, {
-        color: atomData.color || getDefaultAtomColor(element),
+        color: atomData.color || BRIGHT_SCHEME.colors[element] || '#C0C0C0',
         radius,
         label: atomData.label,
         fixed: atomData.fixed ?? false,

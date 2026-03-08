@@ -82,6 +82,7 @@ export function updateSelectedInputs(atom: Atom | null): void {
 export function updateAtomColorPreview(): void {
   const atomColorPicker = document.getElementById('atom-color-picker') as HTMLInputElement | null;
   const atomColorText = document.getElementById('atom-color-text') as HTMLInputElement | null;
+  const toolbarColorPicker = document.getElementById('toolbar-color-picker') as HTMLInputElement | null;
   if (!atomColorPicker || !atomColorText) { return; }
 
   let previewColor: string | null = null;
@@ -98,6 +99,7 @@ export function updateAtomColorPreview(): void {
   if (!previewColor) { return; }
   atomColorPicker.value = previewColor;
   atomColorText.value = previewColor;
+  if (toolbarColorPicker) toolbarColorPicker.value = previewColor;
 }
 
 export function updateAdsorptionUI(): void {

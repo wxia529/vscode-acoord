@@ -1,7 +1,8 @@
 import { Structure } from '../../models/structure.js';
 import { Atom } from '../../models/atom.js';
 import { UnitCell } from '../../models/unitCell.js';
-import { parseElement, getDefaultAtomColor, getDefaultAtomRadius } from '../../utils/elementData.js';
+import { parseElement, getDefaultAtomRadius } from '../../utils/elementData.js';
+import { BRIGHT_SCHEME } from '../../config/presets/color-schemes/index.js';
 import { StructureParser } from './structureParser.js';
 
 /**
@@ -331,7 +332,7 @@ export class CIFParser extends StructureParser {
 
       if (Number.isFinite(x) && Number.isFinite(y) && Number.isFinite(z)) {
         structure.addAtom(new Atom(symbol, x, y, z, undefined, {
-          color: getDefaultAtomColor(symbol),
+          color: BRIGHT_SCHEME.colors[symbol] || '#C0C0C0',
           radius: getDefaultAtomRadius(symbol),
         }));
       }

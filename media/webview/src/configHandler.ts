@@ -1,4 +1,5 @@
 import { configStore, displayStore, lightingStore, extractDisplaySettings, applyDisplaySettings } from './state';
+import * as colorSchemeHandler from './colorSchemeHandler';
 import { renderer } from './renderer';
 import type { VsCodeApi, DisplaySettings } from './types';
 import type { ExtensionToWebviewMessage, DisplayConfigLoadedMessage, DisplayConfigSavedMessage, DisplayConfigErrorMessage, CurrentDisplaySettingsMessage } from '../../../src/shared/protocol';
@@ -122,6 +123,9 @@ export function handleMessage(message: ExtensionToWebviewMessage): void {
     case 'currentDisplaySettings':
       if (message.settings) {
         applyDisplaySettings(message.settings);
+        if (message.settings.currentColorScheme) {
+          colorSchemeHandler.loadScheme(message.settings.currentColorScheme);
+        }
         updateUI();
       }
       break;

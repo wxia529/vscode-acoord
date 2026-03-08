@@ -7,6 +7,7 @@ import { setup as setupEdit } from './appEdit';
 import { setup as setupLattice, updateLatticeUI, updateSelectedAtomSizePanel } from './appLattice';
 import { setup as setupView } from './appView';
 import { setup as setupTools } from './appTools';
+import * as brushPanel from './brushPanel';
 import { init as initInteraction } from './interaction';
 import { initVscode as initInteractionConfigVscode, init as initInteractionConfig, updateConfigSelector } from './interactionConfig';
 import type { Atom, Structure, VsCodeApi, AppCallbacks } from './types';
@@ -142,7 +143,6 @@ function setupUI(): void {
   const toolbarAddAtom = document.getElementById('toolbar-add-atom') as HTMLSelectElement | null;
   const toolbarDelete = document.getElementById('toolbar-delete') as HTMLButtonElement | null;
   const toolbarBoxMode = document.getElementById('toolbar-box-mode') as HTMLSelectElement | null;
-  const toolbarColorScheme = document.getElementById('toolbar-color-scheme') as HTMLSelectElement | null;
   const btnReset = document.getElementById('btn-reset') as HTMLButtonElement | null;
   const btnUndo = document.getElementById('btn-undo') as HTMLButtonElement | null;
   const btnRedo = document.getElementById('btn-redo') as HTMLButtonElement | null;
@@ -176,15 +176,6 @@ function setupUI(): void {
       interactionStore.boxSelectionMode = toolbarBoxMode.value as BoxSelectionMode;
     });
     toolbarBoxMode.value = interactionStore.boxSelectionMode;
-  }
-
-  if (toolbarColorScheme) {
-    toolbarColorScheme.addEventListener('change', () => {
-      const schemeId = toolbarColorScheme.value;
-      if (schemeId) {
-        colorSchemeHandler.loadScheme(schemeId);
-      }
-    });
   }
 
   if (btnReset) btnReset.addEventListener('click', () => renderer.fitCamera());
@@ -253,6 +244,7 @@ function setupUI(): void {
   setupLattice(callbacks);
   setupView();
   setupTools(callbacks);
+  brushPanel.init(vscode, setStatus);
   updateBondSelectionUI();
 }
 
@@ -459,6 +451,7 @@ function handleRenderMessage(message: RenderMessage): void {
       : [];
   structureStore.currentSelectedBondKey = selectionStore.selectedBondKeys.at(-1) ?? null;
   displayStore.supercell = message.data.supercell || [1, 1, 1];
+  brushPanel.update();
 
   // Apply display settings
   if (message.displaySettings) {

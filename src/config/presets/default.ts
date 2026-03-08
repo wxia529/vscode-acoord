@@ -49,7 +49,7 @@ export const DEFAULT_PRESET: DisplayConfig = {
       y: 5,
       z: -10
     },
-    currentColorScheme: 'preset-jmol-default',
+    currentColorScheme: 'preset-bright',
     currentColorByElement: {}
   }
 };

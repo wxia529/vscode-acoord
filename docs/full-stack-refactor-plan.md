@@ -117,8 +117,7 @@ export interface WireAtom {
 1. `atom.color`
 2. `settings.atomColorByElement[element]`
 3. `colorScheme.colors[element]`
-4. `ELEMENT_DATA[element].color`
-5. `'#C0C0C0'`
+4. `'#C0C0C0'`
 
 **Radius 优先级**（Webview 端）：
 1. `displayStore.atomSizeByAtom[atomId]`

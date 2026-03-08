@@ -2,7 +2,8 @@ import { RenderMessageBuilder } from '../renderers/renderMessageBuilder.js';
 import { Atom } from '../models/atom.js';
 import { UndoManager } from '../providers/undoManager.js';
 import { TrajectoryManager } from '../providers/trajectoryManager.js';
-import { parseElement, getDefaultAtomColor, getDefaultAtomRadius, ELEMENT_DATA } from '../utils/elementData.js';
+import { parseElement, getDefaultAtomRadius, ELEMENT_DATA } from '../utils/elementData.js';
+import { BRIGHT_SCHEME } from '../config/presets/color-schemes/index.js';
 import { DisplaySettings } from '../config/types.js';
 import { ColorScheme } from '../shared/protocol.js';
 
@@ -359,7 +360,7 @@ export class AtomEditService {
     } else if (colorScheme?.colors[element]) {
       color = colorScheme.colors[element];
     } else {
-      color = getDefaultAtomColor(element);
+      color = BRIGHT_SCHEME.colors[element] || '#C0C0C0';
     }
     
     let radius: number;

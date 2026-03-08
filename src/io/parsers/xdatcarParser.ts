@@ -1,7 +1,8 @@
 import { Structure } from '../../models/structure.js';
 import { Atom } from '../../models/atom.js';
 import { UnitCell } from '../../models/unitCell.js';
-import { parseElement, getDefaultAtomColor, getDefaultAtomRadius } from '../../utils/elementData.js';
+import { parseElement, getDefaultAtomRadius } from '../../utils/elementData.js';
+import { BRIGHT_SCHEME } from '../../config/presets/color-schemes/index.js';
 import { expandElements, fractionalToCartesian } from '../../utils/parserUtils.js';
 import { StructureParser } from './structureParser.js';
 
@@ -253,7 +254,7 @@ export class XDATCARParser extends StructureParser {
         [x, y, z] = fractionalToCartesian(x, y, z, header.latticeVectors);
       }
       structure.addAtom(new Atom(expandedElements[i], x, y, z, undefined, {
-        color: getDefaultAtomColor(expandedElements[i]),
+        color: BRIGHT_SCHEME.colors[expandedElements[i]] || '#C0C0C0',
         radius: getDefaultAtomRadius(expandedElements[i]),
       }));
     }

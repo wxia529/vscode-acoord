@@ -2,7 +2,7 @@ import { ColorScheme } from '../../../shared/protocol.js';
 
 export const BRIGHT_SCHEME: ColorScheme = {
   id: 'preset-bright',
-  name: 'Bright Colors',
+  name: 'Bright',
   description: 'Bright color scheme for enhanced visibility',
   isPreset: true,
   isReadOnly: true,

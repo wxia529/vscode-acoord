@@ -174,9 +174,9 @@ src/
        struParser.ts
        acoordParser.ts          # Native .acoord format (JSON)
        index.ts                 # Barrel re-exports
-  utils/
-    elementData.ts             # Periodic table data (symbols, radii, colors)
-    parserUtils.ts             # Shared parsing helpers
+   utils/
+     elementData.ts             # Periodic table data (symbols, radii)
+     parserUtils.ts             # Shared parsing helpers
     constants.ts               # App-wide constants
 
 media/webview/
@@ -400,7 +400,7 @@ When setting atom properties, use this priority:
 1. User-specified color (via `setAtomColor` or loaded from .acoord)
 2. `DisplaySettings.currentColorByElement[element]` (when applying)
 3. Color from `DisplaySettings.currentColorScheme` (when applying)
-4. `ELEMENT_DATA[element].color` (fallback)
+4. `'#C0C0C0'` (final fallback: gray)
 
 **For radius:**
 1. User-specified radius (via `setAtomRadius` or loaded from .acoord)
@@ -736,12 +736,14 @@ one-element array. Trajectory formats return the full frame array.
 
 **Parser responsibility for atom properties:**
 - Parsers MUST set `atom.color` and `atom.radius` during parsing
-- Use the current color scheme (default: JMol) to determine colors
+- Use the default color scheme (Bright) to determine colors
 - Use covalent radii from `ELEMENT_DATA` to determine radii
 - Example:
   ```typescript
-  const color = getColorForElement(atom.element);  // JMol by default
-  const radius = ELEMENT_DATA[atom.element]?.covalentRadius ?? 0.3;
+  import { BRIGHT_SCHEME } from '../../config/presets/color-schemes/index.js';
+  
+  const color = BRIGHT_SCHEME.colors[element] || '#C0C0C0';
+  const radius = ELEMENT_DATA[element]?.covalentRadius ?? 0.3;
   atom.color = color;
   atom.radius = radius;
   ```
@@ -755,7 +757,7 @@ Every parser must:
    name, line number, and what was expected. Never return an empty structure
    in place of an error.
 3. **Set atom color and radius.** These are required fields, not optional.
-   Use default color scheme (JMol) and covalent radii.
+   Use default color scheme (Bright) and covalent radii.
 4. **Preserve format-specific metadata.** Store format-specific data
    (charge, multiplicity, comments, selective dynamics, etc.) in
    `structure.metadata` (a `Map<string, unknown>`). Serializers must read
@@ -946,7 +948,7 @@ When a user opens a .acoord file, modifies it, and saves:
 ### 8.5.4 Import from Other Formats
 
 When opening XYZ, POSCAR, CIF, etc.:
-1. Parser sets default color (from current color scheme, typically JMol)
+1. Parser sets default color (from default color scheme: Bright)
 2. Parser sets default radius (covalent radius × 0.35 for visual aesthetics)
 3. User can modify these and save as .acoord to preserve changes
 
@@ -1456,7 +1458,7 @@ export class MyFormatParser extends StructureParser {
 
 **Key points for parsers:**
 - You MUST set `atom.color` and `atom.radius` for every atom during parsing
-- Use `getColorForElement(element)` to get the default color (JMol scheme)
+- Use `BRIGHT_SCHEME.colors[element] || '#C0C0C0'` to get the default color
 - Use `ELEMENT_DATA[element]?.covalentRadius ?? 0.3` for default radius
 - For .acoord format, read color/radius directly from the file
 

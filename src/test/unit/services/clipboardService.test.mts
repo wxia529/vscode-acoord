@@ -2,20 +2,21 @@ import { expect } from 'chai';
 import { Structure } from '../../../models/structure.js';
 import { Atom } from '../../../models/atom.js';
 import { ClipboardService } from '../../../services/clipboardService.js';
-import { getDefaultAtomColor, getDefaultAtomRadius } from '../../../utils/elementData.js';
+import { getDefaultAtomRadius } from '../../../utils/elementData.js';
+import { BRIGHT_SCHEME } from '../../../config/presets/color-schemes/index.js';
 
 function makeStructure(): Structure {
   const s = new Structure('test');
   s.addAtom(new Atom('C', 0, 0, 0, undefined, {
-    color: getDefaultAtomColor('C'),
+    color: BRIGHT_SCHEME.colors['C'] || '#C0C0C0',
     radius: getDefaultAtomRadius('C'),
   }));
   s.addAtom(new Atom('O', 1.5, 0, 0, undefined, {
-    color: getDefaultAtomColor('O'),
+    color: BRIGHT_SCHEME.colors['O'] || '#C0C0C0',
     radius: getDefaultAtomRadius('O'),
   }));
   s.addAtom(new Atom('H', 0, 1.5, 0, undefined, {
-    color: getDefaultAtomColor('H'),
+    color: BRIGHT_SCHEME.colors['H'] || '#C0C0C0',
     radius: getDefaultAtomRadius('H'),
   }));
   return s;
@@ -104,7 +105,7 @@ describe('ClipboardService', () => {
       const newAtom = structure.getAtom(newAtomIds[0]);
       
       expect(newAtom!.element).to.equal('O');
-      expect(newAtom!.color).to.equal('#FF0D0D');
+      expect(newAtom!.color).to.equal(BRIGHT_SCHEME.colors['O']);
     });
   });
 
