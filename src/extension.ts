@@ -10,12 +10,13 @@ import { Atom } from './models/atom.js';
 import { UnitCell } from './models/unitCell.js';
 import { FileManager } from './io/fileManager.js';
 import { ColorSchemeManager } from './config/colorSchemeManager.js';
+import { ConfigMigration } from './config/configMigration.js';
 
-/**
- * Extension activation
- */
 export function activate(context: vscode.ExtensionContext) {
   console.log('ACoord extension is now active!');
+
+  const configMigration = new ConfigMigration(context);
+  configMigration.run().catch(console.error);
 
   const colorSchemeManager = new ColorSchemeManager(context);
   

@@ -2,6 +2,27 @@
 
 All notable changes to this project will be documented in this file.
 
+## 0.3.0
+
+### Major Architecture Refactoring
+
+This release includes significant architectural improvements and new features.
+
+#### New Configuration System
+
+- **Simplified Config Architecture**: Removed complex ConfigManager, ConfigStorage, and ConfigValidator classes. Configuration is now managed directly in services for better maintainability.
+- **Bond Schemes**: Added `bondSchemes.ts` with predefined bond color schemes for consistent bond coloring.
+- **Streamlined Display Configuration**: DisplayConfigService simplified with direct preset management.
+
+#### New Features
+
+- **Right-Click Context Menu**: Interactive context menu in 3D canvas with atom operations, bond operations, and element selection. Supports submenus for element changes and common operations.
+- **ACoord Native Format**: New `.acoord` JSON-based file format that preserves all atom properties including user-specified colors and radii. Allows exact round-trip preservation of visual customizations.
+- **Enhanced Axis Indicator**: Improved 3D axis indicator showing X/Y/Z orientation in the canvas corner with real-time updates based on camera view.
+- **Brush Panel**: New brush panel for applying color schemes to selected atoms. Apply color schemes to atom subsets for quick visualization.
+- **Atom Size & Style Controls**: Enhanced atom size and style controls with better UI and real-time preview.
+- **Rotation Tool**: Interactive rotation tool for selected atoms with axis selection and angle control.
+
 ## 0.2.2
 
 ### New features
