@@ -10,6 +10,7 @@ export class Structure {
   atoms: Atom[] = [];
   private atomIndex: Map<string, Atom> = new Map();
   bonds: Array<[string, string]> = [];
+  periodicBondImages: Map<string, [number, number, number]> = new Map();
   unitCell?: UnitCell;
   isCrystal: boolean = false;
   supercell: [number, number, number] = [1, 1, 1];
@@ -38,7 +39,19 @@ export class Structure {
   removeAtom(atomId: string): void {
     this.atoms = this.atoms.filter((a) => a.id !== atomId);
     this.atomIndex.delete(atomId);
+    
+    const bondsToRemove: string[] = [];
+    for (const [a, b] of this.bonds) {
+      if (a === atomId || b === atomId) {
+        bondsToRemove.push(Structure.bondKey(a, b));
+      }
+    }
+    
     this.bonds = this.bonds.filter(([a, b]) => a !== atomId && b !== atomId);
+    
+    for (const key of bondsToRemove) {
+      this.periodicBondImages.delete(key);
+    }
   }
 
   static normalizeBondPair(atomId1: string, atomId2: string): [string, string] {
@@ -69,12 +82,46 @@ export class Structure {
     const exists = this.bonds.some(([x, y]) => x === a && y === b);
     if (!exists) {
       this.bonds.push([a, b]);
+      
+      if (this.isCrystal && this.unitCell) {
+        const atom1 = this.getAtom(a)!;
+        const atom2 = this.getAtom(b)!;
+        const vectors = this.unitCell.getLatticeVectors();
+        
+        let minDistSq = Infinity;
+        let bestImage: [number, number, number] = [0, 0, 0];
+        
+        for (let ox = -1; ox <= 1; ox++) {
+          for (let oy = -1; oy <= 1; oy++) {
+            for (let oz = -1; oz <= 1; oz++) {
+              const offsetX = ox * vectors[0][0] + oy * vectors[1][0] + oz * vectors[2][0];
+              const offsetY = ox * vectors[0][1] + oy * vectors[1][1] + oz * vectors[2][1];
+              const offsetZ = ox * vectors[0][2] + oy * vectors[1][2] + oz * vectors[2][2];
+              
+              const dx = (atom2.x + offsetX) - atom1.x;
+              const dy = (atom2.y + offsetY) - atom1.y;
+              const dz = (atom2.z + offsetZ) - atom1.z;
+              const distanceSq = dx * dx + dy * dy + dz * dz;
+              
+              if (distanceSq < minDistSq) {
+                minDistSq = distanceSq;
+                bestImage = [ox, oy, oz];
+              }
+            }
+          }
+        }
+        
+        const key = Structure.bondKey(a, b);
+        this.periodicBondImages.set(key, bestImage);
+      }
     }
   }
 
   removeBond(atomId1: string, atomId2: string): void {
     const [a, b] = Structure.normalizeBondPair(atomId1, atomId2);
+    const key = Structure.bondKey(a, b);
     this.bonds = this.bonds.filter(([x, y]) => !(x === a && y === b));
+    this.periodicBondImages.delete(key);
   }
 
   hasBond(atomId1: string, atomId2: string): boolean {
@@ -84,6 +131,7 @@ export class Structure {
 
   clearBonds(): void {
     this.bonds = [];
+    this.periodicBondImages.clear();
   }
 
   /**
@@ -163,6 +211,7 @@ export class Structure {
   calculateBonds(schemeId?: BondSchemeId): void {
     const scheme = BOND_SCHEMES[schemeId ?? DEFAULT_BOND_SCHEME];
     this.bonds = [];
+    this.periodicBondImages.clear();
     
     const seen = new Set<string>();
 
@@ -273,6 +322,8 @@ export class Structure {
         const bondLength = (radius1 + radius2) * tolerance;
 
         let minDistSq = Infinity;
+        let bestImage: [number, number, number] = [0, 0, 0];
+        
         for (const [ox, oy, oz] of offsets) {
           const offsetX = ox * vectors[0][0] + oy * vectors[1][0] + oz * vectors[2][0];
           const offsetY = ox * vectors[0][1] + oy * vectors[1][1] + oz * vectors[2][1];
@@ -285,6 +336,7 @@ export class Structure {
 
           if (distanceSq < minDistSq) {
             minDistSq = distanceSq;
+            bestImage = [ox, oy, oz];
           }
         }
 
@@ -292,6 +344,7 @@ export class Structure {
           const key = Structure.bondKey(atom1.id, atom2.id);
           if (!seen.has(key)) {
             this.bonds.push([atom1.id, atom2.id]);
+            this.periodicBondImages.set(key, bestImage);
             seen.add(key);
           }
         }
@@ -406,6 +459,7 @@ export class Structure {
       cloned.addAtom(atom.clone());
     }
     cloned.bonds = this.bonds.map(([a, b]) => [a, b]);
+    cloned.periodicBondImages = new Map(this.periodicBondImages);
     if (this.unitCell) {
       cloned.unitCell = this.unitCell.clone();
     }
@@ -448,39 +502,61 @@ export class Structure {
       const atom2 = this.getAtom(id2);
       if (!atom1 || !atom2) continue;
 
-      let minDist = Infinity;
-      let bestImage: [number, number, number] = [0, 0, 0];
+      const bondKey = Structure.bondKey(id1, id2);
+      const storedImage = this.periodicBondImages.get(bondKey);
+      
+      if (storedImage) {
+        const [ox, oy, oz] = storedImage;
+        const offsetX = ox * vectors[0][0] + oy * vectors[1][0] + oz * vectors[2][0];
+        const offsetY = ox * vectors[0][1] + oy * vectors[1][1] + oz * vectors[2][1];
+        const offsetZ = ox * vectors[0][2] + oy * vectors[1][2] + oz * vectors[2][2];
+        
+        const dx = (atom2.x + offsetX) - atom1.x;
+        const dy = (atom2.y + offsetY) - atom1.y;
+        const dz = (atom2.z + offsetZ) - atom1.z;
+        const distance = Math.sqrt(dx * dx + dy * dy + dz * dz);
+        
+        bonds.push({
+          atomId1: id1,
+          atomId2: id2,
+          distance,
+          image: storedImage,
+        });
+      } else {
+        let minDist = Infinity;
+        let bestImage: [number, number, number] = [0, 0, 0];
 
-      for (let ox = -1; ox <= 1; ox++) {
-        for (let oy = -1; oy <= 1; oy++) {
-          for (let oz = -1; oz <= 1; oz++) {
-            const offsetX = ox * vectors[0][0] + oy * vectors[1][0] + oz * vectors[2][0];
-            const offsetY = ox * vectors[0][1] + oy * vectors[1][1] + oz * vectors[2][1];
-            const offsetZ = ox * vectors[0][2] + oy * vectors[1][2] + oz * vectors[2][2];
+        for (let ox = -1; ox <= 1; ox++) {
+          for (let oy = -1; oy <= 1; oy++) {
+            for (let oz = -1; oz <= 1; oz++) {
+              const offsetX = ox * vectors[0][0] + oy * vectors[1][0] + oz * vectors[2][0];
+              const offsetY = ox * vectors[0][1] + oy * vectors[1][1] + oz * vectors[2][1];
+              const offsetZ = ox * vectors[0][2] + oy * vectors[1][2] + oz * vectors[2][2];
 
-            const imageX = atom2.x + offsetX;
-            const imageY = atom2.y + offsetY;
-            const imageZ = atom2.z + offsetZ;
+              const imageX = atom2.x + offsetX;
+              const imageY = atom2.y + offsetY;
+              const imageZ = atom2.z + offsetZ;
 
-            const dx = imageX - atom1.x;
-            const dy = imageY - atom1.y;
-            const dz = imageZ - atom1.z;
-            const distSq = dx * dx + dy * dy + dz * dz;
+              const dx = imageX - atom1.x;
+              const dy = imageY - atom1.y;
+              const dz = imageZ - atom1.z;
+              const distSq = dx * dx + dy * dy + dz * dz;
 
-            if (distSq < minDist * minDist) {
-              minDist = Math.sqrt(distSq);
-              bestImage = [ox, oy, oz];
+              if (distSq < minDist * minDist) {
+                minDist = Math.sqrt(distSq);
+                bestImage = [ox, oy, oz];
+              }
             }
           }
         }
-      }
 
-      bonds.push({
-        atomId1: id1,
-        atomId2: id2,
-        distance: minDist,
-        image: bestImage,
-      });
+        bonds.push({
+          atomId1: id1,
+          atomId2: id2,
+          distance: minDist,
+          image: bestImage,
+        });
+      }
     }
 
     return bonds;
@@ -495,6 +571,7 @@ export class Structure {
       name: this.name,
       atoms: this.atoms.map((a) => a.toJSON()),
       bonds: this.bonds,
+      periodicBondImages: Array.from(this.periodicBondImages.entries()),
       unitCell: this.unitCell?.toJSON(),
       isCrystal: this.isCrystal,
       supercell: this.supercell,
@@ -517,6 +594,14 @@ export class Structure {
     s.bonds = (data as Record<string, unknown>).bonds as Array<[string, string]> | undefined 
       ?? (data as Record<string, unknown>).manualBonds as Array<[string, string]> | undefined 
       ?? [];
+    
+    const periodicBondImagesData = (data as Record<string, unknown>).periodicBondImages as
+      | Array<[string, [number, number, number]]>
+      | undefined;
+    if (periodicBondImagesData) {
+      s.periodicBondImages = new Map(periodicBondImagesData);
+    }
+    
     if (data.unitCell) {
       const uc = data.unitCell;
       s.unitCell = new UnitCell(uc.a, uc.b, uc.c, uc.alpha, uc.beta, uc.gamma);

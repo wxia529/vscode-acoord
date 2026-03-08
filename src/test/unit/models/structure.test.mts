@@ -278,4 +278,262 @@ describe('Structure', () => {
       expect(json.metadata).to.have.lengthOf(2);
     });
   });
+
+  describe('periodicBondImages', () => {
+    it('calculateBonds() sets periodicBondImages for crystal structures', () => {
+      const structure = new Structure('periodic', true);
+      structure.unitCell = new UnitCell(3, 3, 3, 90, 90, 90);
+
+      const atom1 = new Atom('H', 0, 0, 0);
+      const atom2 = new Atom('H', 2.8, 0, 0);
+
+      structure.addAtom(atom1);
+      structure.addAtom(atom2);
+
+      structure.calculateBonds('all');
+      
+      expect(structure.bonds).to.have.lengthOf(1);
+      expect(structure.periodicBondImages.size).to.equal(1);
+      
+      const bondKey = Structure.bondKey(atom1.id, atom2.id);
+      const image = structure.periodicBondImages.get(bondKey);
+      expect(image).to.not.be.undefined;
+    });
+
+    it('getPeriodicBonds() uses stored images instead of recalculating', () => {
+      const structure = new Structure('periodic', true);
+      structure.unitCell = new UnitCell(3, 3, 3, 90, 90, 90);
+
+      const atom1 = new Atom('H', 0, 0, 0);
+      const atom2 = new Atom('H', 2.8, 0, 0);
+
+      structure.addAtom(atom1);
+      structure.addAtom(atom2);
+
+      structure.calculateBonds('all');
+      
+      const bondsBefore = structure.getPeriodicBonds();
+      const imageBefore = bondsBefore[0].image;
+      
+      atom2.x = 5.0;
+      
+      const bondsAfter = structure.getPeriodicBonds();
+      expect(bondsAfter[0].image).to.deep.equal(imageBefore);
+    });
+
+    it('stored images are preserved after atom movement', () => {
+      const structure = new Structure('periodic', true);
+      structure.unitCell = new UnitCell(3, 3, 3, 90, 90, 90);
+
+      const atom1 = new Atom('H', 0, 0, 0);
+      const atom2 = new Atom('H', 2.8, 0, 0);
+
+      structure.addAtom(atom1);
+      structure.addAtom(atom2);
+
+      structure.calculateBonds('all');
+      
+      const bondKey = Structure.bondKey(atom1.id, atom2.id);
+      const imageBefore = structure.periodicBondImages.get(bondKey);
+      
+      atom2.x = 5.0;
+      
+      const imageAfter = structure.periodicBondImages.get(bondKey);
+      expect(imageAfter).to.deep.equal(imageBefore);
+    });
+  });
+
+  describe('manual bond operations with periodicBondImages', () => {
+    it('addBond() calculates and stores image for periodic systems', () => {
+      const structure = new Structure('periodic', true);
+      structure.unitCell = new UnitCell(3, 3, 3, 90, 90, 90);
+
+      const atom1 = new Atom('H', 0, 0, 0);
+      const atom2 = new Atom('H', 2.8, 0, 0);
+
+      structure.addAtom(atom1);
+      structure.addAtom(atom2);
+
+      structure.addBond(atom1.id, atom2.id);
+      
+      expect(structure.bonds).to.have.lengthOf(1);
+      expect(structure.periodicBondImages.size).to.equal(1);
+      
+      const bondKey = Structure.bondKey(atom1.id, atom2.id);
+      expect(structure.periodicBondImages.has(bondKey)).to.be.true;
+    });
+
+    it('removeBond() removes from periodicBondImages', () => {
+      const structure = new Structure('periodic', true);
+      structure.unitCell = new UnitCell(3, 3, 3, 90, 90, 90);
+
+      const atom1 = new Atom('H', 0, 0, 0);
+      const atom2 = new Atom('H', 2.8, 0, 0);
+
+      structure.addAtom(atom1);
+      structure.addAtom(atom2);
+
+      structure.addBond(atom1.id, atom2.id);
+      
+      expect(structure.periodicBondImages.size).to.equal(1);
+      
+      structure.removeBond(atom1.id, atom2.id);
+      
+      expect(structure.bonds).to.have.lengthOf(0);
+      expect(structure.periodicBondImages.size).to.equal(0);
+    });
+
+    it('clearBonds() clears periodicBondImages', () => {
+      const structure = new Structure('periodic', true);
+      structure.unitCell = new UnitCell(3, 3, 3, 90, 90, 90);
+
+      const atom1 = new Atom('H', 0, 0, 0);
+      const atom2 = new Atom('H', 2.8, 0, 0);
+
+      structure.addAtom(atom1);
+      structure.addAtom(atom2);
+
+      structure.calculateBonds('all');
+      
+      expect(structure.periodicBondImages.size).to.be.greaterThan(0);
+      
+      structure.clearBonds();
+      
+      expect(structure.bonds).to.have.lengthOf(0);
+      expect(structure.periodicBondImages.size).to.equal(0);
+    });
+
+    it('removeAtom() removes related bond images', () => {
+      const structure = new Structure('periodic', true);
+      structure.unitCell = new UnitCell(3, 3, 3, 90, 90, 90);
+
+      const atom1 = new Atom('H', 0, 0, 0);
+      const atom2 = new Atom('H', 2.8, 0, 0);
+      const atom3 = new Atom('H', 1.4, 1.4, 0);
+
+      structure.addAtom(atom1);
+      structure.addAtom(atom2);
+      structure.addAtom(atom3);
+
+      structure.addBond(atom1.id, atom2.id);
+      structure.addBond(atom2.id, atom3.id);
+      
+      expect(structure.periodicBondImages.size).to.equal(2);
+      
+      structure.removeAtom(atom2.id);
+      
+      expect(structure.bonds).to.have.lengthOf(0);
+      expect(structure.periodicBondImages.size).to.equal(0);
+    });
+  });
+
+  describe('serialization with periodicBondImages', () => {
+    it('clone() copies periodicBondImages', () => {
+      const structure = new Structure('periodic', true);
+      structure.unitCell = new UnitCell(3, 3, 3, 90, 90, 90);
+
+      const atom1 = new Atom('H', 0, 0, 0);
+      const atom2 = new Atom('H', 2.8, 0, 0);
+
+      structure.addAtom(atom1);
+      structure.addAtom(atom2);
+
+      structure.calculateBonds('all');
+      
+      const cloned = structure.clone();
+      
+      expect(cloned.periodicBondImages.size).to.equal(structure.periodicBondImages.size);
+      
+      for (const [key, image] of structure.periodicBondImages) {
+        expect(cloned.periodicBondImages.get(key)).to.deep.equal(image);
+      }
+    });
+
+    it('toJSON/fromJSON preserves periodicBondImages', () => {
+      const structure = new Structure('periodic', true);
+      structure.unitCell = new UnitCell(3, 3, 3, 90, 90, 90);
+
+      const atom1 = new Atom('H', 0, 0, 0);
+      const atom2 = new Atom('H', 2.8, 0, 0);
+
+      structure.addAtom(atom1);
+      structure.addAtom(atom2);
+
+      structure.calculateBonds('all');
+      
+      const json = structure.toJSON();
+      const restored = Structure.fromJSON(json);
+      
+      expect(restored.periodicBondImages.size).to.equal(structure.periodicBondImages.size);
+      
+      for (const [key, image] of structure.periodicBondImages) {
+        expect(restored.periodicBondImages.get(key)).to.deep.equal(image);
+      }
+    });
+
+    it('fromJSON() handles old data without periodicBondImages', () => {
+      const structure = new Structure('periodic', true);
+      structure.unitCell = new UnitCell(3, 3, 3, 90, 90, 90);
+
+      const atom1 = new Atom('H', 0, 0, 0);
+      const atom2 = new Atom('H', 2.8, 0, 0);
+
+      structure.addAtom(atom1);
+      structure.addAtom(atom2);
+
+      structure.addBond(atom1.id, atom2.id);
+      
+      const json = structure.toJSON();
+      delete (json as Record<string, unknown>).periodicBondImages;
+      
+      const restored = Structure.fromJSON(json);
+      
+      expect(restored.bonds).to.have.lengthOf(1);
+      expect(restored.periodicBondImages.size).to.equal(0);
+      
+      const bonds = restored.getPeriodicBonds();
+      expect(bonds).to.have.lengthOf(1);
+      expect(bonds[0].image).to.not.be.undefined;
+    });
+  });
+
+  describe('edge cases with periodicBondImages', () => {
+    it('getPeriodicBonds() falls back to calculation when image not stored', () => {
+      const structure = new Structure('periodic', true);
+      structure.unitCell = new UnitCell(3, 3, 3, 90, 90, 90);
+
+      const atom1 = new Atom('H', 0, 0, 0);
+      const atom2 = new Atom('H', 2.8, 0, 0);
+
+      structure.addAtom(atom1);
+      structure.addAtom(atom2);
+
+      structure.bonds.push([atom1.id, atom2.id]);
+      
+      expect(structure.periodicBondImages.size).to.equal(0);
+      
+      const bonds = structure.getPeriodicBonds();
+      expect(bonds).to.have.lengthOf(1);
+      expect(bonds[0].image).to.not.be.undefined;
+      expect(bonds[0].distance).to.be.greaterThan(0);
+    });
+
+    it('works correctly for non-periodic structures', () => {
+      const structure = new Structure('molecule', false);
+
+      const atom1 = new Atom('H', 0, 0, 0);
+      const atom2 = new Atom('H', 0.8, 0, 0);
+
+      structure.addAtom(atom1);
+      structure.addAtom(atom2);
+
+      structure.addBond(atom1.id, atom2.id);
+      
+      expect(structure.periodicBondImages.size).to.equal(0);
+      
+      const bonds = structure.getBonds();
+      expect(bonds).to.have.lengthOf(1);
+      expect(bonds[0].distance).to.be.closeTo(0.8, 0.01);
+    });
+  });
 });
