@@ -121,6 +121,11 @@ export class MessageRouter {
     this.registerTyped('undo', () => {
       return false;
     });
+
+    this.registerTyped('updateDisplaySettings', (message) => {
+      this.displayConfigService.updateDisplaySettings(message.settings);
+      return true;
+    });
   }
 
   private registerSelectionCommands(): void {

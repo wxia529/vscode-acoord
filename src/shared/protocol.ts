@@ -408,6 +408,11 @@ export interface ApplyDisplaySettingsMessage {
   atomIds: string[];
 }
 
+export interface UpdateDisplaySettingsMessage {
+  command: 'updateDisplaySettings';
+  settings: WireDisplaySettings;
+}
+
 export interface UpdateAtomMessage {
   command: 'updateAtom';
   atomId: string;
@@ -544,6 +549,7 @@ export type WebviewToExtensionMessage =
   | SetAtomRadiusMessage
   | SetCovalentRadiusMessage
   | ApplyDisplaySettingsMessage
+  | UpdateDisplaySettingsMessage
   | UpdateAtomMessage
   | SetBondLengthMessage
   | CreateBondMessage
