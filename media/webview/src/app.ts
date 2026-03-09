@@ -12,6 +12,7 @@ import { initVscode as initInteractionConfigVscode, init as initInteractionConfi
 import { initSettingsUtil } from './settingsUtil';
 import type { Atom, Structure, VsCodeApi, AppCallbacks } from './types';
 import type { ExtensionToWebviewMessage, RenderMessage } from '../../../src/shared/protocol';
+import { showElementPickerDialog } from './components/elementPicker';
 
 // UI utilities
 import {
@@ -153,7 +154,16 @@ function setupUI(): void {
   if (toolbarAddAtom) {
     toolbarAddAtom.addEventListener('change', () => {
       const element = toolbarAddAtom.value;
-      if (element) {
+      if (element === 'more') {
+        showElementPickerDialog((selectedElement) => {
+          if (selectedElement) {
+            interactionStore.addingAtomElement = selectedElement;
+            canvas.style.cursor = 'crosshair';
+            setStatus(`Adding ${selectedElement} atoms - Click to place, Esc to cancel`);
+          }
+        });
+        toolbarAddAtom.value = '';
+      } else if (element) {
         interactionStore.addingAtomElement = element;
         canvas.style.cursor = 'crosshair';
         setStatus(`Adding ${element} atoms - Click to place, Esc to cancel`);

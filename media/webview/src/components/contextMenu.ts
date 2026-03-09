@@ -1,6 +1,7 @@
 import { selectionStore, interactionStore, structureStore } from '../state';
 import { renderer } from '../renderer';
 import { Vector3, Plane } from 'three';
+import { showElementPickerDialog } from './elementPicker';
 
 export interface ContextMenuHandler {
   label?: string;
@@ -21,10 +22,7 @@ let activeMenu: HTMLDivElement | null = null;
 let closeCallback: (() => void) | null = null;
 
 const COMMON_ELEMENTS = [
-  'C', 'H', 'O', 'N', 'S', 'P',
-  'Fe', 'Cu', 'Zn', 'Al', 'Mg', 'Na',
-  'Ca', 'Ti', 'Cr', 'Mn', 'Co', 'Ni',
-  'Ag', 'Au',
+  'C', 'H', 'O', 'N', 'S', 'P', 'F', 'Cl', 'Br',
 ];
 
 const MENU_STYLE = `
@@ -583,6 +581,18 @@ export function createAtomContextMenu(
     label: element,
     action: () => handlers.onChangeElement?.(atomIds, element),
   }));
+  
+  changeElementSubmenu.push({ divider: true });
+  changeElementSubmenu.push({
+    label: 'More elements...',
+    action: () => {
+      showElementPickerDialog((element) => {
+        if (element) {
+          handlers.onChangeElement?.(atomIds, element);
+        }
+      });
+    },
+  });
 
   return [
     {
@@ -668,6 +678,23 @@ export function createEmptySpaceContextMenu(
       }
     },
   }));
+  
+  addAtomSubmenu.push({ divider: true });
+  addAtomSubmenu.push({
+    label: 'More elements...',
+    action: () => {
+      showElementPickerDialog((element) => {
+        if (element) {
+          if (clickPosition) {
+            handlers.onAddAtom?.(element, clickPosition.x, clickPosition.y, clickPosition.z);
+          } else {
+            interactionStore.addingAtomElement = element;
+            handlers.onSetStatus?.(`Adding ${element} atoms - Click to place, Esc to cancel`);
+          }
+        }
+      });
+    },
+  });
 
   return [
     {
