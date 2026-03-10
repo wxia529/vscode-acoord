@@ -2,219 +2,242 @@
 
 All notable changes to this project will be documented in this file.
 
-## 0.3.2
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-### Bug Fixes
+## [0.3.2] - 2026
 
-- **XYZ File Atom Count**: Fixed atom count not updating when saving XYZ files after adding or removing atoms.
-- **QE Input File Format Preservation**: Fixed multiple issues where saving QE input files would lose format-specific content:
-  - Fixed `parseTrajectory()` not preserving raw content, causing all custom namelist parameters to be lost on save
-  - Fixed pseudopotential filenames being replaced with default values
-  - Fixed regex pattern in ATOMIC_SPECIES block that incorrectly matched QE keywords (CELL_PARAMETERS, ATOMIC_POSITIONS, K_POINTS) as element symbols, causing coordinate data loss
-  - Fixed `ntyp` not updating to reflect actual number of element types in structure
+### Fixed
 
+- XYZ file atom count not updating when saving after adding or removing atoms
+- QE input file format preservation issues:
+  - `parseTrajectory()` not preserving raw content, causing custom namelist parameters to be lost on save
+  - Pseudopotential filenames being replaced with default values
+  - Regex pattern in ATOMIC_SPECIES block incorrectly matching QE keywords (CELL_PARAMETERS, ATOMIC_POSITIONS, K_POINTS) as element symbols, causing coordinate data loss
+  - `ntyp` not updating to reflect actual number of element types in structure
 
-## 0.3.1
+## [0.3.1]
 
-### New Features
+### Added
 
-- **Periodic Table Element Picker**: Interactive periodic table UI for element selection with hover tooltips showing element details. Accessible from context menu when changing atom elements.
-- **Read-Only Format Support**: Added read-only mode for specific file formats to preserve original content while allowing visualization.
+- Periodic table element picker: interactive UI for element selection with hover tooltips showing element details (accessible from context menu)
+- Read-only format support for specific file formats to preserve original content while allowing visualization
 
-### Bug Fixes
+### Fixed
 
-- **Bond Size Persistence**: Fixed bond size settings not persisting across sessions.
-- **Atom Drag Optimization**: Improved atom dragging behavior for smoother interaction.
-- **View Rendering**: Fixed view-related rendering issues.
-- **DOM Cleanup**: Resolved DOM event handling issues.
+- Bond size settings not persisting across sessions
+- Atom dragging behavior for smoother interaction
+- View-related rendering issues
+- DOM event handling issues
 
-## 0.3.0
+## [0.3.0]
 
-This release includes significant architectural improvements and new features.
+### Added
 
-#### New Configuration System
+- Right-click context menu in 3D canvas with atom operations, bond operations, and element selection submenus
+- ACoord native format (`.acoord`): JSON-based format preserving all atom properties including user-specified colors and radii
+- Enhanced axis indicator showing X/Y/Z orientation with real-time camera view updates
+- Brush panel for applying color schemes to selected atoms
+- Enhanced atom size and style controls with improved UI and real-time preview
+- Interactive rotation tool for selected atoms with axis selection and angle control
 
-- **Simplified Config Architecture**: Removed complex ConfigManager, ConfigStorage, and ConfigValidator classes. Configuration is now managed directly in services for better maintainability.
-- **Bond Schemes**: Added `bondSchemes.ts` with predefined bond color schemes for consistent bond coloring.
-- **Streamlined Display Configuration**: DisplayConfigService simplified with direct preset management.
+### Changed
 
-#### New Features
+- Simplified configuration architecture: removed ConfigManager, ConfigStorage, and ConfigValidator; configuration now managed directly in services
+- Streamlined DisplayConfigService with direct preset management
 
-- **Right-Click Context Menu**: Interactive context menu in 3D canvas with atom operations, bond operations, and element selection. Supports submenus for element changes and common operations.
-- **ACoord Native Format**: New `.acoord` JSON-based file format that preserves all atom properties including user-specified colors and radii. Allows exact round-trip preservation of visual customizations.
-- **Enhanced Axis Indicator**: Improved 3D axis indicator showing X/Y/Z orientation in the canvas corner with real-time updates based on camera view.
-- **Brush Panel**: New brush panel for applying color schemes to selected atoms. Apply color schemes to atom subsets for quick visualization.
-- **Atom Size & Style Controls**: Enhanced atom size and style controls with better UI and real-time preview.
-- **Rotation Tool**: Interactive rotation tool for selected atoms with axis selection and angle control.
+### Internal
 
-## 0.2.2
+- Added `bondSchemes.ts` with predefined bond color schemes
 
-### New features
+## [0.2.2]
 
-- **Clipboard Copy/Paste**: Full clipboard support for atomic structures via `Ctrl+C` / `Ctrl+V` shortcuts. The `ClipboardService` enables cross-session copy/paste operations with configurable offset (default 0.5Å in each direction).
-- **Enhanced Keyboard Shortcuts**: Added `Ctrl+C` (copy selection), `Ctrl+V` (paste), `Ctrl+Y` (redo), and `A` (focus add atom form) to the existing keyboard shortcut set.
-- **Format Preservation on Save**: When editing GJF, XYZ, ORCA, QE, and ABACUS STRU files, ACoord now preserves original format-specific content and only updates coordinate data. This ensures user configurations are not lost during editing:
+### Added
 
-### Bug Fixes
+- Clipboard copy/paste: `Ctrl+C` (copy selection), `Ctrl+V` (paste) with configurable offset (default 0.5Å)
+- Keyboard shortcuts: `Ctrl+Y` (redo), `A` (focus add atom form)
+- Format preservation on save for GJF, XYZ, ORCA, QE, and ABACUS STRU files (only coordinate data updated, original content preserved)
 
-- **Periodic Bond Detection for Out-of-Cell Atoms**: Fixed asymmetric bond detection where atoms with fractional coordinates outside `[0, 1)` would incorrectly form bonds. The algorithm now properly filters atoms by fractional position before building spatial hashes for periodic images, preventing ghost bonds and ensuring symmetric bond detection regardless of atom placement direction.
-- **Multi-Atom Drag Plane Calculation**: Fixed drag plane normal calculation when dragging multiple atoms simultaneously, ensuring movement stays in the correct view plane.
-- **Camera Control During Drag**: Fixed issue where camera controls remained disabled after cancelled drag operations.
-- **Element Change Color Update**: Fixed bug where changing an atom's element did not immediately update its color to the new element's default. The `changeAtoms` method now clears the atom's custom color when the element changes.
-- **UI Cleanup**: Removed duplicate "Change Element" panel; element changes are now performed exclusively via the "Selected Atom" panel for a cleaner interface.
-- **ColorSchem**: Add ColorScheme
+### Fixed
 
-## 0.2.1
+- Periodic bond detection for atoms with fractional coordinates outside `[0, 1)`: algorithm now properly filters atoms by fractional position before building spatial hashes
+- Multi-atom drag plane normal calculation
+- Camera controls remaining disabled after cancelled drag operations
+- Atom color not updating immediately when element changes
+- Duplicate "Change Element" panel removed; element changes now performed exclusively via "Selected Atom" panel
 
-### Bug Fixes
+### Internal
 
-- **Periodic Boundary Condition Bond Detection**: Fixed cross-boundary bond generation to prevent duplicate bonds when atoms are outside the unit cell. The algorithm now checks if the origin atom is inside the unit cell before generating bonds to periodic images, ensuring correct bonding visualization for supercell structures.
+- Added ColorScheme support
 
-## 0.2.0
+## [0.2.1]
 
-### Major Architecture Refactoring
+### Fixed
 
-This release includes a complete architectural overhaul for improved maintainability, type safety, and testability. The changes span 32 commits since v0.1.11.
+- Periodic boundary condition bond detection: cross-boundary bond generation now checks if origin atom is inside unit cell to prevent duplicate bonds
 
-#### Two-Process Architecture
+## [0.2.0]
 
-- **Separated Extension Host and Webview**: Implemented a strict two-process architecture with the extension host running in Node.js and the webview in a sandboxed browser environment.
-- **Protocol-First Design**: All messages between processes are defined in `src/shared/protocol.ts` with full TypeScript typing; no `any` types on message boundaries.
-- **Service Isolation**: Extracted domain logic into dedicated services:
-  - `AtomEditService` - atom manipulation (add, delete, move, copy, recolor)
-  - `BondService` - bond creation, deletion, and recalculation
-  - `SelectionService` - atom and bond selection state management
-  - `UnitCellService` - unit cell CRUD, supercell, and centering operations
-  - `DocumentService` - save, save-as, reload, and image export
-  - `DisplayConfigService` - display settings lifecycle
-- **Centralized Message Routing**: `MessageRouter` is the single dispatch point for all 37 webview-to-extension commands with typed handlers.
+### Added
 
-#### Configuration System
+- Two-process architecture: extension host (Node.js) and webview (sandboxed browser) with strict separation
+- Protocol-first design: all IPC messages defined in `src/shared/protocol.ts` with full TypeScript typing
+- Dedicated services: `AtomEditService`, `BondService`, `SelectionService`, `UnitCellService`, `DocumentService`, `DisplayConfigService`
+- Centralized message routing via `MessageRouter` for all webview-to-extension commands
+- Configuration system with ConfigManager, ConfigStorage, and ConfigValidator
+- Display settings presets (default, white) with import/export support
+- JSON schema validation for user configurations with versioned migrations
+- Unit test framework (Mocha) with `.mts` test files
+- Parser round-trip tests for 11 file formats (XYZ, CIF, POSCAR, XDATCAR, OUTCAR, QE, PDB, GJF, ORCA, STRU)
 
-- **User Configuration Management**: Full configuration system with ConfigManager, ConfigStorage, and ConfigValidator.
-- **Display Settings Presets**: Built-in immutable presets (default, white) plus user-created custom configs.
-- **Import/Export**: Support for importing and exporting display configuration files.
-- **Schema Validation**: JSON schema validation for all user-created configurations.
-- **Versioned Migrations**: Automatic schema upgrades when stored config versions are outdated.
+### Changed
 
-#### Webview Modernization
+- Webview rewritten from JavaScript to TypeScript with strict type checking
+- Modular webview architecture: `app.ts`, `renderer.ts`, `state.ts`, `interaction.ts`, and panel-specific modules
+- Message dispatch uses `_exhaustive: never` pattern for compile-time completeness
 
-- **JavaScript to TypeScript Migration**: Complete rewrite of webview code from JS to TS with strict type checking.
-- **Modular Architecture**: Split monolithic app.js into focused modules:
-  - `app.ts` - bootstrap and message dispatch
-  - `renderer.ts` - Three.js scene management
-  - `state.ts` - reactive stores for UI state
-  - `interaction.ts` - mouse/keyboard/pointer event handling
-  - `appEdit.ts`, `appLattice.ts`, `appView.ts`, `appTools.ts`, `appTrajectory.ts` - UI panels
-- **Resource Management**: Proper disposal of all event listeners, `requestAnimationFrame` IDs, Three.js geometries, materials, and textures.
-- **Instanced Rendering**: Optimized rendering using `THREE.InstancedMesh` for atoms and bonds.
+### Fixed
 
-#### Type Safety & Code Quality
+- Proper disposal of event listeners, `requestAnimationFrame` IDs, Three.js geometries, materials, and textures
 
-- **Strict TypeScript**: Enabled strict mode with `noImplicitAny`, `strictNullChecks`, `noUnusedLocals`, `noUnusedParameters`.
-- **Exhaustive Pattern Matching**: Message dispatch uses `_exhaustive: never` pattern to catch missing cases at compile time.
-- **Protocol Types**: All wire-format types (WireAtom, WireBond, WireDisplaySettings, etc.) are centrally defined.
+### Internal
 
-#### Testing Infrastructure
+- Optimized rendering using `THREE.InstancedMesh` for atoms and bonds
+- Spatial hash-based bond detection for O(n) amortized performance
+- Debounced trajectory slider and display settings controls
+- Local preview updates during atom dragging
 
-- **Unit Test Framework**: Added Mocha-based unit test framework using `.mts` (ES Module TypeScript) files.
-- **Parser Tests**: Round-trip tests for all 11 supported file formats (XYZ, CIF, POSCAR, XDATCAR, OUTCAR, QE, PDB, GJF, ORCA, STRU).
-- **Service Tests**: Unit tests for AtomEditService, BondService, SelectionService, MessageRouter, and UndoManager.
-- **Model Tests**: Unit tests for Structure and UnitCell models.
-- **Test Fixtures**: Added representative test files for each supported format.
+## [0.1.11]
 
-### Performance Improvements
+### Added
 
-- **Drag Preview Optimization**: Local preview updates during atom dragging without round-tripping to the extension host.
-- **Debounced Controls**: Trajectory slider and display settings sliders are debounced to avoid flooding the extension host.
-- **Optimized Bond Detection**: Spatial hash-based bond detection for O(n) amortized performance.
-- **Display Settings Optimization**: Improved performance of display settings updates.
+- Keyboard shortcuts: Delete/Backspace (delete selected), Ctrl/Cmd+Z (undo), Ctrl/Cmd+S (save), Ctrl/Cmd+Shift+S (save as)
+- Canvas-based light direction picking for Key/Fill/Rim lights
+- Light color controls for ambient/key/fill/rim lights
+- Surface shininess control for atom/bond material gloss
+- Inline numeric edit for slider values (double-click value label, press Enter to apply)
 
-### Bug Fixes
+### Changed
 
-## 0.1.11
+- Key Light default direction to (0, 0, 10)
+- Lighting defaults: Ambient Intensity to 0.4, Key Light Intensity to 0.7
+- Default Key Light color to #CCCCCC
 
-- Added keyboard shortcuts in the structure editor: Delete/Backspace (delete selected atom(s)), Ctrl/Cmd+Z (undo), Ctrl/Cmd+S (save), Ctrl/Cmd+Shift+S (save as).
-- Added canvas-based light direction picking for Key/Fill/Rim lights via "Pick in Canvas".
-- Fixed lighting defaults/updates to preserve zero values for X/Y/Z and intensity controls.
-- Changed Key Light default direction to (0, 0, 10).
-- Updated lighting defaults: Ambient Intensity = 0.4 and Key Light Intensity = 0.7.
-- Added light color controls for ambient/key/fill/rim lights.
-- Updated default Key Light color to #CCCCCC.
-- Added surface shininess control for atom/bond material gloss.
-- Added inline numeric edit for slider values (double-click value label, press Enter to apply).
+### Fixed
 
-## 0.1.10
+- Lighting defaults/updates not preserving zero values for X/Y/Z and intensity controls
 
-- Added a toggle switch for axis display.
-- Add atomic radius display settings
-- Bug fixes.
+## [0.1.10]
 
-## 0.1.9
+### Added
 
-- Fixed XDATCAR trajectory parsing for files that use `Direct configuration=     N` frame markers.
+- Axis display toggle switch
+- Atomic radius display settings
 
-## 0.1.8
+## [0.1.9]
 
-- Added HD PNG export from the 3D view.
-- Added Quantum ESPRESSO input/output parsing and IO support (`.in/.pwi/.out/.pwo/.log`), including trajectory extraction from QE output.
-- Added trajectory IO for XYZ/EXTXYZ, with support for reading, displaying, and exporting trajectory data.
-- Added trajectory playback with adjustable speed, defaulting newly opened trajectories to the last frame.
-- Improved playback stability by disposing WebGL resources during re-render and reducing frame-request buildup.
-- Improved sidebar tab usability with adaptive multi-row tab layout when width is limited.
-- Added unit-cell display controls for lattice thickness and solid/dashed line style.
-- Improved POSCAR read/write compatibility (VASP 4/5 style headers, scaling factors, selective dynamics handling).
-- Added XDATCAR trajectory read/write support.
-- Added OUTCAR trajectory read support.
+### Fixed
 
-## 0.1.7
+- XDATCAR trajectory parsing for files with `Direct configuration=     N` frame markers
 
-- Reorganized the sidebar into 4 tabs (Edit, Lattice, Display, Tools) to reduce scrolling.
-- Moved Atom Color to the top of the Display tab and restored Copy/Delete actions to the top toolbar.
-- Added bond thickness control in Display Scale panel with real-time rendering updates.
-- Refined Atom size slider precision (step 0.05) and updated value display to 2 decimal places.
-- Reduced Atom size slider maximum from 20 to 3 for tighter visual scaling control.
-- Refined CIF io.
+## [0.1.8]
 
-## 0.1.6
+### Added
 
-- Added atom color editing for selected atoms, with bond segment colors synchronized to atom colors.
-- Added bond editing workflow: select bond in canvas, create bond from selected atoms, and delete selected bond.
-- Added one-click `Recalculate All Bonds` action to rebuild auto bonds from current atom positions.
-- Added click-empty-space behavior to clear current atom/bond selection.
-- Added atom color preview in the Atom Color panel based on current selection.
-- Added copy selected atoms action in toolbar (duplicate with offset).
-- Added display settings panel for background color and unit-cell color.
-- Added full lighting controls (ambient/key/fill/rim) and reset lighting action.
-- Added toolbar actions to open source text and reload structure from disk.
+- HD PNG export from 3D view
+- Quantum ESPRESSO input/output parsing and IO support (`.in/.pwi/.out/.pwo/.log`) with trajectory extraction
+- Trajectory IO for XYZ/EXTXYZ (read, display, export)
+- Trajectory playback with adjustable speed (newly opened trajectories default to last frame)
+- Adaptive multi-row tab layout for sidebar when width is limited
+- Unit-cell display controls for lattice thickness and solid/dashed line style
+- XDATCAR trajectory read/write support
+- OUTCAR trajectory read support
 
-## 0.1.5
+### Changed
 
-- Updated ABACUS STRU export to use ONCV pseudopotentials and include NUMERICAL_ORBITAL defaults.
+- Improved POSCAR read/write compatibility (VASP 4/5 style headers, scaling factors, selective dynamics)
+- Improved playback stability by disposing WebGL resources during re-render
 
-## 0.1.4
+## [0.1.7]
 
-- Refined multi-select dragging to keep movement in the view plane.
-- Added box selection for atoms (Shift-drag to select in screen space).
-- Added a bottom status bar showing render status and selected atom coordinates.
+### Added
 
-## 0.1.3
+- Bond thickness control in Display Scale panel with real-time rendering updates
 
-- Added lattice editing panel with apply/remove and center-to-cell actions.
-- Added orthographic projection option with view controls.
-- Added supercell display and periodic bond rendering.
-- Improved export naming defaults and CIF export validation.
+### Changed
 
-## 0.1.2
+- Sidebar reorganized into 4 tabs (Edit, Lattice, Display, Tools)
+- Atom Color moved to top of Display tab; Copy/Delete actions restored to top toolbar
+- Atom size slider precision refined (step 0.05, 2 decimal places display)
+- Atom size slider maximum reduced from 20 to 3
 
-- Bug fixes.
+### Fixed
 
-## 0.1.1
+- CIF I/O handling
 
-- Added undo support for rotation.
-- Enabled 0-360 degree rotation.
-- Improved rotation preview rendering performance.
+## [0.1.6]
 
-## 0.1.0
+### Added
 
-- Initial release.
+- Atom color editing for selected atoms (bond colors synchronized)
+- Bond editing workflow: select bond in canvas, create bond from selected atoms, delete selected bond
+- `Recalculate All Bonds` action to rebuild auto bonds from current positions
+- Click-empty-space behavior to clear current atom/bond selection
+- Atom color preview in Atom Color panel based on current selection
+- Copy selected atoms action in toolbar (duplicate with offset)
+- Display settings panel for background color and unit-cell color
+- Full lighting controls (ambient/key/fill/rim) with reset action
+- Toolbar actions to open source text and reload structure from disk
+
+## [0.1.5]
+
+### Changed
+
+- ABACUS STRU export to use ONCV pseudopotentials and include NUMERICAL_ORBITAL defaults
+
+## [0.1.4]
+
+### Added
+
+- Box selection for atoms (Shift-drag to select in screen space)
+- Bottom status bar showing render status and selected atom coordinates
+
+### Changed
+
+- Multi-select dragging to keep movement in the view plane
+
+## [0.1.3]
+
+### Added
+
+- Lattice editing panel with apply/remove and center-to-cell actions
+- Orthographic projection option with view controls
+- Supercell display and periodic bond rendering
+
+### Changed
+
+- Export naming defaults
+- CIF export validation
+
+## [0.1.2]
+
+### Fixed
+
+- Various bug fixes
+
+## [0.1.1]
+
+### Added
+
+- Undo support for rotation
+- 0-360 degree rotation support
+
+### Changed
+
+- Improved rotation preview rendering performance
+
+## [0.1.0]
+
+### Added
+
+- Initial release

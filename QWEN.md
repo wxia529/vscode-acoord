@@ -1,4 +1,4 @@
-# AGENTS.md — ACoord (VS Code Extension)
+# QWEN.md — ACoord (VS Code Extension)
 
 ## Project Overview
 
