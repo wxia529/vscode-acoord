@@ -1,7 +1,7 @@
 # ACoord Developer Guide
 
-**Version:** 0.3.0  
-**Last Updated:** 2026-03-08  
+**Version:** 0.3.2
+**Last Updated:** 2026-03-10
 **License:** GPL-3.0-only
 
 This document is the authoritative reference for ACoord development. It
