@@ -3,7 +3,7 @@
   "displayName": "ACoord",
   "description": "Atomic Coordinate Toolkit",
   "publisher": "wxia529",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "license": "GPL-3.0-only",
   "type": "module",
   "icon": "media/acoord-icon.png",

@@ -50,13 +50,20 @@ export class QEParser extends StructureParser {
 
   parseTrajectory(content: string): Structure[] {
     const lines = content.split(/\r?\n/);
+    let frames: Structure[];
     if (this.looksLikeQeOutput(lines)) {
-      return this.parseOutputTrajectory(lines);
+      frames = this.parseOutputTrajectory(lines);
+    } else if (this.looksLikeQeInput(lines)) {
+      frames = [this.parseInput(lines)];
+    } else {
+      frames = this.parseOutputTrajectory(lines);
     }
-    if (this.looksLikeQeInput(lines)) {
-      return [this.parseInput(lines)];
+    
+    for (const frame of frames) {
+      frame.metadata.set('qeRawContent', content);
     }
-    return this.parseOutputTrajectory(lines);
+    
+    return frames;
   }
 
   serialize(structure: Structure): string {
@@ -154,6 +161,8 @@ export class QEParser extends StructureParser {
       ? structure.unitCell.getLatticeVectors()
       : null;
     const hasFixedFlags = structure.atoms.some((atom) => atom.fixed);
+    
+    const originalSpeciesLines = this.extractSpeciesLines(lines);
 
     let i = 0;
     while (i < lines.length) {
@@ -193,21 +202,29 @@ export class QEParser extends StructureParser {
         resultLines.push(line);
         i++;
 
-        // Skip old species lines
+        // Skip old species lines (element symbol followed by mass number)
         while (i < lines.length) {
           const checkLine = this.cleanLine(lines[i]);
           if (!checkLine) break;
-          if (/^[A-Z][a-z]?/i.test(checkLine) || this.looksLikeNamelist(checkLine)) {
+          if (/^[A-Z][a-z]?\s+[\d.]/i.test(checkLine) || this.looksLikeNamelist(checkLine)) {
             i++;
           } else {
             break;
           }
         }
 
-        // Write new species
+        // Write species with preserved pseudo filenames
         for (const symbol of speciesOrder) {
-          const mass = ELEMENT_DATA[symbol]?.atomicMass ?? 1;
-          resultLines.push(`${symbol}  ${mass.toFixed(6)}  ${symbol}.UPF`);
+          const originalLine = originalSpeciesLines.get(symbol);
+          if (originalLine) {
+            const mass = ELEMENT_DATA[symbol]?.atomicMass ?? 1;
+            const parts = originalLine.trim().split(/\s+/);
+            const pseudoFile = parts.length >= 3 ? parts.slice(2).join(' ') : `${symbol}.UPF`;
+            resultLines.push(`${symbol}  ${mass.toFixed(6)}  ${pseudoFile}`);
+          } else {
+            const mass = ELEMENT_DATA[symbol]?.atomicMass ?? 1;
+            resultLines.push(`${symbol}  ${mass.toFixed(6)}  ${symbol}.UPF`);
+          }
         }
         continue;
       }
@@ -245,6 +262,14 @@ export class QEParser extends StructureParser {
       if (/^\s*nat\s*=/i.test(trimmed)) {
         const indent = trimmed.match(/^(\s*)/)?.[1] ?? '';
         resultLines.push(`${indent}nat = ${structure.atoms.length}`);
+        i++;
+        continue;
+      }
+
+      // Update ntyp in SYSTEM block
+      if (/^\s*ntyp\s*=/i.test(trimmed)) {
+        const indent = trimmed.match(/^(\s*)/)?.[1] ?? '';
+        resultLines.push(`${indent}ntyp = ${speciesOrder.length}`);
         i++;
         continue;
       }
@@ -862,6 +887,30 @@ export class QEParser extends StructureParser {
       }
     }
     return blockLines.length > 0 ? blockLines : null;
+  }
+
+  private extractSpeciesLines(lines: string[]): Map<string, string> {
+    const speciesMap = new Map<string, string>();
+    let startIndex = -1;
+    for (let i = 0; i < lines.length; i++) {
+      if (/^ATOMIC_SPECIES\b/i.test(lines[i].trim())) {
+        startIndex = i;
+        break;
+      }
+    }
+    if (startIndex < 0) return speciesMap;
+
+    for (let i = startIndex + 1; i < lines.length; i++) {
+      const trimmed = lines[i].trim();
+      if (!trimmed) break;
+      const match = trimmed.match(/^([A-Z][a-z]?)\s+/i);
+      if (match) {
+        speciesMap.set(match[1], lines[i]);
+      } else {
+        break;
+      }
+    }
+    return speciesMap;
   }
 
   private extractSpeciesBlock(lines: string[]): string[] | null {

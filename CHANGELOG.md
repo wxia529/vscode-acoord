@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## 0.3.2
+
+### Bug Fixes
+
+- **QE Input File Format Preservation**: Fixed multiple issues where saving QE input files would lose format-specific content:
+  - Fixed `parseTrajectory()` not preserving raw content, causing all custom namelist parameters to be lost on save
+  - Fixed pseudopotential filenames being replaced with default values
+  - Fixed regex pattern in ATOMIC_SPECIES block that incorrectly matched QE keywords (CELL_PARAMETERS, ATOMIC_POSITIONS, K_POINTS) as element symbols, causing coordinate data loss
+  - Fixed `ntyp` not updating to reflect actual number of element types in structure
+
+
 ## 0.3.1
 
 ### New Features
