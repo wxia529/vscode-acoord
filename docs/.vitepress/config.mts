@@ -4,6 +4,7 @@ import { defineConfig } from 'vitepress';
 export default defineConfig({
   title: 'ACoord',
   description: 'Atomic Coordinate Toolkit for VS Code',
+  base: '/vscode-acoord/',
 
   head: [
     ['link', { rel: 'icon', href: '/favicon.ico' }],

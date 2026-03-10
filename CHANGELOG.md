@@ -5,7 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.3.2] - 2026
+## [0.3.3]
+
+### Changed
+
+- File name recognition for POSCAR, CONTCAR, XDATCAR, OUTCAR, and STRU files now uses substring matching instead of exact match. Files containing these keywords (e.g., `POSCAR_001`, `STRU_relaxed`, `backup_CONTCAR`) are now automatically recognized and opened with ACoord
+
+### Fixed
+
+- Image export default directory now uses the document's location instead of home directory
+
+## [0.3.2]
 
 ### Fixed
 

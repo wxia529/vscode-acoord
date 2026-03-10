@@ -366,7 +366,7 @@ export class MessageRouter {
         message.dataUrl,
         message.suggestedName ?? '',
         (msg) => this.webviewPanel.webview.postMessage(msg),
-        () => this.webviewPanel.title
+        this.documentUri
       );
       return true;
     });

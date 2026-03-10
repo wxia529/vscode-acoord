@@ -189,17 +189,17 @@ export class FileManager {
     }
     const baseName = filePath.split(/[/\\]/).pop() || '';
     const upper = baseName.toUpperCase();
-    if (upper === 'POSCAR' || upper === 'CONTCAR') {
-      return 'poscar';
+    if (upper.includes('STRU')) {
+      return 'stru';
     }
-    if (upper === 'XDATCAR') {
-      return 'xdatcar';
-    }
-    if (upper === 'OUTCAR') {
+    if (upper.includes('OUTCAR')) {
       return 'outcar';
     }
-    if (upper === 'STRU') {
-      return 'stru';
+    if (upper.includes('XDATCAR')) {
+      return 'xdatcar';
+    }
+    if (upper.includes('POSCAR') || upper.includes('CONTCAR')) {
+      return 'poscar';
     }
     return '';
   }

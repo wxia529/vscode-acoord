@@ -3,7 +3,7 @@
   "displayName": "ACoord",
   "description": "Atomic Coordinate Toolkit",
   "publisher": "wxia529",
-  "version": "0.3.2",
+  "version": "0.3.3",
   "license": "GPL-3.0-only",
   "type": "module",
   "icon": "media/acoord-icon.png",
@@ -61,7 +61,19 @@
             "filenamePattern": "*.vasp"
           },
           {
-            "filenamePattern": "*POSCAR"
+            "filenamePattern": "*POSCAR*"
+          },
+          {
+            "filenamePattern": "*CONTCAR*"
+          },
+          {
+            "filenamePattern": "*XDATCAR*"
+          },
+          {
+            "filenamePattern": "*OUTCAR*"
+          },
+          {
+            "filenamePattern": "*STRU*"
           },
           {
             "filenamePattern": "*CONTCAR"
@@ -115,7 +127,7 @@
       "editor/title": [
         {
           "command": "acoord.openStructureEditor",
-          "when": "resourceExtname =~ /\\.(cif|xyz|poscar|vasp|xdatcar|outcar|pdb|gjf|com|inp|in|pwi|out|pwo|log|stru)$/i || resourceFilename =~ /^(POSCAR|CONTCAR|XDATCAR|OUTCAR|STRU)$/i || editorLangId == gaussian",
+          "when": "resourceExtname =~ /\\.(cif|xyz|poscar|vasp|xdatcar|outcar|pdb|gjf|com|inp|in|pwi|out|pwo|log|stru)$/i || resourceFilename =~ /STRU|OUTCAR|XDATCAR|POSCAR|CONTCAR/i || editorLangId == gaussian",
           "group": "navigation"
         }
       ]

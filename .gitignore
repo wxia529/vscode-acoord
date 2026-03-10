@@ -5,3 +5,7 @@ out/
 bug.md
 code-report.md
 
+# VitePress
+docs/.vitepress/dist/
+docs/.vitepress/cache/
+

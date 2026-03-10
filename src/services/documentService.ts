@@ -95,7 +95,7 @@ export class DocumentService {
     dataUrl: string,
     suggestedName: string,
     postMessage: (msg: unknown) => void,
-    getTitle: () => string
+    documentPath: string
   ): Promise<void> {
     const imageMatch = dataUrl.match(/^data:image\/png;base64,(.+)$/);
     if (!imageMatch || !imageMatch[1]) {
@@ -113,7 +113,7 @@ export class DocumentService {
 
     const saveUri = await vscode.window.showSaveDialog({
       saveLabel: 'Save HD Image',
-      defaultUri: vscode.Uri.joinPath(vscode.Uri.file(path.dirname(getTitle())), fileName),
+      defaultUri: vscode.Uri.joinPath(vscode.Uri.file(path.dirname(documentPath)), fileName),
       filters: {
         'PNG Image': ['png'],
       },
