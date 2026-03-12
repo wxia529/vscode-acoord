@@ -3,7 +3,7 @@
   "displayName": "ACoord",
   "description": "Atomic Coordinate Toolkit",
   "publisher": "wxia529",
-  "version": "0.3.5",
+  "version": "0.3.6",
   "license": "MIT",
   "type": "module",
   "icon": "media/acoord-icon.png",
@@ -32,7 +32,7 @@
     "url": "https://github.com/wxia529/vscode-acoord"
   },
   "engines": {
-    "vscode": "^1.109.0"
+    "vscode": "^1.90.0"
   },
   "main": "./out/extension.js",
   "activationEvents": [
@@ -247,7 +247,7 @@
     "@types/mocha": "^10.0.10",
     "@types/node": "22.x",
     "@types/three": "^0.183.1",
-    "@types/vscode": "^1.109.0",
+    "@types/vscode": "^1.90.0",
     "@vscode/test-cli": "^0.0.12",
     "@vscode/test-electron": "^2.5.2",
     "chai": "^5.1.2",
