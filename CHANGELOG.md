@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.7]
+
+### Fixed
+
+- File extension detection for paths containing dots (e.g., `OUT.cell-relax/STRU_ION10_D`). Previously, `split('.')` incorrectly extracted `cell-relax/STRU_ION10_D` as the extension, now correctly identifies it as ABACUS STRU format
+
 ## [0.3.6]
 
 ### Changed

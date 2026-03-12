@@ -187,12 +187,9 @@ export class FileManager {
    * Get file extension
    */
   private static getFileExtension(filePath: string): string {
-    const parts = filePath.split('.');
-    if (parts.length > 1) {
-      return parts[parts.length - 1];
-    }
     const baseName = filePath.split(/[/\\]/).pop() || '';
     const upper = baseName.toUpperCase();
+    
     if (upper.includes('STRU')) {
       return 'stru';
     }
@@ -204,6 +201,11 @@ export class FileManager {
     }
     if (upper.includes('POSCAR') || upper.includes('CONTCAR')) {
       return 'poscar';
+    }
+    
+    const dotIndex = baseName.lastIndexOf('.');
+    if (dotIndex > 0 && dotIndex < baseName.length - 1) {
+      return baseName.slice(dotIndex + 1).toLowerCase();
     }
     return '';
   }
