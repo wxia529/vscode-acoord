@@ -188,6 +188,12 @@ export class FileManager {
    */
   private static getFileExtension(filePath: string): string {
     const baseName = filePath.split(/[/\\]/).pop() || '';
+    const dotIndex = baseName.lastIndexOf('.');
+    
+    if (dotIndex > 0 && dotIndex < baseName.length - 1) {
+      return baseName.slice(dotIndex + 1).toLowerCase();
+    }
+    
     const upper = baseName.toUpperCase();
     
     if (upper.includes('STRU')) {
@@ -203,10 +209,6 @@ export class FileManager {
       return 'poscar';
     }
     
-    const dotIndex = baseName.lastIndexOf('.');
-    if (dotIndex > 0 && dotIndex < baseName.length - 1) {
-      return baseName.slice(dotIndex + 1).toLowerCase();
-    }
     return '';
   }
 }
