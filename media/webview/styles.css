@@ -1,21 +1,23 @@
 :root {
   /* VS Code theme variables as primary source */
-  --acoord-bg: var(--vscode-editor-background, #0f1114);
-  --acoord-bg-2: var(--vscode-sideBar-background, #171a1f);
-  --acoord-panel: var(--vscode-panel-background, #1c2026);
-  --acoord-panel-2: var(--vscode-editor-inactiveSelectionBackground, #21262d);
-  --acoord-border: var(--vscode-panel-border, #2d333b);
-  --acoord-text: var(--vscode-foreground, #e6edf3);
-  --acoord-muted: var(--vscode-descriptionForeground, #9da7b3);
+  --acoord-bg: var(--vscode-editor-background, #1e1e1e);
+  --acoord-bg-2: var(--vscode-sideBar-background, #252526);
+  --acoord-panel: var(--vscode-panel-background, #252526);
+  --acoord-panel-2: var(--vscode-editor-inactiveSelectionBackground, #37373d);
+  --acoord-border: var(--vscode-panel-border, #3c3c3c);
+  --acoord-text: var(--vscode-foreground, #cccccc);
+  --acoord-muted: var(--vscode-descriptionForeground, #858585);
+
+  /* VS Code brand colors */
+  --vscode-brand: #0078d4;
+  --vscode-brand-hover: #1c8ae6;
+  --vscode-brand-light: rgba(0, 120, 212, 0.2);
 
   /* VS Code input/button colors */
-  --vscode-input-bg: var(--vscode-input-background, #11161c);
-  --vscode-input-fg: var(--vscode-input-foreground, #e6edf3);
-  --vscode-input-border: var(--vscode-input-border, rgba(255, 255, 255, 0.08));
-  --vscode-button-bg: var(--vscode-button-background, #1b2026);
-  --vscode-button-fg: var(--vscode-button-foreground, #e6edf3);
-  --vscode-button-hover: var(--vscode-button-hoverBackground, rgba(52, 211, 153, 0.25));
-  --vscode-focus-border: var(--vscode-focusBorder, rgba(52, 211, 153, 0.5));
+  --vscode-input-bg: var(--vscode-input-background, #3c3c3c);
+  --vscode-input-fg: var(--vscode-input-foreground, #cccccc);
+  --vscode-input-border: var(--vscode-input-border, #3c3c3c);
+  --vscode-focus-border: var(--vscode-focusBorder, #0078d4);
 }
 
 * {
@@ -25,11 +27,8 @@
 }
 
 body {
-  font-family: "Palatino Linotype", "Book Antiqua", Palatino, serif;
-  background:
-    radial-gradient(1200px 600px at 10% 0%, rgba(52, 211, 153, 0.08), transparent 60%),
-    radial-gradient(900px 500px at 90% 10%, rgba(245, 158, 11, 0.08), transparent 60%),
-    var(--acoord-bg);
+  font-family: var(--vscode-font-family, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif);
+  background: var(--acoord-bg);
   color: var(--acoord-text);
   height: 100vh;
   display: flex;
@@ -37,15 +36,12 @@ body {
 }
 
 #toolbar {
-  background:
-    linear-gradient(135deg, rgba(52, 211, 153, 0.18), rgba(245, 158, 11, 0.12)),
-    var(--acoord-panel);
+  background: var(--acoord-panel);
   padding: 6px 12px;
   display: flex;
   align-items: center;
   gap: 8px;
   border-bottom: 1px solid var(--acoord-border);
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.35);
 }
 
 .toolbar-group {
@@ -71,7 +67,7 @@ body {
 
 .toolbar-group select:focus {
   outline: none;
-  border-color: rgba(52, 211, 153, 0.5);
+  border-color: var(--vscode-focusBorder, #0078d4);
 }
 
 .toolbar-separator {
@@ -89,41 +85,41 @@ body {
 }
 
 button {
-  background: var(--vscode-button-secondaryBackground,
-    linear-gradient(135deg, rgba(52, 211, 153, 0.25), rgba(52, 211, 153, 0.05)),
-    #1b2026);
+  background: var(--vscode-button-secondaryBackground, #3c3c3c);
   color: var(--vscode-button-secondaryForeground, var(--acoord-text));
-  border: 1px solid var(--vscode-button-border, rgba(52, 211, 153, 0.35));
-  padding: 6px 12px;
-  border-radius: 999px;
+  border: 1px solid transparent;
+  padding: 4px 12px;
+  border-radius: 2px;
   cursor: pointer;
   font-size: 12px;
-  letter-spacing: 0.02em;
-  transition: transform 0.15s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+  transition: background 0.15s ease;
 }
 
 button:hover {
-  transform: translateY(-1px);
-  background: var(--vscode-button-secondaryHoverBackground,
-    linear-gradient(135deg, rgba(245, 158, 11, 0.25), rgba(245, 158, 11, 0.1)));
-  border-color: var(--vscode-focusBorder, rgba(245, 158, 11, 0.6));
-  box-shadow: 0 6px 18px rgba(245, 158, 11, 0.2);
+  background: var(--vscode-button-secondaryHoverBackground, #505050);
 }
 
 /* VS Code Webview UI Toolkit button styles */
 vscode-button {
-  --border-radius: 999px;
+  --border-radius: 2px;
   --foreground: var(--acoord-text);
   font-size: 12px;
-  letter-spacing: 0.02em;
 }
 
 vscode-button[appearance="primary"] {
-  --background: linear-gradient(135deg, rgba(52, 211, 153, 0.3), rgba(52, 211, 153, 0.1));
+  --background: var(--vscode-brand, #0078d4);
+}
+
+vscode-button[appearance="primary"]:hover {
+  --background: var(--vscode-brand-hover, #1c8ae6);
 }
 
 vscode-button[appearance="secondary"] {
-  --background: linear-gradient(135deg, rgba(52, 211, 153, 0.18), rgba(52, 211, 153, 0.05));
+  --background: var(--vscode-button-secondaryBackground, #3c3c3c);
+}
+
+vscode-button[appearance="secondary"]:hover {
+  --background: var(--vscode-button-secondaryHoverBackground, #505050);
 }
 
 vscode-button[appearance="icon"] {
@@ -132,8 +128,8 @@ vscode-button[appearance="icon"] {
   padding: 4px 8px;
 }
 
-vscode-button:hover {
-  --background: linear-gradient(135deg, rgba(245, 158, 11, 0.3), rgba(245, 158, 11, 0.1));
+vscode-button[appearance="icon"]:hover {
+  --background: var(--vscode-toolbar-hoverBackground, rgba(255, 255, 255, 0.1));
 }
 
 /* VS Code Webview UI Toolkit dropdown styles */
@@ -162,37 +158,29 @@ vscode-checkbox::part(control) {
 }
 
 .axis-button {
-  background: var(--vscode-button-secondaryBackground, #11161c);
+  background: var(--vscode-button-secondaryBackground, #3c3c3c);
   color: var(--vscode-button-secondaryForeground, var(--acoord-text));
-  border: 1px solid var(--vscode-button-border, rgba(52, 211, 153, 0.35));
+  border: 1px solid transparent;
   padding: 4px 10px;
-  border-radius: 999px;
+  border-radius: 2px;
   cursor: pointer;
   font-size: 11px;
   min-width: 28px;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  transition: background 0.15s ease;
 }
 
 .axis-button:hover {
-  background: var(--vscode-button-secondaryHoverBackground, #1b2026);
-  border-color: var(--vscode-focusBorder, rgba(245, 158, 11, 0.6));
-  box-shadow: 0 4px 12px rgba(245, 158, 11, 0.2);
+  background: var(--vscode-button-secondaryHoverBackground, #505050);
 }
 
 .axis-button.selected {
-  border-color: var(--vscode-focusBorder, rgba(245, 158, 11, 0.8));
-  box-shadow: 0 6px 18px rgba(245, 158, 11, 0.35);
-  background:
-    linear-gradient(135deg, rgba(245, 158, 11, 0.35), rgba(245, 158, 11, 0.1)),
-    var(--vscode-button-secondaryBackground, #1b2026);
+  background: var(--vscode-brand-light, rgba(0, 120, 212, 0.2));
+  border-color: var(--vscode-brand, #0078d4);
 }
 
 .toggle-button.selected {
-  border-color: rgba(245, 158, 11, 0.8);
-  box-shadow: 0 6px 18px rgba(245, 158, 11, 0.35);
-  background:
-    linear-gradient(135deg, rgba(245, 158, 11, 0.35), rgba(245, 158, 11, 0.1)),
-    #1b2026;
+  border-color: var(--vscode-brand, #0078d4);
+  background: var(--vscode-brand-light, rgba(0, 120, 212, 0.2));
 }
 
 #container {
@@ -215,27 +203,25 @@ vscode-checkbox::part(control) {
 .tool-btn {
   width: 32px;
   height: 32px;
-  border: 1px solid var(--vscode-toolbar-border, rgba(255, 255, 255, 0.1));
-  background: var(--vscode-toolbar-hoverBackground, var(--acoord-bg-2));
+  border: 1px solid transparent;
+  background: transparent;
   color: var(--vscode-foreground, var(--acoord-muted));
   cursor: pointer;
   font-weight: bold;
   font-size: 12px;
-  border-radius: 6px;
-  transition: all 0.15s ease;
+  border-radius: 4px;
+  transition: background 0.15s ease;
 }
 
 .tool-btn:hover {
-  background: var(--vscode-toolbar-activeBackground, var(--acoord-panel-2));
+  background: var(--vscode-toolbar-hoverBackground, rgba(255, 255, 255, 0.1));
   color: var(--vscode-foreground, var(--acoord-text));
-  border-color: var(--vscode-focusBorder, rgba(52, 211, 153, 0.4));
 }
 
 .tool-btn.active {
-  background: linear-gradient(135deg, rgba(52, 211, 153, 0.3), rgba(52, 211, 153, 0.1));
+  background: var(--vscode-brand-light, rgba(0, 120, 212, 0.2));
   color: var(--vscode-foreground, var(--acoord-text));
-  border-color: var(--vscode-focusBorder, rgba(52, 211, 153, 0.7));
-  box-shadow: 0 2px 8px rgba(52, 211, 153, 0.25);
+  border-color: var(--vscode-brand, #0078d4);
 }
 
 .toolbar-spacer-vertical {
@@ -258,7 +244,7 @@ vscode-checkbox::part(control) {
 .brush-scheme-name {
   text-align: center;
   font-size: 10px;
-  color: rgba(52, 211, 153, 0.9);
+  color: var(--vscode-textLink-foreground, #3794ff);
   font-weight: 600;
   padding: 4px 0;
   cursor: pointer;
@@ -269,7 +255,7 @@ vscode-checkbox::part(control) {
 }
 
 .brush-scheme-name:hover {
-  border-color: rgba(52, 211, 153, 0.6);
+  border-color: var(--vscode-focusBorder, #0078d4);
 }
 
 .brush-scheme-name::after {
@@ -310,7 +296,7 @@ vscode-checkbox::part(control) {
 }
 
 .brush-scheme-dropdown-item.active {
-  color: rgba(52, 211, 153, 0.9);
+  color: var(--vscode-textLink-foreground, #3794ff);
   font-weight: 600;
 }
 
@@ -336,15 +322,13 @@ vscode-checkbox::part(control) {
   border-radius: 4px;
   text-align: center;
   line-height: 1.2;
-  background: var(--vscode-button-secondaryBackground, var(--acoord-bg-2));
+  background: var(--vscode-button-secondaryBackground, #3c3c3c);
   color: var(--vscode-button-secondaryForeground, var(--acoord-text));
-  border: 1px solid var(--vscode-button-border, rgba(255, 255, 255, 0.1));
+  border: 1px solid transparent;
 }
 
 .brush-btn:hover {
-  transform: none;
-  border-color: var(--vscode-focusBorder, rgba(52, 211, 153, 0.6));
-  background: var(--vscode-button-secondaryHoverBackground, var(--acoord-panel-2));
+  background: var(--vscode-button-secondaryHoverBackground, #505050);
 }
 
 .brush-btn:disabled {
@@ -371,7 +355,7 @@ vscode-checkbox::part(control) {
 }
 
 #toolbar-color-picker:hover {
-  border-color: rgba(52, 211, 153, 0.6);
+  border-color: var(--vscode-focusBorder, #0078d4);
 }
 
 #canvas-wrap {
@@ -385,17 +369,14 @@ vscode-checkbox::part(control) {
   height: 100%;
   display: block;
   flex: 1;
-  background:
-    radial-gradient(800px 500px at 20% 20%, rgba(255, 255, 255, 0.06), transparent 60%),
-    radial-gradient(600px 400px at 80% 30%, rgba(52, 211, 153, 0.08), transparent 60%),
-    linear-gradient(160deg, #12151a 0%, #1f242b 60%, #101217 100%);
+  background: var(--acoord-bg);
   outline: 1px solid rgba(255, 255, 255, 0.04);
 }
 
 #selection-box {
   position: absolute;
-  border: 1px dashed rgba(246, 213, 92, 0.9);
-  background: rgba(246, 213, 92, 0.15);
+  border: 1px dashed var(--vscode-focusBorder, #0078d4);
+  background: var(--vscode-brand-light, rgba(0, 120, 212, 0.15));
   pointer-events: none;
   display: none;
   z-index: 2;
@@ -477,13 +458,13 @@ vscode-checkbox::part(control) {
   align-items: center;
   padding: 10px 12px;
   cursor: pointer;
-  background: linear-gradient(135deg, rgba(52, 211, 153, 0.08), rgba(245, 158, 11, 0.05));
-  transition: background 0.2s ease;
+  background: var(--acoord-panel);
+  transition: background 0.15s ease;
   user-select: none;
 }
 
 .panel-header:hover {
-  background: linear-gradient(135deg, rgba(52, 211, 153, 0.15), rgba(245, 158, 11, 0.1));
+  background: var(--vscode-list-hoverBackground, rgba(255, 255, 255, 0.05));
 }
 
 .panel-header .panel-title {
@@ -524,7 +505,7 @@ vscode-checkbox::part(control) {
   font-size: 10px;
   text-transform: uppercase;
   letter-spacing: 0.1em;
-  color: var(--vscode-textLink-foreground, rgba(246, 213, 92, 0.85));
+  color: var(--vscode-textLink-foreground, #3794ff);
   margin-bottom: 8px;
 }
 
@@ -562,7 +543,7 @@ vscode-checkbox::part(control) {
 }
 
 #status-mode {
-  color: rgba(52, 211, 153, 0.9);
+  color: var(--vscode-textLink-foreground, #3794ff);
   font-weight: 600;
 }
 
@@ -626,25 +607,25 @@ vscode-checkbox::part(control) {
   padding: 0 4px;
   font-size: 11px;
   color: var(--vscode-input-foreground, var(--acoord-text));
-  background: var(--vscode-input-background, #0e1116);
-  border: 1px solid var(--vscode-focusBorder, rgba(245, 158, 11, 0.6));
+  background: var(--vscode-input-background, #3c3c3c);
+  border: 1px solid var(--vscode-focusBorder, #0078d4);
   border-radius: 4px;
 }
 
 .input-group input[type="text"],
 .input-group input[type="number"] {
   padding: 6px 8px;
-  background-color: var(--vscode-input-background, #0e1116);
+  background-color: var(--vscode-input-background, #3c3c3c);
   color: var(--vscode-input-foreground, var(--acoord-text));
-  border: 1px solid var(--vscode-input-border, rgba(255, 255, 255, 0.08));
-  border-radius: 8px;
+  border: 1px solid var(--vscode-input-border, #3c3c3c);
+  border-radius: 4px;
   font-size: 12px;
 }
 
 .input-group input[type="text"]:focus,
 .input-group input[type="number"]:focus {
   outline: none;
-  border-color: var(--vscode-focusBorder, rgba(52, 211, 153, 0.5));
+  border-color: var(--vscode-focusBorder, #0078d4);
 }
 
 .input-group select {
@@ -690,14 +671,14 @@ vscode-checkbox::part(control) {
 }
 
 .atom-item.selected {
-  background-color: rgba(52, 211, 153, 0.18);
+  background-color: var(--vscode-list-activeSelectionBackground, rgba(0, 120, 212, 0.2));
   color: var(--acoord-text);
-  border-color: rgba(52, 211, 153, 0.6);
+  border-color: var(--vscode-focusBorder, #0078d4);
 }
 
 .atom-item.size-override {
-  border-color: rgba(245, 158, 11, 0.6);
-  box-shadow: inset 0 0 0 1px rgba(245, 158, 11, 0.25);
+  border-color: var(--vscode-textLink-foreground, #3794ff);
+  box-shadow: inset 0 0 0 1px rgba(55, 148, 255, 0.25);
 }
 
 #info {
@@ -721,7 +702,7 @@ vscode-checkbox::part(control) {
 .light-sub-title {
   font-size: 10px;
   font-weight: 600;
-  color: var(--vscode-textLink-foreground, rgba(246, 213, 92, 0.9));
+  color: var(--vscode-textLink-foreground, #3794ff);
   margin-bottom: 6px;
   text-transform: uppercase;
   letter-spacing: 0.08em;
@@ -729,15 +710,12 @@ vscode-checkbox::part(control) {
 
 .light-pick-button {
   width: 100%;
-  border-radius: 8px;
+  border-radius: 4px;
 }
 
 .light-pick-button.active {
-  border-color: var(--vscode-focusBorder, rgba(245, 158, 11, 0.8));
-  box-shadow: 0 6px 18px rgba(245, 158, 11, 0.35);
-  background:
-    linear-gradient(135deg, rgba(245, 158, 11, 0.35), rgba(245, 158, 11, 0.1)),
-    var(--vscode-button-secondaryBackground, #1b2026);
+  border-color: var(--vscode-focusBorder, #0078d4);
+  background: var(--vscode-brand-light, rgba(0, 120, 212, 0.2));
 }
 
 .light-pick-hint {
@@ -767,8 +745,8 @@ vscode-checkbox::part(control) {
 }
 
 .atom-size-element-row.size-override {
-  border-color: rgba(245, 158, 11, 0.6);
-  background: rgba(245, 158, 11, 0.12);
+  border-color: var(--vscode-textLink-foreground, #3794ff);
+  background: var(--vscode-brand-light, rgba(0, 120, 212, 0.1));
 }
 
 .atom-size-element-header {
@@ -791,7 +769,7 @@ input[type="range"] {
   appearance: none;
   width: 100%;
   height: 6px;
-  background: rgba(255, 255, 255, 0.1);
+  background: var(--vscode-scrollbarSlider-background, rgba(255, 255, 255, 0.1));
   border-radius: 3px;
   outline: none;
   cursor: pointer;
@@ -802,31 +780,27 @@ input[type="range"]::-webkit-slider-thumb {
   appearance: none;
   width: 14px;
   height: 14px;
-  background: linear-gradient(135deg, rgba(52, 211, 153, 0.8), rgba(52, 211, 153, 0.5));
+  background: var(--vscode-brand, #0078d4);
   border-radius: 50%;
   cursor: pointer;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+  border: 1px solid transparent;
 }
 
 input[type="range"]::-webkit-slider-thumb:hover {
-  background: linear-gradient(135deg, rgba(245, 158, 11, 0.9), rgba(245, 158, 11, 0.6));
-  box-shadow: 0 2px 8px rgba(245, 158, 11, 0.4);
+  background: var(--vscode-brand-hover, #1c8ae6);
 }
 
 input[type="range"]::-moz-range-thumb {
   width: 14px;
   height: 14px;
-  background: linear-gradient(135deg, rgba(52, 211, 153, 0.8), rgba(52, 211, 153, 0.5));
+  background: var(--vscode-brand, #0078d4);
   border-radius: 50%;
   cursor: pointer;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+  border: 1px solid transparent;
 }
 
 input[type="range"]::-moz-range-thumb:hover {
-  background: linear-gradient(135deg, rgba(245, 158, 11, 0.9), rgba(245, 158, 11, 0.6));
-  box-shadow: 0 2px 8px rgba(245, 158, 11, 0.4);
+  background: var(--vscode-brand-hover, #1c8ae6);
 }
 
 input[type="color"] {
@@ -875,14 +849,13 @@ input[type="color"]::-moz-color-swatch {
   align-items: center;
   justify-content: center;
   line-height: 1;
-  background: var(--vscode-button-secondaryBackground, #1b2026);
+  background: var(--vscode-button-secondaryBackground, #3c3c3c);
   color: var(--vscode-button-secondaryForeground, var(--acoord-text));
-  border: 1px solid var(--vscode-button-border, rgba(52, 211, 153, 0.35));
+  border: 1px solid transparent;
 }
 
 .rot-btn:hover {
-  background: var(--vscode-button-secondaryHoverBackground, var(--acoord-panel-2));
-  border-color: var(--vscode-focusBorder, rgba(245, 158, 11, 0.6));
+  background: var(--vscode-button-secondaryHoverBackground, #505050);
 }
 
 .rot-center,

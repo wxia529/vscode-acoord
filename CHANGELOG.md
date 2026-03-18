@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.9]
+
+### Changed
+
+- Migrated webview UI to `@vscode/webview-ui-toolkit` for native VS Code look and feel
+- Redesigned color scheme from custom green/yellow to VS Code native blue (#0078d4)
+- All UI components now use VS Code theme variables for automatic light/dark theme adaptation
+- Simplified button and panel styling: removed gradients, unified border radius to 2-4px
+- Replaced custom fonts with VS Code system font stack
+
 ## [0.3.8]
 
 ### Added
