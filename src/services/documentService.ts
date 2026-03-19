@@ -35,7 +35,7 @@ export class DocumentService {
       { id: 'gjf', label: 'Gaussian input (.gjf)' },
       { id: 'inp', label: 'ORCA input (.inp)' },
       { id: 'in', label: 'QE input (.in)' },
-      { id: 'stru', label: 'ABACUS STRU (.stru)' },
+      { id: 'stru', label: 'ABACUS STRU' },
       { id: 'fdf', label: 'SIESTA fdf (.fdf)' },
     ];
 
@@ -66,14 +66,15 @@ export class DocumentService {
     }
 
     const defaultFileName = StructureDocumentManager.defaultSaveAsFileName(key, selectedFormat);
-    const isPoscarFormat = ['poscar', 'vasp'].includes(selectedFormat.toLowerCase());
+    const noExtensionFormats = ['poscar', 'vasp', 'stru'];
+    const isNoExtensionFormat = noExtensionFormats.includes(selectedFormat.toLowerCase());
 
     const saveOptions: vscode.SaveDialogOptions = {
       saveLabel: 'Save Structure As',
       defaultUri: vscode.Uri.joinPath(vscode.Uri.file(path.dirname(key)), defaultFileName),
     };
 
-    if (!isPoscarFormat) {
+    if (!isNoExtensionFormat) {
       saveOptions.filters = {
         'Structure Files': [selectedFormat],
       };
@@ -90,7 +91,7 @@ export class DocumentService {
       const actualFormat = FileManager.resolveFormat(selectedFormat, 'xyz');
       const fileExt = path.extname(uri.fsPath).slice(1).toLowerCase();
 
-      if (fileExt && fileExt !== actualFormat && !(isPoscarFormat && fileExt === 'vasp')) {
+      if (fileExt && fileExt !== actualFormat && !(isNoExtensionFormat && fileExt === 'vasp')) {
         vscode.window.showInformationMessage(
           `Saved as ${actualFormat.toUpperCase()} format to ${path.basename(uri.fsPath)}`
         );

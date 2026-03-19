@@ -132,8 +132,9 @@ export class StructureDocumentManager {
   /** Return the default file name (without directory) for "Save As". */
   static defaultSaveAsFileName(sourceFsPath: string, format: string): string {
     const baseName = path.basename(sourceFsPath, path.extname(sourceFsPath));
-    const isPoscarFormat = ['poscar', 'vasp'].includes(format.toLowerCase());
-    return isPoscarFormat
+    const noExtensionFormats = ['poscar', 'vasp', 'stru'];
+    const isNoExtensionFormat = noExtensionFormats.includes(format.toLowerCase());
+    return isNoExtensionFormat
       ? baseName || 'structure'
       : `${baseName || 'structure'}.${format}`;
   }

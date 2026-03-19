@@ -53,6 +53,7 @@ export class AtomEditService {
   /**
    * Add a new atom with color/radius from current DisplaySettings.
    * Uses the "current brush" concept - applies active color scheme and radius scale.
+   * If the structure has selective dynamics enabled, new atoms default to [T, T, T].
    */
   addAtom(element: string, x: number, y: number, z: number): boolean {
     const parsedElement = parseElement(element);
@@ -64,12 +65,16 @@ export class AtomEditService {
       this.trajectoryManager.beginEdit();
     }
     const editStructure = this.trajectoryManager.activeStructure;
-    
+
     const { color, radius } = this.computeAtomProperties(parsedElement);
-    
+
+    // Check if structure has selective dynamics enabled
+    const hasSelectiveDynamics = editStructure.atoms.some(a => a.selectiveDynamics !== undefined);
+
     const atom = new Atom(parsedElement, x, y, z, undefined, {
       color,
       radius,
+      selectiveDynamics: hasSelectiveDynamics ? [true, true, true] : undefined,
     });
     this.undoManager.push(editStructure);
     editStructure.addAtom(atom);

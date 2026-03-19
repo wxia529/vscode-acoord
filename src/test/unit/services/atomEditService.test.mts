@@ -52,6 +52,25 @@ describe('AtomEditService', () => {
       const added = tm.activeStructure.atoms[tm.activeStructure.atoms.length - 1];
       expect(added.element).to.equal('Fe');
     });
+
+    it('should set selectiveDynamics to [T, T, T] when structure has selective dynamics', () => {
+      const s = new Structure('test');
+      const atomWithSD = new Atom('C', 0, 0, 0);
+      atomWithSD.selectiveDynamics = [true, false, true];
+      s.addAtom(atomWithSD);
+      const { svc, tm } = makeServices(s);
+      svc.addAtom('H', 1, 0, 0);
+      const added = tm.activeStructure.atoms[tm.activeStructure.atoms.length - 1];
+      expect(added.selectiveDynamics).to.deep.equal([true, true, true]);
+    });
+
+    it('should not set selectiveDynamics when structure has no selective dynamics', () => {
+      const s = makeStructure(); // no atoms have selectiveDynamics
+      const { svc, tm } = makeServices(s);
+      svc.addAtom('H', 1, 0, 0);
+      const added = tm.activeStructure.atoms[tm.activeStructure.atoms.length - 1];
+      expect(added.selectiveDynamics).to.be.undefined;
+    });
   });
 
   describe('deleteAtom', () => {
