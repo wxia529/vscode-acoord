@@ -414,6 +414,10 @@ function setupInteraction(): void {
       vscode.postMessage({ command: 'setAtomRadius', atomIds, radius });
     },
 
+    onSetAtomFixed: (atomIds: string[], fixed: boolean) => {
+      vscode.postMessage({ command: 'setAtomFixed', atomIds, fixed });
+    },
+
     onChangeElement: (atomIds: string[], element: string) => {
       vscode.postMessage({ command: 'changeAtoms', atomIds, element });
     },

@@ -209,6 +209,7 @@ export interface ContextMenuHandlers {
   onPaste?: () => void;
   onSetAtomColor?: (atomIds: string[], color: string) => void;
   onSetAtomRadius?: (atomIds: string[], radius: number) => void;
+  onSetAtomFixed?: (atomIds: string[], fixed: boolean) => void;
   onCreateBond?: (atomIds: string[]) => void;
   onSetBondLength?: (bondKeys: string[], length: number) => void;
   onCalculateBonds?: () => void;
@@ -628,6 +629,15 @@ export function createAtomContextMenu(
           handlers.onSetAtomRadius?.(atomIds, radius);
         });
       },
+    },
+    { divider: true },
+    {
+      label: 'Fix atom' + (atomIds.length > 1 ? 's' : ''),
+      action: () => handlers.onSetAtomFixed?.(atomIds, true),
+    },
+    {
+      label: 'Unfix atom' + (atomIds.length > 1 ? 's' : ''),
+      action: () => handlers.onSetAtomFixed?.(atomIds, false),
     },
   ];
 }

@@ -91,6 +91,10 @@ interface RendererState {
   /** Instanced meshes that visually render bonds (one per radius group). */
   bondInstancedMeshes: THREE.InstancedMesh[];
   unitCellGroup: THREE.Group | null;
+  /** Group containing fixed atom marker meshes (wireframe octahedrons). */
+  fixedAtomMarkerGroup: THREE.Group | null;
+  /** Maps atom id to its fixed atom marker mesh for position updates during drag. */
+  fixedAtomMeshes: Map<string, THREE.Object3D>;
   raycaster: THREE.Raycaster | null;
   mouse: THREE.Vector2 | null;
   dragPlane: THREE.Plane | null;
@@ -127,6 +131,8 @@ const rendererState: RendererState = {
   bondLines: [],
   bondInstancedMeshes: [],
   unitCellGroup: null,
+  fixedAtomMarkerGroup: null,
+  fixedAtomMeshes: new Map(),
   raycaster: null,
   mouse: null,
   dragPlane: null,
@@ -889,6 +895,53 @@ function renderStructure(data: Structure, uiHooks?: Partial<UiHooks>, options?: 
     }
   }
 
+  // Fixed atom markers: 3D cross markers visible on atom surface
+  // Clear existing markers
+  if (rendererState.fixedAtomMarkerGroup) {
+    rendererState.scene!.remove(rendererState.fixedAtomMarkerGroup);
+    disposeObject3D(rendererState.fixedAtomMarkerGroup);
+  }
+  rendererState.fixedAtomMarkerGroup = new THREE.Group();
+  rendererState.fixedAtomMeshes.clear();
+
+  // Add markers for fixed atoms (only for selectable atoms)
+  const fixedAtoms = renderAtoms ? renderAtoms.filter(atom => atom.fixed && atom.selectable !== false) : [];
+  for (const atom of fixedAtoms) {
+    const configuredRadius = getConfiguredAtomRadius(atom);
+    const sphereRadius = Math.max(configuredRadius * sizeScale, 0.12);
+
+    // Create 3D cross: three lines extending in ±X, ±Y, ±Z
+    // Lines go from center to 1.3x radius, so tips extend beyond sphere surface
+    const crossLength = sphereRadius * 1.3;
+    const crossGeometry = new THREE.BufferGeometry();
+    const positions = new Float32Array([
+      // X-axis line: -crossLength to +crossLength
+      -crossLength, 0, 0, crossLength, 0, 0,
+      // Y-axis line
+      0, -crossLength, 0, 0, crossLength, 0,
+      // Z-axis line
+      0, 0, -crossLength, 0, 0, crossLength,
+    ]);
+    crossGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+
+    const crossMaterial = new THREE.LineBasicMaterial({
+      color: 0xffffff,
+    });
+
+    const cross = new THREE.LineSegments(crossGeometry, crossMaterial);
+    cross.position.set(
+      atom.position[0] * scale,
+      atom.position[1] * scale,
+      atom.position[2] * scale
+    );
+
+    rendererState.fixedAtomMarkerGroup.add(cross);
+    rendererState.fixedAtomMeshes.set(atom.id, cross);
+  }
+  if (rendererState.fixedAtomMarkerGroup.children.length > 0) {
+    rendererState.scene!.add(rendererState.fixedAtomMarkerGroup);
+  }
+
   if (uiHooks) {
     if (uiHooks.updateCounts) {
       uiHooks.updateCounts(data.atoms.length, data.bonds ? data.bonds.length : 0);
@@ -1222,6 +1275,12 @@ function updateAtomPosition(atomId: string, position: THREE.Vector3): void {
     }
   }
 
+  // Update fixed atom marker position
+  const fixedMarker = rendererState.fixedAtomMeshes.get(atomId);
+  if (fixedMarker) {
+    fixedMarker.position.copy(position);
+  }
+
   markDirty();
 }
 
@@ -1339,6 +1398,13 @@ function dispose(): void {
     disposeObject3D(rendererState.unitCellGroup);
     rendererState.unitCellGroup = null;
   }
+
+  if (rendererState.fixedAtomMarkerGroup) {
+    rendererState.scene?.remove(rendererState.fixedAtomMarkerGroup);
+    disposeObject3D(rendererState.fixedAtomMarkerGroup);
+    rendererState.fixedAtomMarkerGroup = null;
+  }
+  rendererState.fixedAtomMeshes.clear();
 
   axisIndicator.dispose();
 

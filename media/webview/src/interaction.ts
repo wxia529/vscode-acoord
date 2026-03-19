@@ -56,6 +56,7 @@ export interface InteractionHandlers {
   onExportImage?: () => void;
   onSetAtomColor?: (atomIds: string[], color: string) => void;
   onSetAtomRadius?: (atomIds: string[], radius: number) => void;
+  onSetAtomFixed?: (atomIds: string[], fixed: boolean) => void;
   onChangeElement?: (atomIds: string[], element: string) => void;
   onCreateBond?: (atomIds: string[]) => void;
   onSetBondLength?: (bondKeys: string[], length: number) => void;
@@ -610,6 +611,7 @@ export function init(canvas: HTMLCanvasElement, handlers: InteractionHandlers): 
           onPaste: handlers.onPaste,
           onSetAtomColor: handlers.onSetAtomColor,
           onSetAtomRadius: handlers.onSetAtomRadius,
+          onSetAtomFixed: handlers.onSetAtomFixed,
           onCreateBond: handlers.onCreateBond,
           onSetBondLength: handlers.onSetBondLength,
           onCalculateBonds: handlers.onCalculateBonds,
@@ -864,6 +866,7 @@ export function init(canvas: HTMLCanvasElement, handlers: InteractionHandlers): 
     onPaste: handlers.onPaste,
     onSetAtomColor: handlers.onSetAtomColor,
     onSetAtomRadius: handlers.onSetAtomRadius,
+    onSetAtomFixed: handlers.onSetAtomFixed,
     onCreateBond: handlers.onCreateBond,
     onSetBondLength: handlers.onSetBondLength,
     onCalculateBonds: handlers.onCalculateBonds,

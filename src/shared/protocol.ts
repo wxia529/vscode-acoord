@@ -23,6 +23,7 @@ export interface WireAtom {
   radius: number;
   selected?: boolean;
   selectable?: boolean;
+  fixed?: boolean;
 }
 
 /**
@@ -398,6 +399,12 @@ export interface SetAtomRadiusMessage {
   radius: number;
 }
 
+export interface SetAtomFixedMessage {
+  command: 'setAtomFixed';
+  atomIds: string[];
+  fixed: boolean;
+}
+
 export interface SetCovalentRadiusMessage {
   command: 'setCovalentRadius';
   atomIds: string[];
@@ -547,6 +554,7 @@ export type WebviewToExtensionMessage =
   | ChangeAtomsMessage
   | SetAtomColorMessage
   | SetAtomRadiusMessage
+  | SetAtomFixedMessage
   | SetCovalentRadiusMessage
   | ApplyDisplaySettingsMessage
   | UpdateDisplaySettingsMessage

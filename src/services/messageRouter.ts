@@ -236,6 +236,11 @@ export class MessageRouter {
       return true;
     });
 
+    this.registerTyped('setAtomFixed', (message) => {
+      this.atomEditService.setAtomFixed(message.atomIds, message.fixed);
+      return true;
+    });
+
     this.registerTyped('setCovalentRadius', (message) => {
       this.atomEditService.setCovalentRadius(message.atomIds);
       return true;

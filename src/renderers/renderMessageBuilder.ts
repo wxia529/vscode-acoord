@@ -191,6 +191,7 @@ export class RenderMessageBuilder {
         radius: atom.radius,
         color: atom.color,
         selected: atom.selected,
+        fixed: atom.fixed,
       };
     });
   }

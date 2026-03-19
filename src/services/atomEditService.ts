@@ -320,12 +320,36 @@ export class AtomEditService {
       this.trajectoryManager.beginEdit();
     }
     const editStructure = this.trajectoryManager.activeStructure;
-    
+
     this.undoManager.push(editStructure);
     for (const id of atomIds) {
       const atom = editStructure.getAtom(id);
       if (atom) {
         atom.radius = radius;
+      }
+    }
+    this.renderer.setStructure(editStructure);
+    this.trajectoryManager.commitEdit();
+    return true;
+  }
+
+  setAtomFixed(atomIds: string[], fixed: boolean): boolean {
+    if (atomIds.length === 0) {
+      return false;
+    }
+
+    if (!this.trajectoryManager.isEditing) {
+      this.trajectoryManager.beginEdit();
+    }
+    const editStructure = this.trajectoryManager.activeStructure;
+
+    this.undoManager.push(editStructure);
+    for (const id of atomIds) {
+      const atom = editStructure.getAtom(id);
+      if (atom) {
+        atom.fixed = fixed;
+        // Sync selectiveDynamics: fixed = [F, F, F], unfixed = [T, T, T]
+        atom.selectiveDynamics = fixed ? [false, false, false] : [true, true, true];
       }
     }
     this.renderer.setStructure(editStructure);
