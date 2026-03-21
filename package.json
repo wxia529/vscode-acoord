@@ -244,7 +244,7 @@
   },
   "dependencies": {
     "@vscode/webview-ui-toolkit": "^1.4.0",
-    "acoord-3d": "file:../acoord-3d",
+    "acoord-3d": "^0.1.0",
     "three": "^0.183.2"
   },
   "devDependencies": {
