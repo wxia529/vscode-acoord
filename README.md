@@ -1,142 +1,290 @@
 # ACoord
 
-**Version:** 0.3.10
-**License:** MIT
+**Version:** 0.3.10  
+**License:** MIT  
+**Repository:** https://github.com/wxia529/vscode-acoord
 
-Atomic Coordinate Toolkit (ACoord) is a VS Code extension for 3D visualization and editing of atomic, molecular, and crystal structures. It supports 15 file formats and provides interactive 3D rendering via Three.js inside VS Code's Custom Editor API.
+Atomic Coordinate Toolkit (ACoord) is a VS Code extension for **3D visualization and editing of atomic, molecular, and crystal structures**. It combines the convenience of a code editor with powerful molecular visualization, enabling you to view, edit, and convert structure files without leaving VS Code.
+
+![License](https://img.shields.io/badge/License-MIT-yellow.svg)
+
+---
 
 ## Features
 
-- **3D viewer** (Three.js) with selection, measurement, and basic editing
-- **Trajectory support** (frame navigation + playback speed control) for XYZ, QE logs, XDATCAR, and OUTCAR
-- **Projection toggle** (orthographic/perspective)
-- **Lattice editor** (a/b/c + alpha/beta/gamma) with optional atom scaling
-- **Supercell display** with periodic bonds
-- **Unit-cell display tuning** (color, thickness, solid/dashed line style)
-- **Lighting controls** (ambient/key/fill/rim) with canvas drag picker for light direction
-- **Center atoms to unit cell** (with confirmation)
-- **Manual and auto scaling** for atom size and scene scale
-- **Format conversion** through Save As
-- **HD PNG export** from the current 3D view (custom file name/location)
-- **Display settings configuration** with import/export, presets, and migrations
-- **Atom color schemes** with custom color editing and preset/user scheme management
-- **Clipboard operations** (Ctrl+C/V) for copying and pasting atomic selections across sessions
-- **Extended keyboard shortcuts**: Delete/Backspace (delete), Ctrl+Z (undo), Ctrl+Y (redo), Ctrl+S (save), Ctrl+Shift+S (save as), Ctrl+C (copy), Ctrl+V (paste), A (focus add atom form)
-- **Format preservation** on save for GJF, XYZ, ORCA, QE input/output, and ABACUS STRU files
-- **Right-click context menu** in 3D canvas with atom operations, bond operations, and element selection submenus
-- **Periodic table element picker**: interactive UI for element selection with hover tooltips
-- **Brush panel** for applying color schemes to selected atoms
-- **Interactive rotation tool** for selected atoms with axis selection and angle control
-- **Enhanced axis indicator** showing X/Y/Z orientation with real-time camera view updates
-- **Fixed atoms support**: Mark atoms as fixed (constrained) for geometry optimization; visualized with white 3D cross markers that respect depth occlusion
+### Core Capabilities
 
-## Supported Formats
+- **Interactive 3D Viewer** — Real-time rendering with selection, measurement, and editing
+- **15 File Format Support** — XYZ, CIF, POSCAR, XDATCAR, OUTCAR, PDB, Gaussian, ORCA, Quantum ESPRESSO, ABACUS STRU, CASTEP, SIESTA, and more
+- **Trajectory Visualization** — Frame-by-frame navigation for MD simulations and geometry optimizations
+- **Crystal Structure Tools** — Lattice editing, supercell generation, periodic bond display
+- **Advanced Display Controls** — Lighting, color schemes, projection modes, atom sizing
 
-### Input and Output
+### Editing Features
 
-- **XYZ / extxyz** (trajectory support)
-- **CIF**
-- **POSCAR / VASP / CONTCAR** (Selective dynamics preserved via fixed flags)
-- **XDATCAR trajectory** (.xdatcar / XDATCAR)
-- **OUTCAR trajectory read** (.outcar / OUTCAR)
-- **PDB** (basic CRYST1 + ATOM/HETATM)
-- **Gaussian input** (.gjf)
-- **ORCA input** (.inp)
-- **Quantum ESPRESSO input** (.in / .pwi)
-- **Quantum ESPRESSO output log** (.out / .pwo / .log)
-- **ABACUS STRU** (.stru)
-- **CASTEP cell** (.cell) — LATTICE_CART/ABC, POSITIONS_ABS/FRAC, custom species, ionic constraints
-- **CASTEP output** (.castep) — trajectory extraction from geometry optimization and MD runs
-- **SIESTA fdf** (.fdf) — input structure with species, lattice, coordinates, and calculation parameters
-- **ACoord native** (.acoord) — JSON-based format preserving all atom properties
+- **Atom Manipulation** — Move, add, delete, copy/paste atoms
+- **Bond Management** — Manual bond creation/deletion, automatic bond detection
+- **Lattice Editing** — Modify unit cell parameters with optional atom scaling
+- **Selection Tools** — Single-click, multi-select, box selection
+- **Measurement** — Bond lengths, bond angles, dihedral angles
+- **Fixed Atoms** — Mark atoms as fixed for geometry optimization (syncs with selective dynamics)
 
-### Format Notes
+### Display & Visualization
 
-- **extxyz**: comment line may include `Lattice="..."` and `Properties=species:S:1:pos:R:3`
-- **XYZ trajectory files** (multi-frame XYZ/extxyz) can be opened and exported
-- **QE output logs** with multiple `ATOMIC_POSITIONS` blocks are loaded as trajectories
-- **POSCAR**: improved parsing for VASP 4/5 styles, scaling factors, and selective dynamics flags
-- **XDATCAR trajectories** can be opened and exported
-- **OUTCAR** can be read as trajectory frames from `POSITION ... TOTAL-FORCE` blocks
-- **STRU**: fixed atoms are written as `0 0 0` and free atoms `1 1 1`
-- **CASTEP .cell**: supports LATTICE_CART/ABC, POSITIONS_ABS/FRAC, custom species (e.g., Fe:1), ionic constraints mapping to selectiveDynamics, SPIN/LABEL metadata, SPECIES_MASS, and unit conversion (bohr, nm, pm, etc.)
-- **CASTEP .castep**: output files from CASTEP geometry optimization and MD runs are parsed as trajectories, extracting lattice and atomic positions from BFGS and MD iteration blocks
-- **SIESTA .fdf**: input files with automatic parsing of `%block LatticeVectors`, `%block AtomicCoordinatesAndAtomicSpecies`, `%block ChemicalSpeciesLabel`; preserves all calculation parameters (XC.functional, Mesh.Cutoff, kgrid, etc.) on save; updates NumberOfAtoms, NumberOfSpecies, and block contents when atoms are added/removed
-- **ORCA export** uses the default header:
-  - `! B3LYP D3 def2-SVP`
-  - `%maxcore     8192`
-  - `%pal nprocs   8 end`
-- **GJF export** uses:
-  - `#P`
-  - blank line
-  - `Gaussian input`
-- **Format preservation**: GJF, XYZ, ORCA, QE, and STRU files preserve original content (headers, keywords, pseudopotentials) with only coordinate data updated on save
-- **.acoord native format**: preserves all atom properties including custom colors, radii, labels, fixed flags, and selective dynamics
+- **Dual Projection Modes** — Orthographic and perspective camera
+- **Lighting System** — Ambient, key, fill, and rim lights with interactive picker
+- **Color Schemes** — Built-in presets (Bright, JMol, CPK) and custom schemes
+- **Axis Indicator** — Real-time 3D orientation overlay
+- **HD Image Export** — High-resolution PNG export from any viewpoint
+- **Supercell Display** — Visualize periodic boundaries with proper bond rendering
 
-## Usage
+### Productivity
 
-1. Open a supported structure file in VS Code
-2. Click the preview icon in the editor title bar (or run `ACoord: Open Structure Editor` from Command Palette)
-3. Edit atoms in the 3D view and side panel
-4. Use **Save** or **Save As** from the toolbar to export in various formats
+- **Format Preservation** — Save GJF, XYZ, ORCA, QE, STRU files while preserving headers and keywords
+- **Undo/Redo** — Full undo/redo support for all structural edits
+- **Keyboard Shortcuts** — Extensive keyboard bindings for efficient editing
+- **Right-Click Context Menu** — Quick access to atom and bond operations
+- **Element Picker** — Interactive periodic table for element selection
+- **Clipboard Operations** — Copy/paste atoms within and across sessions
 
-## Basic Operations
+---
 
-### Selection and Navigation
+## Supported File Formats
 
-- **Select atom**: click an atom in the canvas or the atom list
-- **Multi-select**: Ctrl/Cmd+click to add/remove atoms from selection
-- **Box select**: Shift+drag in empty space to select multiple atoms in screen space
-- **Rotate view**: left mouse drag in empty space
-- **Pan view**: middle mouse drag or right mouse drag
-- **Zoom**: mouse wheel
+### Full Support (Read + Write)
 
-### Atom Editing
+| Format | Extensions | Notes |
+|--------|------------|-------|
+| **XYZ / extXYZ** | `.xyz`, `.extxyz` | Trajectory support for multi-frame files |
+| **CIF** | `.cif` | Full crystallographic data |
+| **POSCAR** | `POSCAR`, `CONTCAR`, `.vasp` | Selective dynamics preserved via fixed flags |
+| **PDB** | `.pdb` | Basic CRYST1 + ATOM/HETATM records |
+| **Gaussian Input** | `.gjf` | Preserves route section and metadata |
+| **ORCA Input** | `.inp` | Preserves ! settings and blocks |
+| **Quantum ESPRESSO Input** | `.in`, `.pwi` | Preserves &CONTROL, &SYSTEM, &ELECTRONS sections |
+| **ABACUS STRU** | `.STRU` | Fixed atoms as `0 0 0`, free atoms as `1 1 1` |
+| **ACoord Native** | `.acoord` | JSON format preserving all atom properties |
 
-- **Move atoms**: Shift+drag selected atoms in the canvas
-- **Delete atoms**: press Delete/Backspace or use the Delete button
-- **Add atom**: use the Add Atom panel or press `A` to focus the form
-- **Change element**: use the Selected Atom panel and click Apply
-- **Rotate selection**: pick axis (X/Y/Z) and move the angle slider (0-360°)
-- **Copy atoms**: Ctrl+C to copy selection, Ctrl+V to paste with offset
-- **Fix/unfix atoms**: right-click and select "Fix atom" or "Unfix atom" to constrain atoms during geometry optimization (synced with selective dynamics in VASP POSCAR)
+### Trajectory Support (Read Only)
+
+| Format | Extensions | Notes |
+|--------|------------|-------|
+| **XDATCAR** | `XDATCAR`, `.xdatcar` | VASP MD trajectories |
+| **OUTCAR** | `OUTCAR`, `.outcar` | VASP output with POSITION blocks |
+| **QE Output** | `.out`, `.pwo`, `.log` | Multiple ATOMIC_POSITIONS blocks |
+| **CASTEP Output** | `.castep` | Geometry optimization and MD trajectories |
+
+### Partial Support
+
+| Format | Extensions | Notes |
+|--------|------------|-------|
+| **CASTEP Cell** | `.cell` | LATTICE_CART, POSITIONS_ABS/FRAC, constraints |
+| **SIESTA FDF** | `.fdf` | LatticeVectors, AtomicCoordinates, preserves parameters |
+
+---
+
+## Installation
+
+### From VS Code Marketplace
+
+1. Open VS Code
+2. Go to Extensions (Ctrl+Shift+X)
+3. Search for "ACoord"
+4. Click Install
+
+### From Source
+
+```bash
+git clone https://github.com/wxia529/vscode-acoord.git
+cd vscode-acoord
+npm install
+npm run compile
+# Press F5 to launch Extension Development Host
+```
+
+---
+
+## Quick Start
+
+### Opening a Structure File
+
+1. Open any supported structure file in VS Code (e.g., `structure.cif`, `POSCAR`)
+2. Click the **preview icon** in the editor title bar, or
+3. Run `ACoord: Open Structure Editor` from Command Palette (Ctrl+Shift+P)
+
+### Basic Operations
+
+| Action | Method |
+|--------|--------|
+| **Rotate view** | Left mouse drag in empty space |
+| **Pan view** | Middle mouse drag or right mouse drag |
+| **Zoom** | Mouse wheel |
+| **Select atom** | Click an atom in the canvas |
+| **Multi-select** | Ctrl/Cmd+click to add atoms |
+| **Box select** | Shift+drag in empty space |
+| **Move atoms** | Shift+drag selected atoms |
+| **Delete atoms** | Press Delete/Backspace |
+| **Add atom** | Use Add Atom panel or press `A` |
 
 ### Measurement
 
-- **Bond length**: select 2 atoms to display distance
-- **Bond angle**: select 3 atoms to display angle
-- **Dihedral angle**: select 4 atoms to display dihedral
+Select 2, 3, or 4 atoms to display:
+- **2 atoms** — Bond length (Å)
+- **3 atoms** — Bond angle (degrees)
+- **4 atoms** — Dihedral angle (degrees)
 
-### Distance Adjustment
+### Saving and Export
 
-- **Adjust Distance**: select at least two atoms; the last selected is the reference, and the rest move together along the reference-to-nearest-adsorbate direction to the target distance
+1. Click **Save** (Ctrl+S) to save in current format
+2. Click **Save As** (Ctrl+Shift+S) to choose format
+3. Click **Export Image** to save high-resolution PNG
 
-### Display Settings
+---
 
-- **Scale**: enable Auto scale or adjust Manual scale and Atom size
-- **Lighting**: adjust ambient/key/fill/rim intensity and color, tune surface shininess, or click "Pick in Canvas" under Key/Fill/Rim and drag in viewport to set light direction
-- **Slider values**: double-click the numeric value label, type a number, and press Enter to apply
-- **Color schemes**: apply preset or custom color schemes, create custom schemes, import/export schemes
-- **Display configs**: save custom display configurations, import/export configs, apply presets
-
-### Keyboard Shortcuts
+## Keyboard Shortcuts
 
 | Shortcut | Action |
 |----------|--------|
 | `Delete` / `Backspace` | Delete selected atom(s) |
-| `Ctrl/Cmd+Z` | Undo |
-| `Ctrl/Cmd+Y` | Redo |
-| `Ctrl/Cmd+S` | Save |
-| `Ctrl/Cmd+Shift+S` | Save as |
-| `Ctrl/Cmd+C` | Copy selected atoms |
-| `Ctrl/Cmd+V` | Paste atoms |
-| `A` | Focus add atom form |
+| `Ctrl+Z` | Undo |
+| `Ctrl+Y` | Redo |
+| `Ctrl+S` | Save structure |
+| `Ctrl+Shift+S` | Save as |
+| `Ctrl+C` | Copy selected atoms |
+| `Ctrl+V` | Paste atoms |
+| `A` | Focus Add Atom form |
+
+---
+
+## Display Controls
+
+### Projection Modes
+
+- **Orthographic** — Parallel projection, no perspective distortion (default)
+- **Perspective** — Realistic perspective view
+
+Toggle in the **View** panel or use keyboard shortcuts.
+
+### Lighting
+
+Adjust lighting in the **Lighting** panel:
+- **Ambient** — Base illumination
+- **Key Light** — Primary light source (drag picker in canvas)
+- **Fill Light** — Secondary fill light
+- **Rim Light** — Backlighting for depth
+- **Shininess** — Surface specular highlight
+
+### Color Schemes
+
+Choose from built-in presets or create custom schemes:
+- **Bright** — High-contrast colors (default)
+- **JMol** — JMol-compatible colors
+- **CPK** — Traditional CPK coloring
+
+Apply to selected atoms using the **Apply** button.
+
+---
+
+## Advanced Features
+
+### Trajectory Navigation
+
+For multi-frame files (XDATCAR, trajectory XYZ, etc.):
+
+1. Open the **Trajectory** panel
+2. Use frame navigation buttons or slider
+3. Click **Play** for automatic playback
+4. Adjust playback speed (1-30 fps)
+
+### Supercell Generation
+
+1. Open the **Lattice** panel
+2. Set supercell dimensions (Nx, Ny, Nz)
+3. Click **Apply Supercell**
+4. Periodic bonds are automatically displayed
+
+### Lattice Editing
+
+1. Open the **Lattice** panel
+2. Modify a/b/c parameters or alpha/beta/gamma angles
+3. Optionally check **Scale atoms with lattice**
+4. Click **Apply Lattice**
+
+### Fixed Atoms
+
+Mark atoms as fixed for geometry optimization:
+1. Select atoms
+2. Right-click → **Fix atom** (or **Unfix atom**)
+3. Fixed atoms display with white 3D cross markers
+4. Saved as selective dynamics flags in POSCAR/STRU
+
+---
+
+## Native Format (.acoord)
+
+ACoord includes a native JSON format that preserves all atom properties:
+
+```json
+{
+  "version": "1.0",
+  "atoms": [
+    {
+      "id": "atom_uuid",
+      "element": "C",
+      "x": 0.0,
+      "y": 0.0,
+      "z": 0.0,
+      "color": "#333333",
+      "radius": 0.77,
+      "label": "C1",
+      "fixed": false
+    }
+  ],
+  "unitCell": {
+    "a": 10.0, "b": 10.0, "c": 10.0,
+    "alpha": 90, "beta": 90, "gamma": 90
+  }
+}
+```
+
+**What gets saved:**
+- Atom positions, elements, colors, radii, labels
+- Fixed flags and selective dynamics
+- Unit cell parameters
+- Manual bonds
+
+**What is NOT saved:**
+- Display settings (lighting, background, etc.) — these are per-session preferences
+
+---
+
+## Troubleshooting
+
+### File Not Opening
+
+- Check file extension is supported
+- Verify file is not corrupted
+- Check OUTPUT panel (View → Output → ACoord) for errors
+
+### Rendering Issues
+
+- Try toggling projection mode
+- Reset camera with **Reset** button
+- Check browser console (Help → Toggle Developer Tools → Console)
+
+### Performance Problems
+
+- Large structures (>5000 atoms) may be slow
+- Disable supercell display for large structures
+- Reduce bond detection complexity
+
+---
 
 ## Development
 
-For architecture details, contribution guidelines, and developer documentation, see [DEVELOPMENT.md](DEVELOPMENT.md).
+For architecture details and contribution guidelines, see [DEVELOPMENT.md](DEVELOPMENT.md).
 
-### Quick Start
+### Quick Start for Developers
 
 ```bash
 # Install dependencies
@@ -150,15 +298,23 @@ npm run test:unit
 
 # Run linting
 npm run lint
+
+# Launch Extension Development Host (F5 in VS Code)
 ```
 
-Then press `F5` in VS Code to launch the Extension Development Host.
+---
 
 ## License
 
-MIT. See [LICENSE](LICENSE).
+MIT License — see [LICENSE](LICENSE) for details.
 
-## Repository
+## Acknowledgments
 
-- **Homepage**: https://github.com/wxia529/vscode-acoord
-- **Issues**: https://github.com/wxia529/vscode-acoord/issues
+- **Three.js** — 3D rendering engine
+- **VS Code** — Extension platform
+- **Community** — File format specifications and test files
+
+## Contact
+
+- **Issues:** https://github.com/wxia529/vscode-acoord/issues
+- **Discussions:** https://github.com/wxia529/vscode-acoord/discussions
