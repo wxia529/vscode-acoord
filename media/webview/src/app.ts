@@ -1,6 +1,6 @@
 import { provideVSCodeDesignSystem, vsCodeButton, vsCodeDropdown, vsCodeOption, vsCodeTextField, vsCodeCheckbox, vsCodePanels, vsCodePanelTab, vsCodePanelView } from '@vscode/webview-ui-toolkit';
 import { structureStore, selectionStore, displayStore, adsorptionStore, interactionStore, applyDisplaySettings, type BoxSelectionMode } from './state';
-import { renderer } from './renderer';
+import { renderer, initRenderer } from './renderer';
 import * as colorSchemeHandler from './colorSchemeHandler';
 import * as appTrajectory from './appTrajectory';
 import { setup as setupEdit } from './appEdit';
@@ -462,7 +462,7 @@ function start(): void {
   colorSchemeHandler.init(vscode, setStatus, updateColorSchemeSelector);
   initInteractionConfigVscode(vscode);
   initInteractionConfig();
-  renderer.init(canvas, { setError, setStatus });
+  initRenderer(canvas);
 
   setupUI();
   setupInteraction();

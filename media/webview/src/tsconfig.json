@@ -6,7 +6,9 @@
     "moduleResolution": "bundler",
     "strict": true,
     "noEmit": true,
-    "skipLibCheck": true
+    "skipLibCheck": true,
+    "typeRoots": ["../../../node_modules/@types"]
   },
-  "include": ["./**/*.ts", "../../../src/shared/**/*.ts"]
+  "include": ["./**/*.ts", "../../../src/shared/**/*.ts", "./acoord-3d.d.ts"],
+  "exclude": ["../node_modules"]
 }
